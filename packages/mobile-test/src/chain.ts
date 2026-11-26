@@ -1,18 +1,26 @@
 import { Connection, PublicKey, SystemProgram, type ParsedTransactionWithMeta } from "@solana/web3.js";
-import { DEVNET_GENESIS } from "../../../src/lib/solana/contracts";
-import { pinnedDevnetConnection } from "../../../src/lib/solana/rpc";
 import { RunFailure, type Config } from "./contracts";
 
 export const localRpc = "http://127.0.0.1:8899";
+const DEVNET_RPC = "https://api.devnet.solana.com";
+const DEVNET_GENESIS = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 export type SolExpectation = { payer: string; recipient: string; lamports: string };
 export type TokenExpectation = { payer: string; mint: string; source: string; destination: string; amount: string; decimals: number; owner: string };
 
 export function connection(network: Config["network"]) {
-  if (network.cluster === "devnet") return pinnedDevnetConnection();
-  return new Connection(localRpc, {
+  const devnet = network.cluster === "devnet";
+  const endpoint = devnet ? DEVNET_RPC : localRpc;
+  return new Connection(endpoint, {
+    commitment: devnet ? "confirmed" : undefined,
     disableRetryOnRateLimit: true,
-    fetch: (input, init) => fetch(input, { ...init, redirect: "error", signal: AbortSignal.timeout(5_000) }),
+    fetch: (input, init) => {
+      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+      if (url.origin !== endpoint || url.pathname !== "/" || url.search || url.hash) {
+        throw new RunFailure("RPC_UNAVAILABLE");
+      }
+      return fetch(input, { ...init, redirect: "error", signal: AbortSignal.timeout(devnet ? 12_000 : 5_000) });
+    },
   });
 }
 

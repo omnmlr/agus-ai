@@ -1,0 +1,19 @@
+{
+  "name": "agus-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "npm test --workspaces --if-present",
+    "mobile-test": "npm run cli --workspace @agus/mobile-test"
+  },
+  "overrides": {
+    "jayson": "5.0.0"
+  }
+}

@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Keypair, Transaction } from "@solana/web3.js";
 import { createMint, createTransferCheckedInstruction, getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
-import { base58 } from "../../../src/lib/solana/encoding";
+import bs58 from "bs58";
 import { assertTokenTransfer, connection, finalizedTransaction, startWindow, type TokenExpectation } from "../src/chain";
 import { publicKey } from "../src/contracts";
 
@@ -52,7 +52,7 @@ if (fresh) {
   const transaction = new Transaction({ feePayer: payer.publicKey, recentBlockhash })
     .add(createTransferCheckedInstruction(source.address, mint, destination.address, payer.publicKey, 2_500_000n, 6));
   transaction.sign(payer);
-  const signature = base58(transaction.signature!);
+  const signature = bs58.encode(transaction.signature!);
   prepared = {
     runId: runId ?? null, genesis, startSlot: window.slot, signature,
     expected: {
