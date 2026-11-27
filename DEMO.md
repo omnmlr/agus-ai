@@ -6,6 +6,10 @@ The migrated lab is executable from this repository. Use the [Android lab walkth
 
 On a fresh test device, compare the `wallet-false-success` and `wallet-transfer` scenarios. The first returns a valid wallet signature without a finalized chain effect. The corrected case must independently match the exact payer, recipient, lamports, fee and slot. Verify the Ed25519 report and screenshot digest. The [historical hosted report](docs/mobile-test/evidence/hosted-regression/profiled-run.sealed.json) and [negative control](docs/mobile-test/evidence/hosted-regression/signed-without-broadcast.json) are available when a fresh Android run is unavailable. The archived payout used a local fixture token.
 
+## Recording evidence
+
+Use the provider acceptance recording for actual Android pairing, explicit private acceptance, agent launch, signed evidence and manual marketplace allocation. Use the wallet acceptance recording for MWA, the missing-broadcast control, independently finalized Localnet transfer and test-token payout reconciliation. The provider acceptance offers were explicitly unpaid. [Provider acceptance](https://github.com/omnmlr/agus-ai/actions/runs/45922423658) · [Wallet acceptance](https://github.com/omnmlr/agus-ai/actions/runs/45888580906)
+
 ## Hosted demo acceptance
 
 1. Sign in with a disposable developer account. Register a project and upload a reviewed, hashed fixture build.
