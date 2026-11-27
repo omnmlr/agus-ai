@@ -18,7 +18,7 @@ cp "$work/native/fixture.apk" "$out/agus-fixture-development.apk"
 cp "$work/native/partner.apk" "$out/agus-partner-development.apk"
 cp "$work/native/manifest.public.b64" "$out/development-manifest-public.b64"
 bash packages/mobile-test/lab/build-android.sh "$work/lab" devnet
-cp "$work/lab/agus-mwa-lab.apk" "$out/agus-dedicated-wallet-devnet.apk"
+cp "$work/lab/agus-mwa-devnet.apk" "$out/agus-dedicated-wallet-devnet.apk"
 
 npm --prefix deploy/neon run build -- "$work/neon"
 zip -q -9 -X -j "$out/agus-neon-function.zip" "$work/neon/index.mjs"
