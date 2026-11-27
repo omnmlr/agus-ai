@@ -1,0 +1,62 @@
+{
+  "environment": "disposable Solana Localnet and Postgres; runtime reports used software fixtures",
+  "network": {
+    "mint": "EVNFYL871cyjSyMYwdgUjxURcEjy912GSJG2GZ3rMnHv",
+    "asset": "TEST-SPL",
+    "cluster": "localnet",
+    "genesis": "6dP6XaYtCzHLfbrcgjFymzbJ5FAQdooyUq4cLak4bKsq",
+    "decimals": 6
+  },
+  "funding": {
+    "mint": "EVNFYL871cyjSyMYwdgUjxURcEjy912GSJG2GZ3rMnHv",
+    "slot": 1262,
+    "payer": "DcigYaioC3pJ2KPAF5LdswpH44vua51dDRAChBinqYQ2",
+    "source": "Eu9rhYiA1LKrLU4Hgfs7SS4jyXkearWBpExEhx5EZSgz",
+    "cluster": "localnet",
+    "recipient": "5n2XdSRnCJQV2F64MxffSMLeFoAngxMffcr3fJHzJaYq",
+    "signature": "43AkXPQzSMWJiZwU5Gf2prtjbez378Sbcxq5oxRzqQr42y58C6Q7VtXM1ja4gqLnj8mjiC9Z3ZnQKQxVUue3iKUv",
+    "commitment": "finalized",
+    "amountAtoms": "1700000",
+    "destination": "3hZgV534DoC5hh1o8FSt7LRpdSggFAwjPHEeL5ZEXHSx"
+  },
+  "payouts": [
+    {
+      "basis": "accepted",
+      "mint": "EVNFYL871cyjSyMYwdgUjxURcEjy912GSJG2GZ3rMnHv",
+      "slot": 1294,
+      "payer": "5n2XdSRnCJQV2F64MxffSMLeFoAngxMffcr3fJHzJaYq",
+      "source": "3hZgV534DoC5hh1o8FSt7LRpdSggFAwjPHEeL5ZEXHSx",
+      "cluster": "localnet",
+      "recipient": "23sadTDewsPxRpX7pTY9RTrMkubmrxsdaqDGoyRj8Pz9",
+      "signature": "4nEYTNPghoUJq6PM3JYRFVmxqXeS6pvkMvUTip2LyRTV3Hzwq81oJ5ukJZZS9oBSGxu4hjMi9M5Tc6Rbmk2vsSzN",
+      "commitment": "finalized",
+      "amountAtoms": "700000",
+      "destination": "5i2yZ88DWaNErAqpPAaKCLacpzUEmpuAruqRznheo4ff"
+    },
+    {
+      "basis": "interrupted",
+      "mint": "EVNFYL871cyjSyMYwdgUjxURcEjy912GSJG2GZ3rMnHv",
+      "slot": 1326,
+      "payer": "5n2XdSRnCJQV2F64MxffSMLeFoAngxMffcr3fJHzJaYq",
+      "source": "3hZgV534DoC5hh1o8FSt7LRpdSggFAwjPHEeL5ZEXHSx",
+      "cluster": "localnet",
+      "recipient": "6M8niCExmVC2uYeRVFhkfdp9zRD2Hr9tvBpmVaJhH6kr",
+      "signature": "2Ugv8DJAXX3uMmdscWAFex6wk4pFTNcgqPBGwRveaAQvYzpxFGhs2QVS9nPVdELq2g6pciaeUmLX2KKxy4isDWCL",
+      "commitment": "finalized",
+      "amountAtoms": "200000",
+      "destination": "BEusK534N5vimrPAKQ8tfM9sDG3KQwFXRCp3SRM9za3v"
+    }
+  ],
+  "refund": {
+    "mint": "EVNFYL871cyjSyMYwdgUjxURcEjy912GSJG2GZ3rMnHv",
+    "slot": 1358,
+    "payer": "5n2XdSRnCJQV2F64MxffSMLeFoAngxMffcr3fJHzJaYq",
+    "source": "3hZgV534DoC5hh1o8FSt7LRpdSggFAwjPHEeL5ZEXHSx",
+    "cluster": "localnet",
+    "recipient": "DcigYaioC3pJ2KPAF5LdswpH44vua51dDRAChBinqYQ2",
+    "signature": "21WFUkefMdABFAVHXeWATFmDeJ5NyJj8ABxoDZQsc1nyieCfXJwLgzexRaiwFQjctaagM96kLAjGzGrAM6tATyBd",
+    "commitment": "finalized",
+    "amountAtoms": "800000",
+    "destination": "Eu9rhYiA1LKrLU4Hgfs7SS4jyXkearWBpExEhx5EZSgz"
+  }
+}

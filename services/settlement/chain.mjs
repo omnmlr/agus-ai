@@ -20,7 +20,6 @@ export const DEVNET = Object.freeze({
   decimals: 6,
 });
 
-const MINT = address(DEVNET.mint);
 const MEMO_PROGRAM = address('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
 const MAX_U64 = 2n ** 64n - 1n;
 
@@ -53,8 +52,8 @@ export function assertSignature(signature) {
   }
 }
 
-export async function associatedTokenAccount(wallet) {
-  const [tokenAccount] = await findAssociatedTokenPda({ owner: assertWallet(wallet), tokenProgram: TOKEN_PROGRAM_ADDRESS, mint: MINT });
+export async function associatedTokenAccount(wallet, network = DEVNET) {
+  const [tokenAccount] = await findAssociatedTokenPda({ owner: assertWallet(wallet), tokenProgram: TOKEN_PROGRAM_ADDRESS, mint: address(network.mint) });
   return tokenAccount;
 }
 
@@ -78,12 +77,14 @@ export function sendRpc(request) {
   return request.send({ abortSignal: AbortSignal.timeout(8_000) });
 }
 
-export async function assertDevnet(connection) {
+async function assertCluster(connection, network) {
   const genesis = await sendRpc(connection.getGenesisHash());
-  if (genesis !== DEVNET.genesis) {
-    throw new SettlementError('WRONG_CLUSTER', 'The settlement RPC does not report the Solana Devnet genesis.', 503);
+  if (genesis !== network.genesis) {
+    throw new SettlementError('WRONG_CLUSTER', 'The settlement RPC does not report the pinned Solana genesis.', 503);
   }
 }
+
+export const assertDevnet = connection => assertCluster(connection, DEVNET);
 
 export async function readKeypair(file) {
   try {
@@ -97,14 +98,15 @@ export async function readKeypair(file) {
   }
 }
 
-async function buildTransfer({ payer, recipient, amountAtoms, memo, lifetime, createRecipientAccount = false }) {
-  const [source, destination] = await Promise.all([associatedTokenAccount(payer.address), associatedTokenAccount(recipient)]);
+export async function buildTransfer({ payer, recipient, amountAtoms, memo, lifetime, network = DEVNET, createRecipientAccount = false }) {
+  const mint = address(network.mint);
+  const [source, destination] = await Promise.all([associatedTokenAccount(payer.address, network), associatedTokenAccount(recipient, network)]);
   const instructions = [];
   if (createRecipientAccount) {
-    instructions.push(getCreateAssociatedTokenIdempotentInstruction({ payer, ata: destination, owner: recipient, mint: MINT }));
+    instructions.push(getCreateAssociatedTokenIdempotentInstruction({ payer, ata: destination, owner: recipient, mint }));
   }
   instructions.push(
-    getTransferCheckedInstruction({ source, mint: MINT, destination, authority: payer, amount: assertAmount(amountAtoms), decimals: DEVNET.decimals }),
+    getTransferCheckedInstruction({ source, mint, destination, authority: payer, amount: assertAmount(amountAtoms), decimals: network.decimals }),
     { programAddress: MEMO_PROGRAM, data: Buffer.from(memo, 'utf8') },
   );
   let transaction = createTransactionMessage({ version: 'legacy' });
@@ -138,13 +140,15 @@ function assertProof(condition) {
   }
 }
 
-function tokenBalance(entries, accountIndex, owner) {
+const sameDecimals = (value, expected) => value === expected || value === BigInt(expected);
+
+function tokenBalance(entries, accountIndex, owner, network) {
   const entry = entries?.find((candidate) => candidate.accountIndex === accountIndex);
   if (!entry) return null;
   const amount = entry.uiTokenAmount;
-  assertProof(entry.owner === owner && entry.mint === DEVNET.mint &&
+  assertProof(entry.owner === owner && entry.mint === network.mint &&
     (!entry.programId || entry.programId === TOKEN_PROGRAM_ADDRESS) &&
-    amount?.decimals === DEVNET.decimals && /^\d{1,20}$/.test(amount.amount) && BigInt(amount.amount) <= MAX_U64);
+    sameDecimals(amount?.decimals, network.decimals) && /^\d{1,20}$/.test(amount.amount) && BigInt(amount.amount) <= MAX_U64);
   return BigInt(amount.amount);
 }
 
@@ -157,7 +161,7 @@ function memoText(instruction) {
 }
 
 // Adapts the upstream mobile-test chain verifier to quote-bound checked-transfer and memo pairs.
-export async function assertFinalizedTransfer(transaction, signature, expected) {
+export async function assertFinalizedTransfer(transaction, signature, expected, network = DEVNET) {
   const { meta, transaction: body, slot, blockTime } = transaction;
   const slotNumber = Number(slot);
   const message = body?.message;
@@ -169,22 +173,22 @@ export async function assertFinalizedTransfer(transaction, signature, expected) 
     assertProof(blockTime != null && Number.isSafeInteger(seconds) && seconds >= expected.timeWindow.from && seconds <= expected.timeWindow.until);
   }
 
-  const [source, destination] = await Promise.all([associatedTokenAccount(expected.payer), associatedTokenAccount(expected.recipient)]);
+  const [source, destination] = await Promise.all([associatedTokenAccount(expected.payer, network), associatedTokenAccount(expected.recipient, network)]);
   const instructions = message.instructions;
   assertProof(Array.isArray(instructions) && instructions.length === (expected.createRecipientAccount ? 3 : 2));
 
   const [transfer, memo] = instructions.slice(-2);
   const { type, info } = transfer.parsed ?? {};
   assertProof(transfer.programId === TOKEN_PROGRAM_ADDRESS && type === 'transferChecked' && info &&
-    info.authority === expected.payer && info.mint === DEVNET.mint && info.source === source &&
+    info.authority === expected.payer && info.mint === network.mint && info.source === source &&
     info.destination === destination && source !== destination && info.tokenAmount?.amount === expected.amountAtoms &&
-    info.tokenAmount.decimals === DEVNET.decimals && memo.programId === MEMO_PROGRAM && memoText(memo) === expected.memo);
+    sameDecimals(info.tokenAmount.decimals, network.decimals) && memo.programId === MEMO_PROGRAM && memoText(memo) === expected.memo);
 
   if (expected.createRecipientAccount) {
     const [createAccount] = instructions;
     const parsed = createAccount.parsed;
     assertProof(createAccount.programId === ASSOCIATED_TOKEN_PROGRAM_ADDRESS && parsed?.type === 'createIdempotent' &&
-      parsed.info?.account === destination && parsed.info.wallet === expected.recipient && parsed.info.mint === DEVNET.mint &&
+      parsed.info?.account === destination && parsed.info.wallet === expected.recipient && parsed.info.mint === network.mint &&
       parsed.info.source === expected.payer && parsed.info.tokenProgram === TOKEN_PROGRAM_ADDRESS);
   }
 
@@ -192,10 +196,10 @@ export async function assertFinalizedTransfer(transaction, signature, expected) 
   const sourceIndex = accountIndex(source);
   const destinationIndex = accountIndex(destination);
   assertProof(sourceIndex >= 0 && destinationIndex >= 0);
-  const sourceBefore = tokenBalance(meta.preTokenBalances, sourceIndex, expected.payer);
-  const sourceAfter = tokenBalance(meta.postTokenBalances, sourceIndex, expected.payer);
-  const destinationBefore = tokenBalance(meta.preTokenBalances, destinationIndex, expected.recipient);
-  const destinationAfter = tokenBalance(meta.postTokenBalances, destinationIndex, expected.recipient);
+  const sourceBefore = tokenBalance(meta.preTokenBalances, sourceIndex, expected.payer, network);
+  const sourceAfter = tokenBalance(meta.postTokenBalances, sourceIndex, expected.payer, network);
+  const destinationBefore = tokenBalance(meta.preTokenBalances, destinationIndex, expected.recipient, network);
+  const destinationAfter = tokenBalance(meta.postTokenBalances, destinationIndex, expected.recipient, network);
   const atoms = BigInt(expected.amountAtoms);
   const created = expected.createRecipientAccount && BigInt(meta.preBalances[destinationIndex]) === 0n;
   assertProof(sourceBefore !== null && sourceAfter !== null && destinationAfter !== null &&
@@ -203,43 +207,47 @@ export async function assertFinalizedTransfer(transaction, signature, expected) 
     destinationAfter - (destinationBefore ?? 0n) === atoms);
 
   return {
-    signature, slot: slotNumber, commitment: 'finalized', cluster: DEVNET.cluster, mint: DEVNET.mint,
+    signature, slot: slotNumber, commitment: 'finalized', cluster: network.cluster, mint: network.mint,
     amountAtoms: expected.amountAtoms, source, destination, payer: expected.payer, recipient: expected.recipient,
   };
 }
 
-export async function validateDevnetMint(connection) {
-  await assertDevnet(connection);
-  const { context, value } = await sendRpc(connection.getAccountInfo(MINT, { encoding: 'base64', commitment: 'finalized' }));
+async function validateMint(connection, network) {
+  await assertCluster(connection, network);
+  const { context, value } = await sendRpc(connection.getAccountInfo(address(network.mint), { encoding: 'base64', commitment: 'finalized' }));
   if (!value || value.owner !== TOKEN_PROGRAM_ADDRESS) {
-    throw new SettlementError('WRONG_MINT', 'The Devnet test USDC mint could not be validated.', 503);
+    throw new SettlementError('WRONG_MINT', 'The configured test token mint could not be validated.', 503);
   }
   const mint = getMintDecoder().decode(Buffer.from(value.data[0], 'base64'));
-  if (!mint.isInitialized || mint.decimals !== DEVNET.decimals) {
-    throw new SettlementError('WRONG_MINT', 'The Devnet test USDC mint could not be validated.', 503);
+  if (!mint.isInitialized || mint.decimals !== network.decimals) {
+    throw new SettlementError('WRONG_MINT', 'The configured test token mint could not be validated.', 503);
   }
   return { slot: Number(context.slot), decimals: mint.decimals, initialized: mint.isInitialized, program: value.owner };
 }
+
+export const validateDevnetMint = connection => validateMint(connection, DEVNET);
 
 export async function signTransfer(transaction) {
   const signed = await signTransactionMessageWithSigners(transaction);
   return { signature: getSignatureFromTransaction(signed), signedTransaction: getBase64EncodedWireTransaction(signed) };
 }
 
-export function createDevnetChain({ connection, payer }) {
+export const createDevnetChain = ({ connection, payer }) => createSettlementChain({ connection, payer, network: DEVNET });
+
+export function createSettlementChain({ connection, payer, network }) {
   return {
     async quoteWindow() {
-      await validateDevnetMint(connection);
-      const depositAddress = await associatedTokenAccount(payer.address);
+      await validateMint(connection, network);
+      const depositAddress = await associatedTokenAccount(payer.address, network);
       const { context, value: deposit } = await sendRpc(connection.getAccountInfo(depositAddress, { encoding: 'base64', commitment: 'finalized' }));
       const account = deposit?.owner === TOKEN_PROGRAM_ADDRESS && getTokenDecoder().decode(Buffer.from(deposit.data[0], 'base64'));
-      if (!account || account.state !== AccountState.Initialized || account.owner !== payer.address || account.mint !== MINT) {
-        throw new SettlementError('DEPOSIT_UNAVAILABLE', 'The disposable Devnet deposit account has not been initialized.', 503);
+      if (!account || account.state !== AccountState.Initialized || account.owner !== payer.address || account.mint !== network.mint) {
+        throw new SettlementError('DEPOSIT_UNAVAILABLE', 'The disposable deposit account has not been initialized.', 503);
       }
       return Number(context.slot);
     },
     async observe(signature, lastValidBlockHeight) {
-      await assertDevnet(connection);
+      await assertCluster(connection, network);
       const { value: [status] } = await sendRpc(connection.getSignatureStatuses([signature], { searchTransactionHistory: true }));
       if (status?.confirmationStatus === 'finalized') {
         if (status.err) return { state: 'failed', slot: status.slot };
@@ -257,13 +265,17 @@ export function createDevnetChain({ connection, payer }) {
       return { state: 'pending' };
     },
     async prepare(quote) {
-      await assertDevnet(connection);
+      return this.prepareTransfer({ recipient: quote.providerWallet, amountAtoms: quote.amountAtoms, memo: settlementMemo(quote.reference) });
+    },
+    async prepareTransfer({ recipient, amountAtoms, memo }) {
+      await assertCluster(connection, network);
       const { value: lifetime } = await sendRpc(connection.getLatestBlockhash({ commitment: 'finalized' }));
       const transfer = await buildTransfer({
         payer,
-        recipient: assertWallet(quote.providerWallet),
-        amountAtoms: quote.amountAtoms,
-        memo: settlementMemo(quote.reference),
+        recipient: assertWallet(recipient),
+        amountAtoms,
+        memo,
+        network,
         lifetime,
         createRecipientAccount: true,
       });
@@ -273,7 +285,7 @@ export function createDevnetChain({ connection, payer }) {
       };
     },
     async broadcast(prepared) {
-      await assertDevnet(connection);
+      await assertCluster(connection, network);
       const signature = await sendRpc(connection.sendTransaction(prepared.signedTransaction, {
         encoding: 'base64', skipPreflight: false, preflightCommitment: 'finalized', maxRetries: 0n,
       }));

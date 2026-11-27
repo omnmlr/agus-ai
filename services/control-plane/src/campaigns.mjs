@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { paymentTerms, pinnedPayout, publicObligation, recordObligation, sumCampaignFunds } from './campaign-compensation.mjs';
 import { evidenceExpiresAt, purgeExpiredCampaignEvidence } from './campaign-retention.mjs';
 import { createRun, getOwned, notice, publicRun, requestStop, terminal } from './domain.mjs';
 import { refreshLifecycles } from './person-routes.mjs';
@@ -24,7 +25,7 @@ function text(value, field, maximum) {
 
 function normalizeTask(state, user, input, projectId, config) {
   exact(input, ['title', 'kind', 'runtimeClass', 'buildId', 'count', 'instructions', 'maximumDurationSeconds',
-    'minimumApi', 'abi', 'maximumNetworkLatencyMs', 'skill', 'actions', 'referenceRunId', 'scenario', 'expectedTransaction', 'testUnits', 'stopTestUnits', 'trainingEligible'], 'task');
+    'minimumApi', 'abi', 'maximumNetworkLatencyMs', 'skill', 'actions', 'referenceRunId', 'scenario', 'expectedTransaction', 'testUnits', 'stopTestUnits', 'trainingEligible', 'compensation'], 'task');
   requireCondition(classes.includes(input.runtimeClass) && taskKinds.includes(input.kind), 'Unsupported assignment class');
   const human = input.runtimeClass === 'phone_human';
   const dedicated = input.runtimeClass === 'dedicated_runner';
@@ -50,6 +51,8 @@ function normalizeTask(state, user, input, projectId, config) {
   const minimumApi = integer(input.minimumApi ?? (dedicated ? 0 : 35), dedicated ? 0 : 35, dedicated ? 0 : 100, 'minimum API');
   const testUnits = integer(input.testUnits ?? 0, 0, dedicated ? 0 : 1_000_000, 'test compensation');
   const stopTestUnits = integer(input.stopTestUnits ?? 0, 0, testUnits, 'stop compensation');
+  const compensation = paymentTerms(input.compensation, config, dedicated);
+  requireCondition(!compensation || testUnits === 0, 'Use one compensation asset per task');
   requireCondition(input.trainingEligible === undefined || typeof input.trainingEligible === 'boolean', 'Invalid training eligibility');
   requireCondition(!(input.trainingEligible && dedicated), 'Dedicated trajectory rights use the legacy run contract');
   const scenario = input.scenario ?? 'app-launch';
@@ -71,7 +74,8 @@ function normalizeTask(state, user, input, projectId, config) {
     count: integer(input.count, 1, 12, 'coverage count'), instructions: text(input.instructions, 'instructions', 2_000),
     maximumDurationSeconds: integer(input.maximumDurationSeconds ?? 120, 30, Math.min(900, config.leaseMs / 1000), 'duration'),
     minimumApi, abi, maximumNetworkLatencyMs, skill, actions, scenario, ...(transfer ? { expectedTransaction: transfer } : {}),
-    testUnits, stopTestUnits, ...(referenceRunId && { referenceRunId }), trainingEligible: input.trainingEligible === true, rubric: 'structured-outcome-v1',
+    testUnits, stopTestUnits, ...(compensation && { compensation }), ...(referenceRunId && { referenceRunId }),
+    trainingEligible: input.trainingEligible === true, rubric: 'structured-outcome-v1',
   };
 }
 
@@ -79,6 +83,7 @@ function revision(state, user, input, config, now) {
   exact(input, ['projectId', 'title', 'objective', 'tasks', 'deadlineAt', 'budgetTestUnits', 'retentionDays', 'visibility', 'contributorIds'], 'campaign');
   const project = getOwned(state.projects, input.projectId, user, 'Project');
   const tasks = array(input.tasks, 'task list', 12).map(task => normalizeTask(state, user, task, project.id, config));
+  const fundingAmountAtoms = sumCampaignFunds(tasks);
   const slots = tasks.reduce((count, task) => count + task.count, 0);
   requireCondition(slots > 0 && slots <= 24, 'Choose between one and 24 coverage slots');
   const budget = integer(input.budgetTestUnits ?? 0, 0, 24_000_000, 'campaign budget');
@@ -95,7 +100,8 @@ function revision(state, user, input, config, now) {
     visibility, contributorIds,
     projectId: project.id, title: text(input.title, 'campaign title', 100), objective: text(input.objective, 'objective', 1_000),
     deadlineAt: integer(input.deadlineAt, now + minutes, now + 30 * 86_400_000, 'deadline'),
-    tasks, budgetTestUnits: budget, retentionDays: integer(input.retentionDays ?? 7, 1, 30, 'retention period'),
+    tasks, budgetTestUnits: budget, ...(fundingAmountAtoms !== '0' && { fundingAmountAtoms }),
+    retentionDays: integer(input.retentionDays ?? 7, 1, 30, 'retention period'),
   };
   return { ...value, sha256: digest(stableJson(value)) };
 }
@@ -111,7 +117,8 @@ export const assignmentTask = (state, assignment) =>
   state.campaigns[assignment.campaignId].revisions[assignment.campaignRevision - 1].tasks[assignment.taskIndex];
 
 export function campaignView(campaign) {
-  const { ownerId, ...visible } = campaign;
+  const { ownerId, escrow, ...visible } = campaign;
+  if (escrow) visible.fundingState = escrow.refund?.state ?? (escrow.funding ? 'funded' : 'awaiting_funding');
   return visible;
 }
 
@@ -127,7 +134,7 @@ export function saveCampaign(state, user, input, config, now, id = null) {
   }
   const campaign = ownCampaign(state, user, id);
   exact(input, ['expectedRevision', 'draft'], 'campaign revision');
-  conflict(campaign.state === 'draft' && input.expectedRevision === campaign.revision && campaign.revision < 20,
+  conflict(campaign.state === 'draft' && !campaign.escrow && input.expectedRevision === campaign.revision && campaign.revision < 20,
     'Draft revision changed or publication is final', 'revision_conflict');
   const next = revision(state, user, input.draft, config, now);
   requireCondition(next.projectId === current(campaign).projectId, 'Campaign project is immutable');
@@ -183,6 +190,10 @@ export function changeCampaign(state, user, id, action, input, config, now) {
   if (action === 'launch') {
     if (campaign.state === 'active') return { campaign: campaignView(campaign) };
     conflict(campaign.state === 'draft' && draft.deadlineAt > now, 'Campaign is unavailable');
+    if (draft.fundingAmountAtoms) conflict(campaign.escrow?.funding && campaign.escrow.quote.revisionSha256 === draft.sha256
+      && config.campaignChain?.network.genesis === campaign.escrow.quote.network.genesis
+      && config.campaignChain.depositWallet === campaign.escrow.quote.deposit,
+    'Finalize funding for this exact revision before publication', 'funding_required');
     for (const [taskIndex, task] of draft.tasks.entries()) {
       const dedicated = task.runtimeClass === 'dedicated_runner';
       if (!dedicated) {
@@ -193,7 +204,9 @@ export function changeCampaign(state, user, id, action, input, config, now) {
         const id = randomUUID();
         const terms = { campaignId: campaign.id, revision: campaign.revision, taskIndex, slot,
           buildSha256: task.buildSha256, deadlineAt: draft.deadlineAt, maximumDurationSeconds: task.maximumDurationSeconds,
-          testUnits: task.testUnits, stopTestUnits: task.stopTestUnits, evidence: 'structured_only', purpose: 'testing', trainingEligible: task.trainingEligible };
+          testUnits: task.testUnits, stopTestUnits: task.stopTestUnits,
+          ...(task.compensation && { compensation: { ...task.compensation, network: campaign.escrow.quote.network } }),
+          evidence: 'structured_only', purpose: 'testing', trainingEligible: task.trainingEligible };
         const assignment = {
           id, campaignId: campaign.id, campaignRevision: campaign.revision, ownerId: user.id, taskIndex, slot,
           state: dedicated ? 'dedicated' : 'open', deadlineAt: draft.deadlineAt, attempt: null, priorAttempts: [],
@@ -228,7 +241,8 @@ export function changeCampaign(state, user, id, action, input, config, now) {
     if (action === 'cancel') {
       conflict(!['completed', 'cancelled'].includes(campaign.state), 'Campaign is already closed');
       for (const entry of entries) {
-        if (!immutableStates.includes(entry.state) && entry.state !== 'submitted') {
+        const submittedWork = entry.state === 'submitted' || (entry.terms.compensation && entry.state === 'needs_revision');
+        if (!immutableStates.includes(entry.state) && !submittedWork) {
           stopAssignment(state, entry, 'campaign_cancelled', now);
         }
       }
@@ -287,12 +301,9 @@ function assignmentView(state, assignment, user, now) {
         evaluation: lease.report.evaluation, provenance: lease.report.provenance } : null,
     } }),
     ...(assignment.runId && owned && { run: publicRun(state.runs[assignment.runId]) }),
-    ...(attempt && state.compensation[assignment.id] && { compensation: compensationView(state.compensation[assignment.id]) }),
+    ...(attempt && state.compensation[assignment.id] && { compensation: publicObligation(state.compensation[assignment.id]) }),
+    ...(attempt && assignment.dispute && { dispute: assignment.dispute }),
   };
-}
-
-function compensationView({ id, assignmentId, state, testUnits, acceptedAt }) {
-  return { id, assignmentId, state, testUnits, acceptedAt };
 }
 
 export function listAssignments(state, user, now) {
@@ -320,8 +331,10 @@ export function contributorTransition(state, user, id, action, input, now) {
       entry.taskIndex === assignment.taskIndex && entry.id !== assignment.id && entry.attempt?.contributorId === user.id
       && !['cancelled', 'expired', 'interrupted'].includes(entry.state)), 'This cohort requires distinct contributors');
     assignment.installationId = input.installationId;
+    const payoutWallet = assignment.terms.compensation ? pinnedPayout(state.users[user.id], state.campaigns[assignment.campaignId]) : null;
     assignment.attempt = { id: randomUUID(), contributorId: user.id, startedAt: now,
-      submissions: [], review: null, consent: { testing: now, contributor: null, developer: null } };
+      ...(payoutWallet && { payoutWallet }), submissions: [], review: null,
+      consent: { testing: now, contributor: null, developer: null } };
     assignment.state = 'reserved';
     assignment.reservationExpiresAt = Math.min(assignment.deadlineAt, now + 2 * minutes);
   } else if (action === 'decline') {
@@ -390,11 +403,13 @@ export function reviewSubmission(state, user, id, input, now) {
   requireCondition(['accept', 'revise', 'reject', 'partial'].includes(input.decision), 'Unknown review action');
   const attempt = assignment.attempt;
   const latest = attempt?.submissions.at(-1);
+  conflict(assignment.dispute?.state !== 'open', 'An independent reviewer is resolving this assignment');
   conflict(evidenceExpiresAt(state, assignment) > now, 'Review retention has expired', 'grant_expired');
   if (input.decision === 'partial') {
     const lease = own(state.nativeLeases, attempt?.leaseId);
     conflict(assignment.state === 'interrupted' && attempt?.id === input.attemptId && attempt?.contributorId !== user.id
-      && input.version === 0 && lease?.cleanup && assignment.terms.stopTestUnits > 0,
+      && input.version === 0 && lease?.cleanup
+      && (assignment.terms.stopTestUnits > 0 || BigInt(assignment.terms.compensation?.partialAtoms ?? 0) > 0n),
     'Partial credit requires disclosed terms and a cleaned interrupted attempt');
     attempt.review = { at: now, decision: 'partial', reason: text(input.reason, 'review reason', 400) };
     recordObligation(state, assignment, attempt, assignment.terms.stopTestUnits, 'interrupted', now);
@@ -414,13 +429,6 @@ export function reviewSubmission(state, user, id, input, now) {
   }
   notice(state, attempt.contributorId, 'assignment.reviewed', { assignmentId: id, decision: input.decision }, now);
   return { assignment: assignmentView(state, assignment, user, now) };
-}
-
-function recordObligation(state, assignment, attempt, testUnits, basis, now) {
-  conflict(!state.compensation[assignment.id], 'Work was already accepted');
-  state.compensation[assignment.id] = { id: randomUUID(), assignmentId: assignment.id, contributorId: attempt.contributorId,
-    testUnits, basis, termsDigest: assignment.termsDigest, acceptedAt: now, state: testUnits
-      ? 'test_obligation_recorded' : 'unpaid_accepted' };
 }
 
 export function campaignReport(state, user, id, now) {

@@ -1,4 +1,5 @@
 import { campaignRoute, isCampaignRoute } from './campaign-routes.mjs';
+import { escrowRoute, isEscrowRoute } from './campaign-escrow.mjs';
 import { qualified } from './qualifications.mjs';
 import { authSession } from './domain.mjs';
 import { digest, readJson, requireCondition } from './security.mjs';
@@ -64,7 +65,7 @@ export async function handlePilotRoutes({ services, route, request, response, se
   missing(route.length <= 4, 'Route');
   const input = ['POST', 'PUT', 'PATCH'].includes(method) ? await readJson(request, 65_536) : null;
   if (input) boundJson(input);
-  const result = await store.transaction(state => {
+  const result = isEscrowRoute(route) ? await escrowRoute({ services, route, method, input }) : await store.transaction(state => {
     const now = config.now();
     if (runtime) return transport(state, config.pilot, credential, route, method, input, now);
     const user = authSession(state, credential, now);

@@ -1,4 +1,5 @@
 import { createCampaignExport, readCampaignExport, trainingConsent } from './campaign-training.mjs';
+import { campaignEarnings } from './campaign-escrow.mjs';
 import { idempotencyRecord } from './idempotency.mjs';
 import { missing } from './pilot-policy.mjs';
 import {
@@ -66,10 +67,7 @@ export function campaignRoute(state, user, route, method, input, config, now, re
     if (operation && suffix && method === 'POST') return contributorTransition(state, user, operation, suffix, input, now);
   }
   if (resource === 'me' && id === 'campaign-earnings' && !operation && method === 'GET') {
-    const obligations = Object.values(state.compensation).filter(entry => entry.contributorId === user.id);
-    return { earnings: { asset: 'TEST_UNITS', transferable: false,
-      testUnits: obligations.reduce((sum, entry) => sum + entry.testUnits, 0),
-      records: obligations.map(({ id, assignmentId, testUnits, acceptedAt, state }) => ({ id, assignmentId, testUnits, acceptedAt, state })) } };
+    return campaignEarnings(state, user);
   }
   missing(false, 'Route');
 }

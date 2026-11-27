@@ -64,6 +64,10 @@ export async function createControlPlane({ env = process.env, overrides = {} } =
       const { createSettlementFromEnv } = await import('../../settlement/index.mjs');
       settlement = await createSettlementFromEnv({ pool: store.pool, env });
     }
+    if (env.AGUS_CAMPAIGN_SETTLEMENT_CLUSTER) {
+      const { campaignChainFromEnv } = await import('../../settlement/campaign-chain.mjs');
+      config.campaignChain = await campaignChainFromEnv(env, { persistent: Boolean(store.pool), pilot: config.pilot });
+    }
   } catch (error) {
     await store.close();
     throw error;
