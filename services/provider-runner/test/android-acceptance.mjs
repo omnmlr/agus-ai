@@ -151,8 +151,14 @@ try {
   await waitForRunning(privateRun.id);
   let finished = false;
   let photographed = false;
+  let previousPhase;
   for (let step = 0; step < 25 && !finished; step++) {
     const described = await agentAction(privateRun.id, "describe");
+    const phase = described.observation?.phase ?? described.observation?.code ?? described.state;
+    if (phase !== previousPhase) {
+      console.log("Approved agent phase: " + phase);
+      previousPhase = phase;
+    }
     if (described.state === "failed") {
       await delay(600);
       continue;

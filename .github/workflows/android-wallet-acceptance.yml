@@ -2,6 +2,15 @@ name: Android wallet acceptance
 
 on:
   workflow_dispatch:
+    inputs:
+      provider_only:
+        description: Skip the previously verified local scenario suite
+        type: boolean
+        default: false
+      agent_wallet:
+        description: Exercise the experimental agent-driven Localnet wallet transfer
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -70,6 +79,9 @@ jobs:
           tar -xjf "$AGUS_LAB/agave.tar.bz2" -C "$AGUS_LAB"
       - name: Execute Android wallet regression and reconcile payout
         shell: bash
+        env:
+          PROVIDER_ONLY: ${{ inputs.provider_only }}
+          AGENT_WALLET: ${{ inputs.agent_wallet }}
         run: |
           set -euxo pipefail
           export AGUS_TEST_CONFIG="$AGUS_LAB/runner.json" AGUS_TEST_EVIDENCE="$AGUS_LAB/evidence"
@@ -98,6 +110,17 @@ jobs:
           adb -s emulator-5554 shell input keyevent 82
           adb -s emulator-5554 reverse tcp:8898 tcp:8898
           adb -s emulator-5554 reverse tcp:8899 tcp:8899
+          provider_acceptance() {
+            local wallet_arg=-
+            if [[ "$AGENT_WALLET" == true ]]; then wallet_arg="$AGUS_LAB/wallet.apk"; fi
+            AGUS_ANDROID_ACCEPTANCE_TRANSFER=1 AGUS_AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt" \
+              node --import tsx services/provider-runner/test/android-acceptance.mjs emulator-5554 \
+              "$AGUS_LAB/agus-mwa-lab.apk" "$wallet_arg" "$AGUS_LAB/provider-acceptance"
+          }
+          if [[ "$PROVIDER_ONLY" == true ]]; then
+            provider_acceptance
+            exit 0
+          fi
           node --import tsx packages/mobile-test/lab/configure.ts "$AGUS_TEST_CONFIG" emulator-5554 \
             "$AGUS_LAB/agus-mwa-lab.apk" "$AGUS_LAB/wallet.apk"
           runner() { node --import tsx packages/mobile-test/src/cli.ts "$@"; }
@@ -124,9 +147,7 @@ jobs:
           node --import tsx packages/mobile-test/lab/settlement.ts "$AGUS_LAB/job" "$run_id"
           adb -s emulator-5554 uninstall app.agus.testfixture
           adb -s emulator-5554 uninstall com.solana.mobilewalletadapter.fakewallet
-          AGUS_ANDROID_ACCEPTANCE_TRANSFER=1 AGUS_AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt" \
-            node --import tsx services/provider-runner/test/android-acceptance.mjs emulator-5554 \
-            "$AGUS_LAB/agus-mwa-lab.apk" "$AGUS_LAB/wallet.apk" "$AGUS_LAB/provider-acceptance"
+          provider_acceptance
       - name: Upload disposable fixture evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
