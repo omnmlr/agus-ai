@@ -32,7 +32,7 @@ const inviteBase = {
 };
 const userSummary = obj({ id, email: string, displayName: string }, ['id', 'email']);
 const profile = {
-  kind: string, provenance: values('runner_observed', 'simulated_environment'),
+  kind: string, walletNetwork: nullable(values('devnet', 'localnet')), provenance: values('runner_observed', 'simulated_environment'),
   hardwareAttested: { const: false }, seekerVerified: { const: false },
   measuredAt: nullable(date), source: nullable(string), manufacturer: nullable(string),
   model: nullable(string), androidVersion: nullable(string), apiLevel: nullable(integer),

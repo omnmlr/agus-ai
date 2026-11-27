@@ -117,11 +117,12 @@ async function navigate() {
 function updateWorkloadFields(form, changed) {
   if (!form) return;
   if (!changed || changed === 'projectId') form.elements.buildId.innerHTML = buildOptions(state.data.builds, form.elements.projectId.value);
-  if (!changed || changed === 'scenario') {
+  if (!changed || changed === 'scenario' || changed === 'network') {
     if (form.id === 'run-form') {
       const { deviceId } = form.elements;
       const selectedDevice = deviceId.value;
-      deviceId.innerHTML = deviceOptions(state.data.devices, form.elements.scenario.value);
+      const scenario = form.elements.scenario.value;
+      deviceId.innerHTML = deviceOptions(state.data.devices, scenario, scenario === 'wallet-transfer' ? form.elements.network.value : undefined);
       if (Array.from(deviceId.options).some((option) => option.value === selectedDevice)) deviceId.value = selectedDevice;
     }
     const expected = form.querySelector('[data-transaction-fields]');

@@ -2995,6 +2995,7 @@ export interface components {
             source?: string | null;
             thermalStatus?: string | null;
             throughputMbps?: number | null;
+            walletNetwork?: ("devnet" | "localnet") | null;
             wifiConnected?: boolean | null;
         };
         Diagnostic: {

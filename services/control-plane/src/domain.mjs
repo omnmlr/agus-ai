@@ -112,6 +112,10 @@ const profileStrings = new Set([
 ]);
 const profileKinds = new Set(['emulator', 'physical', 'android-device', 'adb-emulator', 'android-handset', 'unknown']);
 
+export function walletNetworkMatches(device, expectation) {
+  return !expectation || (device.profile?.walletNetwork ?? 'localnet') === expectation.network;
+}
+
 export function safeProfile(input) {
   const source = object(input, 'device profile');
   const profile = {};
@@ -126,6 +130,7 @@ export function safeProfile(input) {
   for (const key of ['charging', 'wifiConnected']) {
     profile[key] = typeof source[key] === 'boolean' ? source[key] : null;
   }
+  profile.walletNetwork = ['devnet', 'localnet'].includes(source.walletNetwork) ? source.walletNetwork : null;
   const kind = profileKinds.has(source.kind) ? source.kind : 'unknown';
   const provenance = kind === 'emulator' || kind === 'adb-emulator' ? 'simulated_environment' : 'runner_observed';
   return { ...profile, kind, provenance, hardwareAttested: false, seekerVerified: false };
@@ -280,12 +285,14 @@ export function createRun(state, user, input, config, now, privateGrant = null) 
   const build = getOwned(state.builds, input.buildId, user, 'Build');
   requireCondition(build.projectId === project.id, 'Build does not belong to this project');
   requireCondition(build.packageName, 'Registered build must include its Android package name');
+  const expected = expectedTransaction(input.expectedTransaction, input.scenario, config);
   let device;
   if (input.deviceId !== undefined && input.deviceId !== null) {
     device = state.devices[input.deviceId];
     requireCondition(device && !device.revokedAt && (privateGrant || visibleTo(device, user, config)),
       'Device not found', 'not_found', 404);
-    requireCondition(device.scenarios.includes(input.scenario), 'Device does not support this scenario');
+    requireCondition(device.scenarios.includes(input.scenario) && walletNetworkMatches(device, expected),
+      'Device does not support this scenario and wallet network', 'device_unavailable', 409);
   }
   requireCondition(input.allocation === undefined || input.allocation === 'marketplace', 'Unsupported allocation');
   const allocation = privateGrant ? 'private'
@@ -298,7 +305,7 @@ export function createRun(state, user, input, config, now, privateGrant = null) 
     maximumDurationSeconds: durationLimit(input.maximumDurationSeconds, config),
     ...(allocation !== 'legacy' ? { evidence: evidenceConsent(input.evidence), consentVersion: 'workload-v1' } : {}),
     ...(privateGrant ? { invitationId: privateGrant.id, authorizedProviderId: device.providerId } : {}),
-    expectedTransaction: expectedTransaction(input.expectedTransaction, input.scenario, config),
+    expectedTransaction: expected,
     state: 'queued', executionState: 'queued', leaseState: 'unallocated', leaseId: null,
     createdAt: timestamp(now), updatedAt: timestamp(now),
   };

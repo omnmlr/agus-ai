@@ -65,7 +65,7 @@ async function enroll(api, config, endpoint, credential, profile, signal) {
 function advertise(config, profile, ready) {
   return {
     id: config.device.id,
-    profile,
+    profile: { ...profile, walletNetwork: config.devnet ? "devnet" : config.localnet ? "localnet" : null },
     scenarios: config.supportedScenarios,
     dedicated: true,
     online: true,

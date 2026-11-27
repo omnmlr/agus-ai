@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   createRun, durationLimit, emit, evidenceConsent, getOwned, marketplaceEligible, notice,
   ownedDevice, publicRun, requestStop, statusDevice, terminal, timestamp, uuid, validPackage,
+  walletNetworkMatches,
 } from './domain.mjs';
 import { digest, hex256, object, requireCondition, stableJson, string, token } from './security.mjs';
 import { MODES, SCENARIOS, expectedTransaction } from './verification.mjs';
@@ -318,7 +319,7 @@ export function expireMarketplace(state, now) {
 
 function matchingMarketJob(state, run, device, now) {
   return run.allocation === 'marketplace' && run.state === 'queued' && run.ownerId !== device.ownerId
-    && (!run.deviceId || run.deviceId === device.id) && device.scenarios.includes(run.scenario)
+    && (!run.deviceId || run.deviceId === device.id) && device.scenarios.includes(run.scenario) && walletNetworkMatches(device, run.expectedTransaction)
     && Date.parse(run.createdAt) + marketplaceDurationMs > now && state.builds[run.buildId]
     && (!run.paymentTerms || (run.paymentTerms.status === 'funded' && run.paymentTerms.providerId === device.providerId));
 }
@@ -367,7 +368,7 @@ export function recordMarketAcceptance(state, device, run, now, method) {
 }
 
 export function claimAllowed(state, run, device, config, now) {
-  const agreesWithDevice = (!run.deviceId || run.deviceId === device.id) && device.scenarios.includes(run.scenario);
+  const agreesWithDevice = (!run.deviceId || run.deviceId === device.id) && device.scenarios.includes(run.scenario) && walletNetworkMatches(device, run.expectedTransaction);
   if (!agreesWithDevice) return false;
   if (device.reservedRunId) {
     const candidate = device.reservedRunId === run.id && run.state === 'reserved'

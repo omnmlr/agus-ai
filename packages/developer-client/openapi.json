@@ -3777,6 +3777,20 @@
           "kind": {
             "type": "string"
           },
+          "walletNetwork": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "devnet",
+                  "localnet"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "provenance": {
             "type": "string",
             "enum": [

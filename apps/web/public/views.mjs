@@ -96,8 +96,9 @@ export function buildOptions(builds, projectId) {
   return selectOption('', 'Select a build') + builds.filter((item) => item.projectId === projectId).map((item) => selectOption(item.id, item.name)).join('');
 }
 
-export function deviceOptions(devices, scenario) {
-  return selectOption('', 'Any compatible listed device') + devices.filter((item) => item.marketplaceEligible && item.scenarios?.includes(scenario)).map((item) => selectOption(item.id, item.label || item.id)).join('');
+export function deviceOptions(devices, scenario, network) {
+  return selectOption('', 'Any compatible listed device') + devices.filter((item) => item.marketplaceEligible && item.scenarios?.includes(scenario)
+    && (!network || (item.profile?.walletNetwork ?? 'localnet') === network)).map((item) => selectOption(item.id, item.label || item.id)).join('');
 }
 
 function transactionFields(visible = false) {

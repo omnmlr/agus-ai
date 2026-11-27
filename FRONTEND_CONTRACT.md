@@ -97,7 +97,7 @@ Use a retry for read failures, an inline remedy for validation and unavailable d
 
 ## Devnet payer, model provenance and training export
 
-Paid Devnet `wallet-transfer` requests include `expectedTransaction.payer`, an explicitly authorized disposable test payer, in addition to network, recipient and integer lamports. `payment.developerWallet` funds the distinct USDC quote. Provider selection and confirmed funding are both required before paid execution. The runner only claims jobs for the locally approved APK digest and wallet network.
+Paid Devnet `wallet-transfer` requests include `expectedTransaction.payer`, an explicitly authorized disposable test payer, in addition to network, recipient and integer lamports. `payment.developerWallet` funds the distinct USDC quote. Provider selection and confirmed funding are both required before paid execution. Match the selected wallet network to the device’s sanitized `profile.walletNetwork`. Legacy records without a network value default to Localnet for matching. The runner only claims jobs for the locally approved APK digest and wallet network.
 
 A signed runner receipt can include `execution.planner="gemini"`, `modelId` and `modelActionCount`. Render this as model-selected actions reported by the runner. Fixture results continue to use separate labels for a scripted run or external controller. A signed report does not establish that a third party observed model execution.
 

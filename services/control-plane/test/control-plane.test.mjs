@@ -57,22 +57,22 @@ async function fixture(t, overrides = {}) {
     });
     return { projectId: project.id, buildId: build.id };
   }
-  function device(id, { ready = true, online = true } = {}) {
+  function device(id, { ready = true, online = true, walletNetwork = null } = {}) {
     return {
       id, profile: {
         kind: 'android-device', model: 'Dedicated test model', measuredAt: new Date(clock).toISOString(),
-        androidVersion: '15', apiLevel: 35, charging: true, wifiConnected: false, imei: 'Never expose',
+        androidVersion: '15', apiLevel: 35, walletNetwork, charging: true, wifiConnected: false, imei: 'Never expose',
       },
       scenarios: baseScenarios, dedicated: true, online, ready,
     };
   }
-  async function pair(owner, id) {
+  async function pair(owner, id, walletNetwork) {
     const { pairing } = await request('/me/devices/pairings', { token: owner.token, body: {}, status: 201 });
     const keys = generateKeyPairSync('ed25519');
     const input = {
       displayName: 'Dedicated test runner',
       publicKeyPem: keys.publicKey.export({ format: 'pem', type: 'spki' }),
-      devices: [device(id)],
+      devices: [device(id, { walletNetwork })],
     };
     const runner = await request('/provider/enroll', { token: pairing.code, body: input });
     return { ...runner, keys, pairing, input, localId: id, id: runner.providerId + ':' + id };
@@ -321,7 +321,7 @@ test('run-bound signature, consent, and independent finalized transfer replay ch
   });
   const owner = await f.account('wallet-owner');
   const developer = await f.account('wallet-developer');
-  const runner = await f.pair(owner, 'wallet');
+  const runner = await f.pair(owner, 'wallet', 'devnet');
   const app = await f.workload(developer);
   async function next() {
     const { invitation } = await f.request('/invitations', {
@@ -333,7 +333,7 @@ test('run-bound signature, consent, and independent finalized transfer replay ch
     const path = '/invitations/' + invitation.id;
     await f.request(path + '/review', { token: owner.token, method: 'POST' });
     await f.request(path + '/accept', { token: owner.token, body: {} });
-    await f.request('/provider/heartbeat', { token: runner.token, body: { devices: [f.device(runner.localId)] } });
+    await f.request('/provider/heartbeat', { token: runner.token, body: { devices: [f.device(runner.localId, { walletNetwork: 'devnet' })] } });
     assert.equal((await f.claim(runner, "localnet")).job, null);
     const { job } = await f.claim(runner, "devnet");
     return job;
