@@ -11,7 +11,7 @@ node --input-type=module - "$out" <<'JS'
 import { generateKeyPairSync } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 const path = process.argv[2];
-const keys = generateKeyPairSync('ed25519');
+const keys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
 const text = keys.publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
 writeFileSync(path + '/manifest.pkcs8', keys.privateKey.export({ type: 'pkcs8', format: 'der' }).toString('base64'), { mode: 0o600, flag: 'wx' });
 for (const [name, pkg] of [['runtime', 'app.agus.runtime.preview'], ['fixture', 'app.agus.preview.fixture']]) {

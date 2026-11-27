@@ -17,7 +17,7 @@ export const safePolicy = {
 
 export async function startTestPilot(t, { env = {}, databaseUrl } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'agus-product-test-'));
-  const manifestKeys = generateKeyPairSync('ed25519');
+  const manifestKeys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const clock = { now: Date.now() };
   const options = {
     env: {

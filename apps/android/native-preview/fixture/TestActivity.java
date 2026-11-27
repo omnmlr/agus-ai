@@ -21,6 +21,8 @@ public class TestActivity extends Activity {
     private JSONArray observations;
     private TextView content;
     private int submissions;
+    private boolean observeHuman;
+    private long started;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -42,11 +44,13 @@ public class TestActivity extends Activity {
             layout.addView(content);
             setContentView(layout);
             observations = new JSONArray();
+            observeHuman = "human_demonstration".equals(task.optString("taskKind"));
+            started = SystemClock.elapsedRealtime();
             if ("phone_cooperative".equals(task.getString("runtimeClass"))) {
                 getWindow().getDecorView().post(() -> automate(task.optJSONArray("actions")));
             } else {
-                button(layout, "Continue", this::advance);
-                button(layout, "Return to review", () -> content.setText("Onboarding review"));
+                button(layout, "Continue", () -> { advance(); observe("continue", "advanced"); });
+                button(layout, "Return to review", () -> { content.setText("Onboarding review"); observe("review", "ready"); });
                 button(layout, "Finish attended test", this::complete);
             }
             button(layout, "Stop fixture", this::finish);
@@ -68,6 +72,14 @@ public class TestActivity extends Activity {
             }
             complete();
         } catch (Exception denied) { finish(); }
+    }
+
+    private void observe(String action, String result) {
+        if (!observeHuman || observations.length() >= 20) return;
+        try {
+            observations.put(new JSONObject().put("action", action).put("result", result)
+                .put("offsetMs", SystemClock.elapsedRealtime() - started));
+        } catch (org.json.JSONException invalid) { finish(); }
     }
 
     private void advance() {

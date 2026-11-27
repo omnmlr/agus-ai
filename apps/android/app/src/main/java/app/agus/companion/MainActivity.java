@@ -82,6 +82,7 @@ public final class MainActivity extends Activity {
     String selectedDevice;
     JSONObject pairing;
     String walletAddress;
+    String walletVerifiedAt;
     String walletStatus;
     boolean walletInFlight;
     String pendingInvitationCode;
@@ -476,6 +477,7 @@ public final class MainActivity extends Activity {
         loading = false;
         mutating = false;
         walletAddress = null;
+        walletVerifiedAt = null;
         walletStatus = null;
         walletInFlight = false;
         pairing = null;
@@ -596,20 +598,49 @@ public final class MainActivity extends Activity {
             .setNegativeButton("Back", null).setPositiveButton(action, (dialog, button) -> accepted.run()).show();
     }
 
+    private String walletRoute() {
+        String device = snapshot == null ? "" : snapshot.deviceScope;
+        return device.isBlank() ? null : ProviderApi.item(ProviderApi.MY_DEVICES, device) + "/payout-wallet";
+    }
+
+    private void updateWallet(JSONObject wallet, String error) {
+        walletAddress = wallet == null ? null : wallet.optString("address", null);
+        walletVerifiedAt = wallet == null ? null : wallet.optString("verifiedAt", null);
+        walletStatus = error;
+        render(true);
+    }
+
+    void loadWallet() {
+        String route = walletRoute();
+        if (route == null || walletInFlight) return;
+        perform("Loading verified wallet…", api -> api.get(route), result -> updateWallet(
+            result.optJSONObject("payoutWallet"), null), this::statusError, false);
+    }
+
+    void disconnectWallet() {
+        String route = walletRoute();
+        if (route == null || walletInFlight) return;
+        confirm("Disconnect payout wallet?", "Future offers will require a new verified wallet. Accepted jobs keep their original terms.",
+            "Disconnect", () -> perform("Disconnecting wallet…", api -> api.delete(route),
+                result -> updateWallet(null, "Payout wallet disconnected."), this::statusError, false));
+    }
+
     void connectWallet() {
         Session current = session;
-        walletAddress = null;
+        String route = walletRoute();
+        if (current == null || route == null || walletInFlight || mutating) return;
         walletStatus = null;
         walletInFlight = true;
         render(true);
-        DevnetWallet.connect(this, walletExecutor, (address, error) -> {
-            if (isDestroyed() || session != current) {
-                return;
-            }
+        DevnetWallet.prove(this, walletExecutor, current.api.client, current.origin, route, (wallet, error) -> {
+            if (isDestroyed() || session != current) return;
             walletInFlight = false;
-            walletAddress = address;
-            walletStatus = address == null ? error : "Address received for a disposable Devnet account.";
-            if (screen == Screen.PROFILE || screen == Screen.EARNINGS) {
+            if (!Objects.equals(route, walletRoute())) {
+                updateWallet(null, "Device selection changed. Refresh its payout wallet.");
+            } else if (wallet != null) {
+                updateWallet(wallet, "Payout wallet ownership verified for future Devnet offers.");
+            } else {
+                walletStatus = error;
                 render(true);
             }
         });

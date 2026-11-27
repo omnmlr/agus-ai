@@ -38,9 +38,9 @@ export function pilotConfig(env) {
   let key;
   try {
     key = createPrivateKey({ key: Buffer.from(env.AGUS_NATIVE_MANIFEST_PKCS8 ?? '', 'base64'), format: 'der', type: 'pkcs8' });
-    if (key.asymmetricKeyType !== 'ed25519') throw new Error();
+    if (key.asymmetricKeyType !== 'ec' || key.asymmetricKeyDetails.namedCurve !== 'prime256v1') throw new Error();
   } catch {
-    throw new Error('AGUS_NATIVE_MANIFEST_PKCS8 must be a disposable Ed25519 PKCS8 key');
+    throw new Error('AGUS_NATIVE_MANIFEST_PKCS8 must be a disposable P-256 PKCS8 key');
   }
   let entries;
   try {
@@ -75,9 +75,9 @@ export function p256PublicKey(encoded) {
 export function manifestEnvelope(pilot, document) {
   const bytes = Buffer.from(stableJson(document));
   return {
-    encoding: 'base64', alg: 'Ed25519', keyId: pilot.manifestKeyId,
+    encoding: 'base64', alg: 'ECDSA-P256-SHA256-DER', keyId: pilot.manifestKeyId,
     payload: bytes.toString('base64'), sha256: digest(bytes),
-    signature: sign(null, bytes, pilot.manifestSigningKey).toString('base64'),
+    signature: sign('sha256', bytes, pilot.manifestSigningKey).toString('base64'),
   };
 }
 
@@ -97,13 +97,14 @@ export function verifyNativeProof(publicKey, input, maxBytes = 8_192) {
 export function qualifyingPolicy(policy) {
   exact(policy, ['managed', 'profileOwner', 'crossProfileCopyBlocked', 'unlocked', 'foreground',
     'installerRestricted', 'apiLevel', 'charging', 'batteryPercent', 'availableStorageMiB', 'thermalStatus',
-    'abi'], 'profile policy');
+    'abi', 'networkLatencyMs'], 'profile policy');
   for (const key of ['managed', 'profileOwner', 'crossProfileCopyBlocked', 'unlocked', 'foreground',
     'installerRestricted', 'charging']) requireCondition(typeof policy[key] === 'boolean', 'Invalid policy field ' + key);
   integer(policy.apiLevel, 1, 100, 'API level');
   integer(policy.batteryPercent, 0, 100, 'battery percentage');
   integer(policy.availableStorageMiB, 0, 10_000_000, 'storage availability');
   integer(policy.thermalStatus, 0, 6, 'thermal status');
+  if (policy.networkLatencyMs !== undefined) integer(policy.networkLatencyMs, 0, 60_000, 'network round-trip');
   requireCondition(['arm64-v8a', 'x86_64', 'other'].includes(policy.abi), 'Invalid profile ABI');
   return policy.managed && policy.profileOwner && policy.crossProfileCopyBlocked && policy.unlocked
     && policy.foreground && policy.installerRestricted && policy.apiLevel >= 35

@@ -63,11 +63,18 @@ final class RuntimeState {
             if (!preferences.edit().putLong("sequence", sequence).commit()) throw new IllegalStateException("State unavailable");
         }
         long seconds = Math.max(0, (windowEnd - SystemClock.elapsedRealtime()) / 1000);
+        JSONObject snapshot = policy(context, seconds > 0);
+        if (windowId.equals(preferences.getString("sampleWindow", ""))) {
+            snapshot.put("networkLatencyMs", preferences.getLong("networkLatencyMs", 0));
+        }
         var values = new JSONObject().put("v", 1).put("kind", "heartbeat").put("installationId", installation)
             .put("sequence", sequence).put("windowId", windowId).put("windowSeconds", seconds)
-            .put("policy", policy(context, seconds > 0));
+            .put("policy", snapshot);
+        long start = SystemClock.elapsedRealtime();
         PilotApi.request("POST", "/runtime/installations/" + installation + "/heartbeat",
             preferences.getString("credential", null), PilotApi.sign(values));
+        preferences.edit().putString("sampleWindow", windowId)
+            .putLong("networkLatencyMs", Math.min(60_000, SystemClock.elapsedRealtime() - start)).apply();
     }
 
     static Session recover(Context context) throws Exception {

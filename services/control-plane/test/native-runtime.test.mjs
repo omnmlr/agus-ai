@@ -48,7 +48,7 @@ test('lease signs reviewed scope, fences tampering and expiry, and quarantines u
   const input = { credential: runtime.credential, body: { assignmentId: 'assignment' } };
   const { lease } = await pilot.request('POST', claim, input);
   const bytes = Buffer.from(lease.manifest.payload, 'base64');
-  assert.equal(verify(null, bytes, pilot.manifestKeys.publicKey, Buffer.from(lease.manifest.signature, 'base64')), true);
+  assert.equal(verify('sha256', bytes, pilot.manifestKeys.publicKey, Buffer.from(lease.manifest.signature, 'base64')), true);
   assert.equal(JSON.parse(bytes).build.signerSha256, review.signerSha256);
   await pilot.request('POST', claim, { ...input, status: 409 });
   const prefix = '/runtime/leases/' + lease.id;

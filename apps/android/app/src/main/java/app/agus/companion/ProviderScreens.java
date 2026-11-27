@@ -603,21 +603,22 @@ final class ProviderScreens {
 
     private void wallet(LinearLayout content) {
         LinearLayout card = ui.card(content);
-        ui.add(card, ui.heading("Devnet test wallet", 18), 0);
-        detail(card, "Authorize the official Fake Wallet to read a disposable Devnet address. Configure the payout destination with the runner operator.", false);
-        if (host.walletAddress != null) {
+        ui.add(card, ui.heading("Devnet payout wallet", 18), 0);
+        if (host.snapshot == null || host.snapshot.deviceScope.isBlank()) {
+            detail(card, "Pair a dedicated test device to configure its payout wallet.", false);
+            return;
+        }
+        detail(card, "The official Fake Wallet signs an exact ownership challenge for a disposable Devnet account.", false);
+        if (host.walletAddress != null && host.walletVerifiedAt != null) {
             detail(card, host.walletAddress, true);
-            button(card, "Copy test address", 0, false, view -> host.copy("Devnet address", host.walletAddress));
-            button(card, "Clear test address", 0, false, view -> {
-                host.walletAddress = null;
-                host.walletStatus = null;
-                host.render(true);
-            });
+            detail(card, "Verified " + host.walletVerifiedAt, false);
+            button(card, "Copy verified address", 0, false, view -> host.copy("Devnet address", host.walletAddress));
+            button(card, "Disconnect payout wallet", 0, false, view -> host.disconnectWallet());
         }
-        if (host.walletStatus != null) {
-            detail(card, host.walletStatus, false);
-        }
-        Button connect = button(card, host.walletInFlight ? "Waiting for wallet…" : "Connect test wallet",
+        if (host.walletStatus != null) detail(card, host.walletStatus, false);
+        button(card, "Refresh verified wallet", 0, false, view -> host.loadWallet()).setEnabled(!host.walletInFlight);
+        Button connect = button(card, host.walletInFlight ? "Waiting for wallet…" :
+            host.walletVerifiedAt == null ? "Verify test wallet" : "Replace payout wallet",
             R.id.connect_test_wallet, false, view -> host.connectWallet());
         connect.setEnabled(!host.walletInFlight);
     }

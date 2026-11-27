@@ -101,7 +101,7 @@ export function nativeHeartbeat(state, installation, proof, now) {
 
 export function stopNativeLease(state, id, reason, now) {
   const lease = own(state.nativeLeases, id);
-  if (lease && lease.state === 'active') {
+  if (lease && ['active', 'cleanup_pending'].includes(lease.state)) {
     lease.state = 'stopping';
     lease.stop = { reason, requestedAt: now };
   }
@@ -132,6 +132,7 @@ export function issueNativeLease(state, installation, assignment, task, build, p
     v: 1, type: 'agus.native.workload', audience: installation.id, assignmentId: assignment.id,
     attemptId: assignment.attempt.id, leaseId: id, fence, runtimeClass: installation.runtimeClass,
     campaignRevision: assignment.campaignRevision, actionContract: sdkVersion,
+    taskKind: task.kind ?? 'automated_test',
     build: { id: build.id, ...review, component: review.packageName + fixtureComponent },
     actions: installation.runtimeClass === 'phone_cooperative' ? task.actions : [],
     observationSchema: 'fixture-result-v1', policyVersion: workProfilePolicy,
@@ -141,8 +142,9 @@ export function issueNativeLease(state, installation, assignment, task, build, p
   const envelope = manifestEnvelope(pilot, manifest);
   const lease = {
     id, fence, assignmentId: assignment.id, attemptId: assignment.attempt.id, installationId: installation.id,
-    buildId: build.id, challenge: manifest.challenge, manifestDigest: envelope.sha256,
-    allowedActions: manifest.actions, deadline, windowId: installation.windowId,
+    buildId: build.id, challenge: manifest.challenge, manifestDigest: envelope.sha256, manifest: envelope,
+    allowedActions: manifest.actions, observeHuman: manifest.taskKind === 'human_demonstration',
+    deadline, windowId: installation.windowId,
     credentialHash: digest(credential), state: 'active', expiresAt: Math.min(now + authorityMs, deadline),
     issuedAt: now, report: null, cleanup: null,
   };
@@ -206,12 +208,21 @@ export function receiveNativeReport(state, lease, input, now) {
   }
   conflict(lease.state === 'active', 'Lease has no report authority', 'grant_expired');
   requireCondition(['completed', 'failed'].includes(value.outcome), 'Unknown runtime outcome');
-  requireCondition(Array.isArray(value.observations) && value.observations.length <= lease.allowedActions.length,
+  const maximum = lease.observeHuman ? 20 : lease.allowedActions.length;
+  requireCondition(Array.isArray(value.observations) && value.observations.length <= maximum,
     'Observations exceed the reviewed action budget');
+  let previousOffset = 0;
   for (const [index, observation] of value.observations.entries()) {
-    exact(observation, ['action', 'result'], 'observation');
-    requireCondition(observation.action === lease.allowedActions[index] &&
-      ['advanced', 'blocked', 'ready'].includes(observation.result), 'Observation is out of scope');
+    exact(observation, lease.observeHuman ? ['action', 'result', 'offsetMs'] : ['action', 'result'], 'observation');
+    if (lease.observeHuman) {
+      integer(observation.offsetMs, previousOffset, lease.deadline - lease.issuedAt, 'observation time');
+      previousOffset = observation.offsetMs;
+      requireCondition((observation.action === 'continue' && observation.result === 'advanced')
+        || (observation.action === 'review' && observation.result === 'ready'), 'Human step is out of scope');
+    } else {
+      requireCondition(observation.action === lease.allowedActions[index] &&
+        ['advanced', 'blocked', 'ready'].includes(observation.result), 'Observation is out of scope');
+    }
   }
   const assignment = state.assignments[lease.assignmentId];
   conflict(assignment.state === 'active' && assignment.attempt.id === lease.attemptId, 'Attempt is no longer current');
@@ -219,8 +230,10 @@ export function receiveNativeReport(state, lease, input, now) {
     : value.outcome === 'completed' && value.observations.length === lease.allowedActions.length
       && value.observations.every(({ action, result }) => result === (action === 'advance' ? 'advanced' : 'ready'))
       ? 'passed' : 'failed';
-  lease.report = { sha256, receivedAt: now, proof: input, outcome: value.outcome,
+  lease.report = { sha256, receivedAt: now, proof: input, outcome: value.outcome, observations: value.observations,
     evaluation, provenance: 'installation_signed_preview_claim' };
+  lease.state = 'cleanup_pending';
+  assignment.state = 'cleanup_pending';
   return { report: lease.report };
 }
 
@@ -238,7 +251,7 @@ export function receiveNativeCleanup(state, lease, input, now) {
   lease.state = 'released';
   installation.activeLeaseId = null;
   installation.readiness = 'pending';
-  if (assignment.state === 'active' || assignment.state === 'stopping') {
+  if (['active', 'cleanup_pending', 'stopping'].includes(assignment.state)) {
     assignment.state = lease.report && !lease.stop ? 'awaiting_submission' : 'interrupted';
   }
   return { cleanup: lease.cleanup };

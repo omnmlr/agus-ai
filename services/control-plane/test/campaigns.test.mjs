@@ -118,3 +118,32 @@ test('Postgres preserves campaign data and serializes competing claims across se
   const { report } = await as(developer, 'GET', path + '/report');
   assert.equal(report.assignments.find(row => row.id === offer.id).attempt.id, assignment.attempt.id);
 });
+
+test('redacted export requires both purpose grants, rejects foreign access and invalidates withdrawn packages', async t => {
+  const { pilot, developer, first, second, as, path } = await setup(t);
+  const runtime = await qualify(pilot, as, first);
+  const [offer] = (await as(first, 'GET', '/me/assignments')).assignments;
+  const { assignment } = await as(first, 'POST', '/me/assignments/' + offer.id + '/accept',
+    { termsDigest: offer.termsDigest, installationId: runtime.id, consent: true });
+  const executed = await executeHuman({ pilot, as, person: first, runtime, offer, accepted: assignment });
+  await as(developer, 'POST', '/assignments/' + offer.id + '/reviews',
+    { attemptId: executed.body.attemptId, version: 1, decision: 'accept', reason: 'Scoped proof' });
+  const routes = path + '/exports';
+  const body = { purpose: 'training', assignmentIds: [offer.id] };
+  const agreement = '/me/assignments/' + offer.id + '/training-consent';
+  await as(developer, 'POST', routes, body, 403);
+  await as(second, 'PUT', agreement, { termsDigest: offer.termsDigest, grant: true }, 404);
+  await as(developer, 'PUT', agreement, { termsDigest: offer.termsDigest, grant: true });
+  await as(developer, 'POST', routes, body, 403);
+  await as(first, 'PUT', agreement, { termsDigest: offer.termsDigest, grant: true });
+  const { export: output } = await as(developer, 'POST', routes, body);
+  await as(first, 'GET', routes + '/' + output.id, undefined, 404);
+  const delivered = (await as(developer, 'GET', routes + '/' + output.id)).export;
+  assert.equal(delivered.sha256, output.sha256);
+  assert.equal(delivered.data.rows[0].result, 'failed');
+  assert.doesNotMatch(JSON.stringify(delivered), /Tap Continue|Two submissions|@example|attemptId/);
+  await as(first, 'DELETE', agreement);
+  await as(developer, 'GET', routes + '/' + output.id, undefined, 403);
+  await as(first, 'PUT', agreement, { termsDigest: offer.termsDigest, grant: true });
+  await as(developer, 'GET', routes + '/' + output.id, undefined, 403);
+});

@@ -1,8 +1,9 @@
+import { createCampaignExport, readCampaignExport, trainingConsent } from './campaign-training.mjs';
 import { idempotencyRecord } from './idempotency.mjs';
 import { missing } from './pilot-policy.mjs';
 import {
   campaignReport, campaignView, changeCampaign, contributorTransition, listAssignments, ownCampaign,
-  refreshCampaigns, reviewSubmission, saveCampaign, sendSubmission,
+  refreshCampaigns, reviewSubmission, saveCampaign, sendSubmission, signedAssignmentReceipt,
 } from './campaigns.mjs';
 import { appealQualification, qualificationView, submitQualification } from './qualifications.mjs';
 
@@ -30,11 +31,18 @@ export function campaignRoute(state, user, route, method, input, config, now, re
       return result;
     }
     if (id && !operation && method === 'GET') return { campaign: campaignView(ownCampaign(state, user, id)) };
+    if (id && operation === 'exports') {
+      if (!suffix && method === 'POST') return createCampaignExport(state, user, id, input, now);
+      if (suffix && method === 'GET') return readCampaignExport(state, user, id, suffix, now);
+    }
     if (id && !operation && method === 'PATCH') return saveCampaign(state, user, input, config, now, id);
     if (id && !suffix && method === 'GET' && operation === 'report') return campaignReport(state, user, id, now);
     if (id && !suffix && method === 'POST' && ['launch', 'pause', 'resume', 'cancel', 'complete'].includes(operation)) {
       return changeCampaign(state, user, id, operation, input, config, now);
     }
+  }
+  if (resource === 'assignments' && id && !suffix && method === 'GET' && operation === 'receipt') {
+    return signedAssignmentReceipt(state, user, id, now);
   }
   if (resource === 'assignments' && id && !suffix && method === 'POST') {
     if (operation === 'submissions') return sendSubmission(state, user, id, input, now);
@@ -47,6 +55,9 @@ export function campaignRoute(state, user, route, method, input, config, now, re
   }
   if (resource === 'me' && id === 'assignments') {
     if (!operation && method === 'GET') return listAssignments(state, user, now);
+    if (operation && suffix === 'training-consent' && ['GET', 'PUT', 'DELETE'].includes(method)) {
+      return trainingConsent(state, user, operation, method, input, now);
+    }
     if (operation && suffix && method === 'POST') return contributorTransition(state, user, operation, suffix, input, now);
   }
   if (resource === 'me' && id === 'campaign-earnings' && !operation && method === 'GET') {

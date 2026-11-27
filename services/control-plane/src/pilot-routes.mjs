@@ -61,7 +61,7 @@ export async function handlePilotRoutes({ services, route, request, response, se
   if (!runtime && !nativePerson && !isCampaignRoute(route)) return false;
   requireCondition(config.pilot, 'The local product pilot is disabled', 'pilot_unavailable', 503);
   missing(route.length <= 4, 'Route');
-  const input = ['POST', 'PATCH'].includes(method) ? await readJson(request, 65_536) : null;
+  const input = ['POST', 'PUT', 'PATCH'].includes(method) ? await readJson(request, 65_536) : null;
   const result = await store.transaction(state => {
     const now = config.now();
     if (runtime) return transport(state, config.pilot, credential, route, method, input, now);

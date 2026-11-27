@@ -5,13 +5,14 @@ import { array, digest, requireCondition, stableJson, string } from './security.
 import { conflict, exact, integer, missing, nativeClasses, own } from './pilot-policy.mjs';
 import { expireNativeLease, publicInstallation, stopNativeLease } from './native-runtime.mjs';
 import { qualified } from './qualifications.mjs';
+import { expectedTransaction, SCENARIOS } from './verification.mjs';
 
 const minutes = 60_000;
 const classes = [...nativeClasses, 'dedicated_runner'];
 const taskKinds = ['automated_test', 'human_test', 'agent_evaluation', 'human_demonstration', 'agent_correction'];
 const outcomes = ['passed', 'failed', 'blocked'];
-const activeAssignments = ['reserved', 'active', 'stopping'];
-const immutableStates = ['accepted', 'cancelled', 'rejected', 'expired', 'interrupted'];
+const activeAssignments = ['reserved', 'active', 'cleanup_pending', 'stopping'];
+const immutableStates = ['accepted', 'partially_accepted', 'cancelled', 'rejected', 'expired', 'interrupted'];
 
 function text(value, field, maximum) {
   const normalized = string(value, field, maximum).trim();
@@ -22,7 +23,7 @@ function text(value, field, maximum) {
 
 function normalizeTask(state, user, input, projectId, config) {
   exact(input, ['title', 'kind', 'runtimeClass', 'buildId', 'count', 'instructions', 'maximumDurationSeconds',
-    'minimumApi', 'abi', 'skill', 'actions', 'scenario', 'expectedTransaction', 'testUnits', 'trainingEligible'], 'task');
+    'minimumApi', 'abi', 'maximumNetworkLatencyMs', 'skill', 'actions', 'scenario', 'expectedTransaction', 'testUnits', 'stopTestUnits', 'trainingEligible'], 'task');
   requireCondition(classes.includes(input.runtimeClass) && taskKinds.includes(input.kind), 'Unsupported assignment class');
   const human = input.runtimeClass === 'phone_human';
   const dedicated = input.runtimeClass === 'dedicated_runner';
@@ -40,20 +41,28 @@ function normalizeTask(state, user, input, projectId, config) {
   requireCondition(Array.isArray(actions) && actions.length <= 4 && actions.every(action => ['describe', 'advance'].includes(action))
     && (input.runtimeClass === 'phone_cooperative' ? actions.includes('advance') : actions.length === 0),
   'Invalid cooperative action plan');
+  const maximumNetworkLatencyMs = input.maximumNetworkLatencyMs == null ? null
+    : integer(input.maximumNetworkLatencyMs, 10, 60_000, 'maximum endpoint latency');
+  requireCondition(!dedicated || maximumNetworkLatencyMs === null, 'Dedicated latency qualification is unavailable');
+  requireCondition(input.kind !== 'agent_evaluation' || dedicated,
+    'Agent selection currently uses the dedicated runner observation protocol');
   const minimumApi = integer(input.minimumApi ?? (dedicated ? 0 : 35), dedicated ? 0 : 35, dedicated ? 0 : 100, 'minimum API');
   const testUnits = integer(input.testUnits ?? 0, 0, dedicated ? 0 : 1_000_000, 'test compensation');
+  const stopTestUnits = integer(input.stopTestUnits ?? 0, 0, testUnits, 'stop compensation');
   requireCondition(input.trainingEligible === undefined || typeof input.trainingEligible === 'boolean', 'Invalid training eligibility');
   requireCondition(!(input.trainingEligible && dedicated), 'Dedicated trajectory rights use the legacy run contract');
   const scenario = input.scenario ?? 'app-launch';
+  requireCondition(SCENARIOS.includes(scenario), 'Unsupported test scenario');
   requireCondition(dedicated || (scenario === 'app-launch' && input.expectedTransaction === undefined),
     'Phone preview supports its offline reviewed app activity');
+  const transfer = expectedTransaction(input.expectedTransaction, scenario, config);
   return {
     title: text(input.title, 'task title', 100), kind: input.kind, runtimeClass: input.runtimeClass,
     buildId: build.id, buildSha256: build.sha256, packageName: build.packageName,
     count: integer(input.count, 1, 12, 'coverage count'), instructions: text(input.instructions, 'instructions', 2_000),
     maximumDurationSeconds: integer(input.maximumDurationSeconds ?? 120, 30, Math.min(900, config.leaseMs / 1000), 'duration'),
-    minimumApi, abi, skill, actions, scenario, ...(input.expectedTransaction ? { expectedTransaction: input.expectedTransaction } : {}),
-    testUnits, trainingEligible: input.trainingEligible === true, rubric: 'structured-outcome-v1',
+    minimumApi, abi, maximumNetworkLatencyMs, skill, actions, scenario, ...(transfer ? { expectedTransaction: transfer } : {}),
+    testUnits, stopTestUnits, trainingEligible: input.trainingEligible === true, rubric: 'structured-outcome-v1',
   };
 }
 
@@ -166,7 +175,7 @@ export function changeCampaign(state, user, id, action, input, config, now) {
         const id = randomUUID();
         const terms = { campaignId: campaign.id, revision: campaign.revision, taskIndex, slot,
           buildSha256: task.buildSha256, deadlineAt: draft.deadlineAt, maximumDurationSeconds: task.maximumDurationSeconds,
-          testUnits: task.testUnits, evidence: 'structured_only', purpose: 'testing', trainingEligible: task.trainingEligible };
+          testUnits: task.testUnits, stopTestUnits: task.stopTestUnits, evidence: 'structured_only', purpose: 'testing', trainingEligible: task.trainingEligible };
         const assignment = {
           id, campaignId: campaign.id, campaignRevision: campaign.revision, ownerId: user.id, taskIndex, slot,
           state: dedicated ? 'dedicated' : 'open', deadlineAt: draft.deadlineAt, attempt: null, priorAttempts: [],
@@ -221,7 +230,9 @@ function installationFor(state, user, assignment, id, now) {
   const task = assignmentTask(state, assignment);
   return installation?.ownerId === user.id && installation.runtimeClass === task.runtimeClass &&
     publicInstallation(installation, now).readiness === 'ready' && installation.policy.apiLevel >= task.minimumApi
-    && (!task.abi || installation.policy.abi === task.abi) ? installation : null;
+    && (!task.abi || installation.policy.abi === task.abi)
+    && (task.maximumNetworkLatencyMs === null || (Number.isSafeInteger(installation.policy.networkLatencyMs)
+      && installation.policy.networkLatencyMs <= task.maximumNetworkLatencyMs)) ? installation : null;
 }
 
 function canSeeOffer(state, user, assignment, now) {
@@ -346,9 +357,20 @@ export function reviewSubmission(state, user, id, input, now) {
   const assignment = own(state.assignments, id);
   missing(assignment?.ownerId === user.id, 'Assignment');
   exact(input, ['attemptId', 'version', 'decision', 'reason'], 'review');
-  requireCondition(['accept', 'revise', 'reject'].includes(input.decision), 'Unknown review action');
+  requireCondition(['accept', 'revise', 'reject', 'partial'].includes(input.decision), 'Unknown review action');
   const attempt = assignment.attempt;
   const latest = attempt?.submissions.at(-1);
+  if (input.decision === 'partial') {
+    const lease = own(state.nativeLeases, attempt?.leaseId);
+    conflict(assignment.state === 'interrupted' && attempt?.id === input.attemptId && attempt?.contributorId !== user.id
+      && input.version === 0 && lease?.cleanup && assignment.terms.stopTestUnits > 0,
+    'Partial credit requires disclosed terms and a cleaned interrupted attempt');
+    attempt.review = { at: now, decision: 'partial', reason: text(input.reason, 'review reason', 400) };
+    recordObligation(state, assignment, attempt, assignment.terms.stopTestUnits, 'interrupted', now);
+    assignment.state = 'partially_accepted';
+    notice(state, attempt.contributorId, 'assignment.reviewed', { assignmentId: id, decision: input.decision }, now);
+    return { assignment: assignmentView(state, assignment, user, now) };
+  }
   conflict(assignment.state === 'submitted' && attempt?.contributorId !== user.id && attempt?.id === input.attemptId
     && latest?.version === input.version, 'Submission is no longer reviewable', 'revision_conflict');
   conflict(input.decision !== 'revise' || (latest.version < 4 && now < assignment.deadlineAt
@@ -357,13 +379,17 @@ export function reviewSubmission(state, user, id, input, now) {
     reason: text(input.reason, 'review reason', 400) };
   assignment.state = { accept: 'accepted', revise: 'needs_revision', reject: 'rejected' }[input.decision];
   if (input.decision === 'accept') {
-    conflict(!state.compensation[id], 'Work was already accepted');
-    state.compensation[id] = { id: randomUUID(), assignmentId: id, contributorId: attempt.contributorId,
-      testUnits: assignment.terms.testUnits, termsDigest: assignment.termsDigest, acceptedAt: now,
-      state: assignment.terms.testUnits ? 'test_obligation_recorded' : 'unpaid_accepted' };
+    recordObligation(state, assignment, attempt, assignment.terms.testUnits, 'accepted', now);
   }
   notice(state, attempt.contributorId, 'assignment.reviewed', { assignmentId: id, decision: input.decision }, now);
   return { assignment: assignmentView(state, assignment, user, now) };
+}
+
+function recordObligation(state, assignment, attempt, testUnits, basis, now) {
+  conflict(!state.compensation[assignment.id], 'Work was already accepted');
+  state.compensation[assignment.id] = { id: randomUUID(), assignmentId: assignment.id, contributorId: attempt.contributorId,
+    testUnits, basis, termsDigest: assignment.termsDigest, acceptedAt: now, state: testUnits
+      ? 'test_obligation_recorded' : 'unpaid_accepted' };
 }
 
 export function campaignReport(state, user, id, now) {
@@ -387,8 +413,25 @@ export function campaignReport(state, user, id, now) {
       missing: task.count - evidence.filter(value => value !== null).length,
     };
   });
-  return { report: { campaign: campaignView(campaign), cells,
+  const findings = entries.flatMap(entry => {
+    const evidence = entry.attempt?.submissions.at(-1)?.evidence;
+    if (entry.state !== 'accepted' || !evidence || evidence.result === 'passed') return [];
+    return [{ assignmentId: entry.id, taskIndex: entry.taskIndex, category: evidence.category, result: evidence.result,
+      findingSha256: entry.attempt.submissions.at(-1).sha256 }];
+  });
+  return { report: { campaign: campaignView(campaign), cells, findings,
     reservedTestUnits: entries.filter(entry => !immutableStates.includes(entry.state)).reduce((sum, entry) => sum + entry.terms.testUnits, 0),
     acceptedTestUnits: entries.reduce((sum, entry) => sum + (state.compensation[entry.id]?.testUnits ?? 0), 0),
     assignments: entries.map(entry => assignmentView(state, entry, user, now)) } };
+}
+
+export function signedAssignmentReceipt(state, user, id, now) {
+  const assignment = own(state.assignments, id);
+  missing(assignment && (assignment.ownerId === user.id || assignment.attempt?.contributorId === user.id), 'Assignment');
+  const revision = state.campaigns[assignment.campaignId].revisions[assignment.campaignRevision - 1];
+  const lease = own(state.nativeLeases, assignment.attempt?.leaseId);
+  missing(lease?.report && assignment.deadlineAt + revision.retentionDays * 86_400_000 > now, 'Evidence receipt');
+  const installation = state.runtimes[lease.installationId];
+  return { receipt: { manifest: lease.manifest, report: lease.report, cleanup: lease.cleanup,
+    algorithm: 'ECDSA-P256-SHA256-DER', publicKey: installation.publicKey } };
 }

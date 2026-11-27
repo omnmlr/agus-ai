@@ -29,11 +29,11 @@ public final class Workload {
     public static Workload verify(JSONObject envelope, String trustedKey) throws Exception {
         byte[] key = decode(trustedKey);
         byte[] bytes = decode(envelope.getString("payload"));
-        if (bytes.length > 8192 || !"Ed25519".equals(envelope.getString("alg"))
+        if (bytes.length > 8192 || !"ECDSA-P256-SHA256-DER".equals(envelope.getString("alg"))
             || !"base64".equals(envelope.getString("encoding")) || !sha256(key).equals(envelope.getString("keyId"))
             || !sha256(bytes).equals(envelope.getString("sha256"))) throw new SecurityException("Invalid manifest envelope");
-        Signature verifier = Signature.getInstance("Ed25519");
-        verifier.initVerify(KeyFactory.getInstance("Ed25519").generatePublic(new X509EncodedKeySpec(key)));
+        Signature verifier = Signature.getInstance("SHA256withECDSA");
+        verifier.initVerify(KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(key)));
         verifier.update(bytes);
         if (!verifier.verify(decode(envelope.getString("signature")))) throw new SecurityException("Manifest signature failed");
         JSONObject value = new JSONObject(new String(bytes, StandardCharsets.UTF_8));
