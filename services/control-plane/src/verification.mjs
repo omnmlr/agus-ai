@@ -25,7 +25,9 @@ export function expectedTransaction(value, scenario, config) {
     Number.isSafeInteger(expected.lamports) && expected.lamports > 0,
     'Invalid expected lamport amount',
   );
-  return { network: expected.network, recipient: expected.recipient, lamports: expected.lamports };
+  requireCondition(expected.payer === undefined || (publicAddress(expected.payer) && expected.payer !== expected.recipient), 'Invalid expected payer');
+  return { network: expected.network, recipient: expected.recipient, lamports: expected.lamports,
+    ...(expected.payer ? { payer: expected.payer } : {}) };
 }
 
 export function validateManifest(report, run, lease, build, now) {
@@ -199,8 +201,10 @@ async function independentlyVerify({ report, expected, lease, config, fetchImpl 
   const transfers = (message?.instructions ?? []).concat(inner);
   const matches = transfers.filter(({ program, parsed }) => program === 'system'
     && parsed?.type === 'transfer' && parsed.info?.destination === expected.recipient
-    && parsed.info?.lamports === expected.lamports);
-  if (matches.length !== 1 || transaction.transaction.signatures?.[0] !== observed.signature) {
+    && parsed.info?.lamports === expected.lamports
+    && (!expected.payer || parsed.info?.source === expected.payer));
+  if (matches.length !== 1 || transaction.transaction.signatures?.[0] !== observed.signature
+    || (expected.payer && (message?.accountKeys?.[0]?.pubkey !== expected.payer || message.accountKeys[0].signer !== true))) {
     return { ...reference, status: 'transfer_mismatch' };
   }
   return {

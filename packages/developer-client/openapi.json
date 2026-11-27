@@ -1641,6 +1641,366 @@
         }
       }
     },
+    "/api/v1/runs/{runId}/training-consent": {
+      "get": {
+        "summary": "Read purpose-specific consent as a run participant",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "consent": {
+                      "type": "object",
+                      "properties": {
+                        "developer": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "provider": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "developer",
+                        "provider"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "consent"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Grant consent for training export",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "consent": {
+                      "type": "object",
+                      "properties": {
+                        "developer": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "provider": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "developer",
+                        "provider"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "consent"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Withdraw consent for future training export",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "consent": {
+                      "type": "object",
+                      "properties": {
+                        "developer": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "provider": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "developer",
+                        "provider"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "consent"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{runId}/training-export": {
+      "get": {
+        "summary": "Export a minimized, consented training trajectory as the developer",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "format": {
+                      "type": "string",
+                      "enum": [
+                        "agus.training-trajectory.v1"
+                      ]
+                    },
+                    "purpose": {
+                      "type": "string",
+                      "enum": [
+                        "training"
+                      ]
+                    },
+                    "scenario": {
+                      "$ref": "#/components/schemas/Scenario"
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "receiptId": {
+                          "type": "string"
+                        },
+                        "manifestSha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "trajectorySha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "planner": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "receiptId",
+                        "manifestSha256",
+                        "trajectorySha256",
+                        "planner"
+                      ]
+                    },
+                    "actions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "index": {
+                            "type": "integer"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "outcome": {
+                            "type": "string",
+                            "enum": [
+                              "completed",
+                              "failed"
+                            ]
+                          },
+                          "offsetMs": {
+                            "type": "integer"
+                          },
+                          "phase": {
+                            "type": "string"
+                          },
+                          "selectedBy": {
+                            "type": "string",
+                            "enum": [
+                              "gemini"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "index",
+                          "type",
+                          "outcome",
+                          "offsetMs"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "format",
+                    "purpose",
+                    "scenario",
+                    "source",
+                    "actions"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/devices": {
       "get": {
         "summary": "List provider-owned device records",
@@ -3253,6 +3613,9 @@
           },
           "lamports": {
             "type": "integer"
+          },
+          "payer": {
+            "type": "string"
           }
         },
         "required": [

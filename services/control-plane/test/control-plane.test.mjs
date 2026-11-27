@@ -87,8 +87,8 @@ async function fixture(t, overrides = {}) {
     runId: job.runId, leaseId: job.leaseId, report,
     signature: sign(null, Buffer.from(stableJson(report)), runner.keys.privateKey).toString('base64'),
   });
-  const claim = (runner) => request('/provider/claim', {
-    token: runner.token, body: { deviceId: runner.localId, approvedBuilds: allowlist },
+  const claim = (runner, walletNetwork) => request('/provider/claim', {
+    token: runner.token, body: { deviceId: runner.localId, approvedBuilds: allowlist.map(build => ({ ...build, walletNetwork })) },
   });
   return { request, account, workload, pair, claim, device, report, signed, advance: (value) => { clock += value; }, now: () => clock };
 }
@@ -325,7 +325,7 @@ test('run-bound signature, consent, and independent finalized transfer replay ch
   async function next() {
     const { invitation } = await f.request('/invitations', {
       token: developer.token, status: 201, body: {
-        ...privateRequest(app, runner.id), scenario: 'wallet-transfer',
+        ...privateRequest(app, runner.id), scenario: 'wallet-transfer', evidence: { trajectory: true },
         expectedTransaction: { network: 'devnet', recipient, lamports: 1_000_000 },
       },
     });
@@ -333,13 +333,19 @@ test('run-bound signature, consent, and independent finalized transfer replay ch
     await f.request(path + '/review', { token: owner.token, method: 'POST' });
     await f.request(path + '/accept', { token: owner.token, body: {} });
     await f.request('/provider/heartbeat', { token: runner.token, body: { devices: [f.device(runner.localId)] } });
-    const { job } = await f.claim(runner);
+    assert.equal((await f.claim(runner, "localnet")).job, null);
+    const { job } = await f.claim(runner, "devnet");
     return job;
   }
   const job = await next();
   const manifest = f.report(job, ['approved-build', 'app-launched', 'wallet-authorized', 'cleanup']);
   manifest.transaction = { signature: transactionSignature, network: 'devnet' };
-  const envelope = f.signed(runner, job, manifest);
+  const trajectory = Buffer.from(JSON.stringify([{ at: manifest.startedAt, type: 'tap', outcome: 'completed',
+    observation: { phase: 'submit-transfer', unapprovedText: 'never export' } }]));
+  const trajectorySha = createHash('sha256').update(trajectory).digest('hex');
+  manifest.evidence = [{ kind: 'trajectory', sha256: trajectorySha }];
+  const envelope = { ...f.signed(runner, job, manifest),
+    attachments: [{ sha256: trajectorySha, dataBase64: trajectory.toString('base64') }] };
   await f.request('/provider/report', { token: job.leaseToken, status: 409, body: {
     ...envelope, report: { ...manifest, challenge: 'fake' },
   } });
@@ -351,6 +357,18 @@ test('run-bound signature, consent, and independent finalized transfer replay ch
   const passed = await f.request('/provider/report', { token: job.leaseToken, body: envelope });
   assert.equal(passed.run.state, 'passed');
   assert.equal(passed.run.verification.transaction.status, 'verified');
+  const route = '/runs/' + job.runId;
+  await f.request(route + '/training-export', { token: developer.token, status: 403 });
+  await f.request(route + '/training-consent', { token: developer.token, method: 'PUT' });
+  await f.request(route + '/training-export', { token: developer.token, status: 403 });
+  await f.request(route + '/training-consent', { token: owner.token, method: 'PUT' });
+  const exported = await f.request(route + '/training-export', { token: developer.token });
+  assert.equal(exported.format, 'agus.training-trajectory.v1');
+  assert.deepEqual(exported.actions, [{ index: 0, type: 'tap', outcome: 'completed', offsetMs: 0, phase: 'submit-transfer' }]);
+  await f.request(route + '/training-export', { token: owner.token, status: 403 });
+  await f.request(route + '/training-consent', { token: owner.token, method: 'DELETE' });
+  await f.request(route + '/training-export', { token: developer.token, status: 403 });
+
 
   const replayJob = await next();
   const replay = f.report(replayJob, ['approved-build', 'app-launched', 'wallet-authorized', 'cleanup']);

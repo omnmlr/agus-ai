@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import org.json.JSONObject;
 
 public final class MainActivity extends Activity {
+    private static final String NETWORK = "localnet";
     private static final String TEST_WALLET = "com.solana.mobilewalletadapter.fakewallet";
     private static final String BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
     private TextView status;
@@ -37,7 +38,7 @@ public final class MainActivity extends Activity {
         title.setText("AGUS MWA Test Fixture");
         content.addView(title);
         status = new TextView(this);
-        status.setText("Local validator / disposable wallet");
+        status.setText(NETWORK + " / disposable wallet");
         content.addView(status);
         send = new Button(this);
         send.setId(android.R.id.button1);
@@ -64,7 +65,7 @@ public final class MainActivity extends Activity {
             try {
                 var client = scenario.start().get(30, TimeUnit.SECONDS);
                 phase = "WALLET_ERROR";
-                var account = client.authorize(null, null, "AGUS MWA Test Fixture", "solana:localnet",
+                var account = client.authorize(null, null, "AGUS MWA Test Fixture", "solana:" + NETWORK,
                     null, null, null, null).get(90, TimeUnit.SECONDS);
                 String payer = base58(account.accounts[0].publicKey);
                 phase = "PREPARE";

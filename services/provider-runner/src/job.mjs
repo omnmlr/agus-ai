@@ -44,18 +44,20 @@ async function stage(stream, file, expectedSha, signal) {
 
 function walletSpec(config, job) {
   if (!["wallet-transfer", "wallet-false-success"].includes(job.scenario)) return null;
-  const configured = { network: "localnet", recipient: FIXTURE_RECIPIENT, lamports: FIXTURE_AMOUNT };
+  const configured = config.devnet
+    ? { network: "devnet", recipient: config.devnet.recipient, lamports: FIXTURE_AMOUNT, payer: config.devnet.payer }
+    : { network: "localnet", recipient: FIXTURE_RECIPIENT, lamports: FIXTURE_AMOUNT };
   const expected = job.expectedTransaction;
-  if (!config.localnet || (job.scenario === "wallet-transfer" && !expected) ||
+  if ((!config.localnet && !config.devnet) || (job.scenario === "wallet-transfer" && !expected) ||
       (expected && (expected.network !== configured.network || expected.recipient !== configured.recipient ||
-        expected.lamports !== configured.lamports))) {
+        expected.lamports !== configured.lamports || (configured.payer && expected.payer !== configured.payer)))) {
     throw new RunnerFailure("FIXTURE_WALLET_POLICY");
   }
   return configured;
 }
 
 function chainVerifier(config, spec) {
-  const network = { cluster: spec.network, genesis: config.localnet.genesis };
+  const network = spec.network === "devnet" ? { cluster: "devnet" } : { cluster: "localnet", genesis: config.localnet.genesis };
   const rpc = connection(network);
   return {
     start: () => startWindow(rpc, network),
@@ -233,6 +235,7 @@ export async function executeJob({ api, config, identity, device, rawJob, shutdo
       const transaction = await waitForCallback(device, since, signal);
       check("wallet-callback", transaction.outcome === "submitted", transaction.code);
       if (transaction.outcome !== "submitted") throw new RunnerFailure(transaction.code);
+      if (spec.payer && transaction.payer !== spec.payer) throw new RunnerFailure("FIXTURE_WALLET_POLICY");
       report.transaction = {
         signature: transaction.signature, network: spec.network,
         recipient: spec.recipient, lamports: spec.lamports,

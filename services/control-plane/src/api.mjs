@@ -7,6 +7,7 @@ import {
   publicProject, publicRun, publicUser, requestStop, timestamp, validPackage, visibleTo,
 } from './domain.mjs';
 import { handlePersonRoutes, refreshLifecycles } from './person-routes.mjs';
+import { trainingAccess, trainingExport } from './training.mjs';
 import { idempotencyRecord } from './idempotency.mjs';
 import {
   acknowledgeCleanup, buildForLease, claim, enrollProvider, finalizeReport, heartbeat, leaseStatus,
@@ -29,7 +30,7 @@ export function createApi({ store, config, settlement }) {
     if (config.corsOrigin && origin === config.corsOrigin) {
       response.setHeader('Access-Control-Allow-Origin', origin);
       response.setHeader('Vary', 'Origin');
-      response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+      response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
       response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Idempotency-Key, Last-Event-ID');
     }
     if (request.method === 'OPTIONS') {
@@ -123,6 +124,21 @@ export function createApi({ store, config, settlement }) {
       const runId = route[1];
       if (route.length === 1) {
         await runCollection({ store, config, user, request, response, settlement });
+        return;
+      }
+      if (route.length === 3 && route[2] === 'training-consent' && ['GET', 'PUT', 'DELETE'].includes(request.method)) {
+        const grant = request.method === 'GET' ? undefined : request.method === 'PUT';
+        const { consent } = await store.transaction(state => trainingAccess(state, runId, user, config.now(), grant));
+        send(response, { consent });
+        return;
+      }
+      if (route.length === 3 && route[2] === 'training-export' && request.method === 'GET') {
+        const access = await store.transaction(state => trainingAccess(state, runId, user, config.now()));
+        requireCondition(access.role === 'developer' && access.consent.developer && access.consent.provider,
+          'Training export requires both parties’ consent', 'training_consent_required', 403);
+        const bytes = await store.artifact(`evidence:${runId}:${access.trace.sha256}`);
+        const current = await store.transaction(state => trainingAccess(state, runId, user, config.now()));
+        send(response, trainingExport(current, bytes));
         return;
       }
       const owned = (action) => store.transaction((state) => {
@@ -293,7 +309,7 @@ async function runCollection({ store, config, user, request, response, settlemen
       requireCondition(settlement, 'Devnet payments are disabled', 'payment_unavailable', 503);
       const provider = state.providers[state.devices[run.deviceId]?.providerId];
       requireCondition(kind === 'devnet' && run.allocation === 'marketplace' && run.scenario === 'wallet-transfer'
-        && run.expectedTransaction?.network === 'devnet' && provider?.payoutWalletVerifiedAt && publicAddress(developerWallet),
+        && run.expectedTransaction?.network === 'devnet' && run.expectedTransaction.payer && provider?.payoutWalletVerifiedAt && publicAddress(developerWallet),
       'Paid work requires verified Devnet wallet-transfer terms and a selected verified provider wallet', 'payment_unavailable', 409);
       run.paymentTerms = {
         kind: 'devnet', status: 'quote_required', providerWallet: provider.payoutWallet,

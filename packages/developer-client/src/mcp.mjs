@@ -8,6 +8,7 @@ const idempotencyKey = z.string().regex(/^[\w.-]{1,128}$/).optional();
 const expectedTransaction = z.object({
   network: z.enum(['devnet', 'localnet']),
   recipient: z.string().min(32).max(44),
+  payer: z.string().min(32).max(44).optional(),
   lamports: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
 });
 

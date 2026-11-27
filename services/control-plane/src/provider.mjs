@@ -59,6 +59,7 @@ function approvedBuilds(value) {
   return array(value, 'approvedBuilds', 50).map((entry) => {
     const build = object(entry, 'approved build');
     requireCondition(hex256(build.sha256) && validPackage(build.packageName)
+      && (build.walletNetwork === undefined || ['devnet', 'localnet'].includes(build.walletNetwork))
       && (build.scenarios === undefined || (Array.isArray(build.scenarios) && build.scenarios.length <= 4
         && build.scenarios.every((value) => typeof value === 'string' && value.length <= 40))),
     'Invalid approved build');
@@ -82,8 +83,9 @@ export async function claim({ store, config, credential, input }) {
     const run = Object.values(state.runs).filter((entry) => {
       const build = state.builds[entry.buildId];
       return build && claimAllowed(state, entry, device, config, now)
-        && (!whitelist || whitelist.some(({ sha256, packageName, scenarios }) => (
+        && (!whitelist || whitelist.some(({ sha256, packageName, scenarios, walletNetwork }) => (
           sha256 === build.sha256 && packageName === build.packageName && (!scenarios || scenarios.includes(entry.scenario))
+            && (!entry.expectedTransaction || (walletNetwork ?? "localnet") === entry.expectedTransaction.network)
         )));
     }).sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0];
     if (!run) return { job: null };

@@ -59,7 +59,8 @@ const schemas = {
   RunState: values('queued', 'reserved', 'running', 'verifying', 'stopping', 'passed', 'failed', 'cancelled', 'expired', 'unverified'),
   LeaseState: values('unallocated', 'reserved', 'running', 'stopping', 'verifying', 'released', 'expired'),
   ExecutionState: values('queued', 'reserved', 'running', 'stopping', 'verifying', 'completed', 'cancelled', 'expired'),
-  TransactionExpectation: obj({ network: values('devnet', 'localnet'), recipient: string, lamports: integer }),
+  TransactionExpectation: obj({ network: values('devnet', 'localnet'), recipient: string, lamports: integer, payer: string },
+    ['network', 'recipient', 'lamports']),
   EvidenceConsent: obj(consent, []),
   CreateRun: obj(createRun, ['projectId', 'buildId', 'scenario', 'mode']),
   Project: obj({ id, name: string, createdAt: date }),
@@ -206,6 +207,17 @@ post('/runs/{runId}/quote', 'Create an immutable eligible Devnet quote', payment
 post('/runs/{runId}/funding', 'Verify a finalized Devnet funding signature', payment, envelope('signature', string));
 post('/runs/{runId}/settle', 'Settle a funded and eligible report', payment);
 post('/runs/{runId}/reconcile', 'Reconcile the same payout signature', payment);
+
+const trainingConsent = envelope('consent', obj({ developer: nullable(date), provider: nullable(date) }));
+get('/runs/{runId}/training-consent', 'Read purpose-specific consent as a run participant', trainingConsent);
+operation('/runs/{runId}/training-consent', 'put', 'Grant consent for training export', trainingConsent);
+operation('/runs/{runId}/training-consent', 'delete', 'Withdraw consent for future training export', trainingConsent);
+get('/runs/{runId}/training-export', 'Export a minimized, consented training trajectory as the developer', obj({
+  format: values('agus.training-trajectory.v1'), purpose: values('training'), scenario: of('Scenario'),
+  source: obj({ receiptId: string, manifestSha256: sha, trajectorySha256: sha, planner: string }),
+  actions: array(obj({ index: integer, type: string, outcome: values('completed', 'failed'), offsetMs: integer,
+    phase: string, selectedBy: values('gemini') }, ['index', 'type', 'outcome', 'offsetMs'])),
+}));
 
 get('/me/devices', 'List provider-owned device records', envelopeList('devices', of('OwnedDevice')));
 post('/me/devices/pairings', 'Issue a one-time runner pairing code', envelope('pairing', obj({ code: string, expiresAt: date })),

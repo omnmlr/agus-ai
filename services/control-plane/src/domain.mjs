@@ -18,7 +18,7 @@ export function getOwned(records, id, user, name) {
 
 export function publicProject({ ownerId, ...project }) { return project; }
 export function publicBuild({ ownerId, artifactId, ...build }) { return build; }
-export function publicRun({ ownerId, leaseId, assignedProviderId, assignedPayoutWallet, authorizedProviderId, paymentNotificationStates, ...run }) { return run; }
+export function publicRun({ ownerId, leaseId, assignedProviderId, assignedPayoutWallet, authorizedProviderId, paymentNotificationStates, trainingConsent, ...run }) { return run; }
 export function publicUser({ id, email, displayName, providerEnabled }) {
   return { id, email, ...(displayName ? { displayName } : {}), capabilities: { developer: true, provider: Boolean(providerEnabled) } };
 }

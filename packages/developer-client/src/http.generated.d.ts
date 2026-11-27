@@ -2650,6 +2650,199 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/{runId}/training-consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read purpose-specific consent as a run participant */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            consent: {
+                                developer: string | null;
+                                provider: string | null;
+                            };
+                        };
+                    };
+                };
+                /** @description Stable error envelope */
+                default: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        /** Grant consent for training export */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            consent: {
+                                developer: string | null;
+                                provider: string | null;
+                            };
+                        };
+                    };
+                };
+                /** @description Stable error envelope */
+                default: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Withdraw consent for future training export */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            consent: {
+                                developer: string | null;
+                                provider: string | null;
+                            };
+                        };
+                    };
+                };
+                /** @description Stable error envelope */
+                default: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{runId}/training-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export a minimized, consented training trajectory as the developer */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            actions: {
+                                index: number;
+                                offsetMs: number;
+                                /** @enum {string} */
+                                outcome: "completed" | "failed";
+                                phase?: string;
+                                /** @enum {string} */
+                                selectedBy?: "gemini";
+                                type: string;
+                            }[];
+                            /** @enum {string} */
+                            format: "agus.training-trajectory.v1";
+                            /** @enum {string} */
+                            purpose: "training";
+                            scenario: components["schemas"]["Scenario"];
+                            source: {
+                                manifestSha256: string;
+                                planner: string;
+                                receiptId: string;
+                                trajectorySha256: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Stable error envelope */
+                default: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/runs/{runId}/verify": {
         parameters: {
             query?: never;
@@ -3100,6 +3293,7 @@ export interface components {
             lamports: number;
             /** @enum {string} */
             network: "devnet" | "localnet";
+            payer?: string;
             recipient: string;
         };
         Unpaid: {

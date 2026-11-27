@@ -34,7 +34,13 @@ export function parseConfig(raw, baseDirectory) {
     !raw.wallet || typeof raw.wallet.apkPath !== "string" || !raw.wallet.apkPath ||
     raw.wallet.sha256 !== FAKE_WALLET_SHA
   )) throw new RunnerFailure("CONFIG_TEST_WALLET");
-  if (supportedScenarios.some((name) => name !== "app-launch") &&
+  const walletNetwork = raw.devnet ? "devnet" : "localnet";
+  if (raw.devnet && (raw.localnet || !publicKeyPattern.test(raw.devnet.payer ?? "") ||
+      !publicKeyPattern.test(raw.devnet.recipient ?? "") || raw.devnet.payer === raw.devnet.recipient ||
+      supportedScenarios.some(name => !["app-launch", "wallet-transfer"].includes(name)))) {
+    throw new RunnerFailure("CONFIG_DEVNET");
+  }
+  if (!raw.devnet && supportedScenarios.some((name) => name !== "app-launch") &&
       (!raw.localnet || !publicKeyPattern.test(raw.localnet.genesis))) {
     throw new RunnerFailure("CONFIG_LOCALNET");
   }
@@ -42,13 +48,14 @@ export function parseConfig(raw, baseDirectory) {
     displayName: raw.displayName.trim(),
     stateDirectory: resolve(baseDirectory, raw.stateDirectory),
     device: raw.device,
-    approvedBuilds: raw.approvedBuilds,
+    approvedBuilds: raw.approvedBuilds.map(build => ({ ...build, walletNetwork })),
     supportedScenarios,
     allowedDeveloperEmails: [...new Set((raw.allowedDeveloperEmails ?? []).map((email) => email.trim().toLowerCase()))].sort(),
     payoutWallet: raw.payoutWallet,
     planner: raw.planner ?? "remote",
     walletPath: raw.wallet ? resolve(baseDirectory, raw.wallet.apkPath) : undefined,
     localnet: raw.localnet,
+    devnet: raw.devnet,
   };
 }
 
