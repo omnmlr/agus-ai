@@ -200,6 +200,12 @@ function checkLeaseProof(state, lease, proof, kind, fields) {
   return { ...result, installation };
 }
 
+export function receiveNativeStop(state, lease, input, now) {
+  checkLeaseProof(state, lease, input, 'owner_stop', []);
+  if (lease.state === 'active') stopNativeLease(state, lease.id, 'owner_stop', now);
+  return renewNativeLease(state, lease, now);
+}
+
 export function receiveNativeReport(state, lease, input, now) {
   const { value, sha256 } = checkLeaseProof(state, lease, input, 'report', ['outcome', 'observations']);
   if (lease.report) {

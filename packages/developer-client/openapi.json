@@ -6264,6 +6264,67 @@
         }
       }
     },
+    "/api/v1/runtime/leases/{leaseId}/stop": {
+      "post": {
+        "summary": "Fence authority after local owner stop",
+        "security": [
+          {
+            "LeaseBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "leaseId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeProof"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lease": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "lease"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/runtime/leases/{leaseId}/cleanup": {
       "post": {
         "summary": "Acknowledge actual profile cleanup",

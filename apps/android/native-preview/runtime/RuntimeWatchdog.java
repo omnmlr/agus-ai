@@ -53,12 +53,22 @@ public class RuntimeWatchdog extends Service {
             .setContentTitle("AGUS testing window").setContentText("Stop immediately to reclaim your screen.")
             .setOngoing(true).addAction(new Notification.Action.Builder(null, "Stop test", stop).build()).build(),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-        if (intent != null && "stop".equals(intent.getAction()) && RuntimeState.live != null) {
-            RuntimeState.live.stop();
-            Log.i("AgusPreview", "WATCHDOG_OWNER_STOP");
-        }
         timer.removeCallbacks(check);
-        timer.post(check);
+        var work = RuntimeState.live;
+        if (intent != null && "stop".equals(intent.getAction()) && work != null) {
+            work.stop();
+            Log.i("AgusPreview", "WATCHDOG_OWNER_STOP");
+            network.execute(() -> {
+                try {
+                    work.notifyOwnerStop();
+                    Log.i("AgusPreview", "WATCHDOG_SERVER_FENCED");
+                }
+                catch (Exception unavailable) { /* Local suspension and expiry stand independently. */ }
+                finally { stopSelf(id); }
+            });
+        } else {
+            timer.post(check);
+        }
         return START_NOT_STICKY;
     }
 

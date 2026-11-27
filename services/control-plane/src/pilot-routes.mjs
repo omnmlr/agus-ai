@@ -5,7 +5,7 @@ import { digest, readJson, requireCondition } from './security.mjs';
 import { boundJson, conflict, exact, missing, own } from './pilot-policy.mjs';
 import {
   authenticateNativeLease, authenticateRuntime, completeNativeEnrollment, issueNativeLease,
-  nativeBuildForLease, nativeHeartbeat, publicInstallation, receiveNativeCleanup, receiveNativeReport,
+  nativeBuildForLease, nativeHeartbeat, publicInstallation, receiveNativeCleanup, receiveNativeReport, receiveNativeStop,
   renewNativeLease, revokeNativeInstallation, startNativeEnrollment,
 } from './native-runtime.mjs';
 
@@ -47,6 +47,7 @@ function transport(state, pilot, credential, route, method, input, now) {
     const lease = authenticateNativeLease(state, id, credential, now);
     if (method === 'GET' && operation === 'build') return nativeBuildForLease(state, lease);
     if (method === 'GET' && !operation) return renewNativeLease(state, lease, now);
+    if (method === 'POST' && operation === 'stop') return receiveNativeStop(state, lease, input, now);
     if (method === 'POST' && operation === 'report') return receiveNativeReport(state, lease, input, now);
     if (method === 'POST' && operation === 'cleanup') return receiveNativeCleanup(state, lease, input, now);
   }

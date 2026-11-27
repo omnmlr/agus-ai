@@ -2,6 +2,12 @@ name: AGUS product preview on Android
 
 on:
   workflow_dispatch:
+    inputs:
+      journey:
+        description: Android preview journey
+        type: choice
+        options: [full, safety, cooperative]
+        default: full
   push:
     branches: [feature/phase-2-3-product]
     paths:
@@ -31,6 +37,8 @@ jobs:
           java-version: "21"
       - name: Build and exercise signed preview on Android
         shell: bash
+        env:
+          AGUS_PREVIEW_JOURNEY: ${{ inputs.journey || 'full' }}
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/agus-product-preview"

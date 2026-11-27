@@ -219,6 +219,10 @@ final class RuntimeState {
                 PilotApi.sign(binding("report").put("outcome", "completed").put("observations", observations)));
         }
 
+        void notifyOwnerStop() throws Exception {
+            PilotApi.request("POST", path() + "/stop", credential, PilotApi.sign(binding("owner_stop")));
+        }
+
         void acknowledge() throws Exception {
             if (!absent(context) || prefs(context).getBoolean("packagePending", false) || !ProfileAdmin.installRestricted(context))
                 throw new SecurityException("Package cleanup is unconfirmed");

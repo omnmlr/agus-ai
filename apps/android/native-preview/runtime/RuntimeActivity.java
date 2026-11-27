@@ -92,8 +92,13 @@ public class RuntimeActivity extends Activity {
         if (RuntimeState.live != null) {
             var work = RuntimeState.live;
             label(work.stopped ? "Cleanup pending" : "Authorized test session");
-            button("Stop test now", () -> { work.stop(); render(); status("Stopped locally. Complete Android cleanup."); });
             if (!work.stopped) {
+                button("Stop test now", () -> {
+                    work.stop();
+                    render();
+                    status("Stopped locally. Complete Android cleanup.");
+                    run(() -> { work.notifyOwnerStop(); return null; });
+                });
                 button("Allow Android installation source", this::openInstallerSource);
                 button("Stage reviewed APK", () -> run(() -> {
                     RuntimeState.install(this, work); return "Queued for Android approval";

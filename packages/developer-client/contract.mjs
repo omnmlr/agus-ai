@@ -360,6 +360,7 @@ operation('/runtime/leases/{leaseId}/build', 'get', 'Download the leased reviewe
   auth: 'LeaseBearer', emptyResponse: 'Reviewed pinned APK bytes',
 });
 post('/runtime/leases/{leaseId}/report', 'Seal a native execution report', envelope('report', record), of('NativeProof'), { auth: 'LeaseBearer' });
+post('/runtime/leases/{leaseId}/stop', 'Fence authority after local owner stop', envelope('lease', record), of('NativeProof'), { auth: 'LeaseBearer' });
 post('/runtime/leases/{leaseId}/cleanup', 'Acknowledge actual profile cleanup', envelope('cleanup', record), of('NativeProof'), { auth: 'LeaseBearer' });
 
 const spec = {

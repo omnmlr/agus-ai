@@ -13,6 +13,7 @@ ADB = str(Path(os.environ["ANDROID_HOME"]) / "platform-tools" / "adb")
 OUT = Path(sys.argv[1])
 APP = "app.agus.runtime.preview"
 FIXTURE = "app.agus.preview.fixture"
+JOURNEY = os.environ.get("AGUS_PREVIEW_JOURNEY", "full")
 marks = []
 
 
@@ -41,12 +42,27 @@ def tree():
         return ET.Element("empty")
 
 
+def bounds(node):
+    return tuple(map(int, re.findall(r"\d+", node.get("bounds", ""))))
+
+
 def touch(labels):
-    for node in tree().iter("node"):
+    root = tree()
+    scroll_view = next((node for node in root.iter("node") if node.get("package") == APP
+                        and node.get("class") == "android.widget.ScrollView"), None)
+    scrolled = set(scroll_view.iter("node")) if scroll_view is not None else set()
+    for node in root.iter("node"):
         label = (node.get("text") or node.get("content-desc") or "").lower()
         if label in labels and node.get("enabled") == "true":
-            x0, y0, x1, y1 = map(int, re.findall(r"\d+", node.get("bounds")))
-            adb("shell", "input", "tap", str((x0 + x1) // 2), str((y0 + y1) // 2))
+            x0, y0, x1, y1 = bounds(node)
+            if node in scrolled:
+                left, top, right, bottom = bounds(scroll_view)
+                x0, y0, x1, y1 = max(x0, left), max(y0, top), min(x1, right), min(y1, bottom)
+            if x1 <= x0 or y1 - y0 < 14:
+                continue
+            x, y = (x0 + x1) // 2, (y0 + y1) // 2
+            print(f"Touch {node.get('package')} {label!r} at ({x}, {y})", flush=True)
+            adb("shell", "input", "tap", str(x), str(y))
             return label
     return None
 
@@ -62,13 +78,13 @@ def tap(label, scroll=True):
             scroll_view = next((node for node in tree().iter("node") if node.get("package") == APP
                                 and node.get("class") == "android.widget.ScrollView"), None)
             if scroll_view is not None:
-                left, top, right, bottom = map(int, re.findall(r"\d+", scroll_view.get("bounds")))
+                left, top, right, bottom = bounds(scroll_view)
                 x = str((left + right) // 2)
                 y0 = str(top + (bottom - top) // 4)
                 y1 = str(top + (bottom - top) * 3 // 4)
                 if (count // 2) % 6 in (4, 5, 0):
                     y0, y1 = y1, y0
-                adb("shell", "input", "swipe", x, y1, x, y0, "220")
+                adb("shell", "input", "swipe", x, y1, x, y0, "440")
         return clicked
     return until(find, "Missing visible control: " + label)
 
@@ -143,9 +159,12 @@ def run():
     expect("PROFILE_PERSON_AUTHENTICATED")
     enrollments = 0
     finished = 0
-    for number, mode in enumerate(("human", "owner-stop", "offline", "cooperative"), start=1):
-        if mode in ("human", "cooperative"):
-            tap("Enroll this phone for " + mode + " testing")
+    modes = {"full": ("human", "owner-stop", "offline", "cooperative"),
+             "safety": ("owner-stop", "offline"), "cooperative": ("cooperative",)}[JOURNEY]
+    for number, mode in enumerate(modes, start=1):
+        if number == 1 or mode == "cooperative":
+            kind = "cooperative" if mode == "cooperative" else "human"
+            tap("Enroll this phone for " + kind + " testing")
             enrollments += 1
             expect("PROFILE_RUNTIME_ENROLLED", enrollments)
         if number == 1:
@@ -179,6 +198,7 @@ def run():
             tap("Stop test", scroll=False)
             expect("WATCHDOG_OWNER_STOP")
             adb("shell", "cmd", "statusbar", "collapse")
+            expect("WATCHDOG_SERVER_FENCED")
         if mode == "offline":
             # Expire after staging and before launch, so the test APP cannot trigger its own stop.
             backend = int(os.environ["AGUS_PREVIEW_BACKEND_PID"])
@@ -217,7 +237,7 @@ def run():
                 tap("Show my assignments")
         else:
             record(mode + " independently suspended the fixture and confirmed cleanup")
-        if mode == "offline":
+        if mode == "offline" and "cooperative" in modes:
             tap("Revoke installation")
             tap("Revoke", scroll=False)
     tap("Remove test work profile")
@@ -232,6 +252,8 @@ try:
     run()
 except Exception:
     print("Final synthetic screen:", [item.get("text") for item in tree().iter("node") if item.get("text")], flush=True)
+    print("Focus:", next((line.strip() for line in adb("shell", "dumpsys", "window").splitlines()
+                          if "mCurrentFocus=" in line), "not reported"), flush=True)
     print(adb("logcat", "-d", "-t", "1000", "-s", "AndroidRuntime:E", "*:S"), flush=True)
     raise
 finally:

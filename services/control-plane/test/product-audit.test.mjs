@@ -51,7 +51,17 @@ test('30 fenced reservation/stop cycles reject old authority and require postcon
       }
       const leasePath = '/runtime/leases/' + lease.id;
       if (index % 2 === 0) {
-        await as(provider, 'POST', '/me/assignments/' + offer.id + '/stop', {});
+        if (index % 4 === 0) {
+          const stop = leaseProof(runtime, lease, 'owner_stop', {});
+          if (priorGrant) {
+            await pilot.request('POST', leasePath + '/stop', { credential: lease.credential,
+              body: leaseProof(runtime, priorGrant, 'owner_stop', {}), status: 403 });
+          }
+          await pilot.request('POST', leasePath + '/stop', { credential: runtime.credential, body: stop, status: 401 });
+          const stopped = await pilot.request('POST', leasePath + '/stop', { credential: lease.credential, body: stop });
+          assert.equal(stopped.lease.stop.reason, 'owner_stop');
+          assert.deepEqual(await pilot.request('POST', leasePath + '/stop', { credential: lease.credential, body: stop }), stopped);
+        } else await as(provider, 'POST', '/me/assignments/' + offer.id + '/stop', {});
       } else pilot.clock.now = lease.expiresAt;
       await pilot.request('GET', leasePath + '/build', { credential: lease.credential, status: 409 });
       await pilot.request('POST', leasePath + '/cleanup', { credential: lease.credential,
