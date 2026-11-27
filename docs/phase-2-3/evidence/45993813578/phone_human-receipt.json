@@ -1,0 +1,51 @@
+{
+  "receipt": {
+    "manifest": {
+      "encoding": "base64",
+      "alg": "ECDSA-P256-SHA256-DER",
+      "keyId": "8f6002ba907530e993b06f79171232015432161f4f81b02bf33cdcbf7e53e5be",
+      "payload": "eyJhY3Rpb25Db250cmFjdCI6ImNvb3BlcmF0aXZlLXYxIiwiYWN0aW9ucyI6W10sImFzc2lnbm1lbnRJZCI6ImNkYjNkNWE0LTIwYjAtNDJmZi1iMzM3LTNkMTY0NDY4NzE5ZCIsImF0dGVtcHRJZCI6IjBmYmRiMDAwLTBkYjEtNGQ2Zi1iYWIxLWNjOTU2ZDc5MmY3ZCIsImF1ZGllbmNlIjoiNjM2MzliNjAtZjBmMy00ODQ2LTk0NTQtOGM2YTgwZTZlM2EwIiwiYnVpbGQiOnsiY29tcG9uZW50IjoiYXBwLmFndXMucHJldmlldy5maXh0dXJlLlRlc3RBY3Rpdml0eSIsImlkIjoiM2Y3MDg5ZGItYTY5ZS00NTFlLTk5M2YtMWU5YWY5ZjAxY2Q5IiwicGFja2FnZU5hbWUiOiJhcHAuYWd1cy5wcmV2aWV3LmZpeHR1cmUiLCJzaGEyNTYiOiI5YjE3NGM0YjJkNTRhYTk3NGU5YTNiNjVmNGE3ZTUzYTNkNmEyZGE2NDhkNGIzZDc5ODgzYWNhYTk1ODRkMWYzIiwic2lnbmVyU2hhMjU2IjoiNmNjZjE5MzU5NjQ3MWI2MDJiMDc3MzdiODczMGY2YzUzYjM4ZmFkYWI0OTc5ZTU2Y2M3ODU0ZDI3NzJlNTUxMyJ9LCJjYW1wYWlnblJldmlzaW9uIjoxLCJjaGFsbGVuZ2UiOiJMMXVBMklFSnpsd0FrbWxzcHR6SS01eGZxZnBsLWdpRFVqMWVNSUdRRmZnIiwiZGVhZGxpbmUiOjE3OTU3ODA1ODY1MzAsImV2aWRlbmNlIjoic3RydWN0dXJlZF9vbmx5IiwiZmVuY2UiOjEsImluc3RhbGxhdGlvbktleVNoYTI1NiI6ImRlZWNlZTRiMzRmYjAxMThiZTQwMjc4MTk5ZmEwNTk5MWM0OGYyN2RiZTNmMjdkYmEwMTA4MTU2NGQ3Mjc3ZjQiLCJpc3N1ZWRBdCI6MTc5NTc4MDQwNjUzMCwibGVhc2VJZCI6IjJiNDQ4ZmI3LTVjNDktNGQxZi05N2UyLTk3OWI0ZDIzMGUyNSIsIm9ic2VydmF0aW9uU2NoZW1hIjoiZml4dHVyZS1yZXN1bHQtdjEiLCJwb2xpY3lWZXJzaW9uIjoibWFuYWdlZC1wcm9maWxlLXYxIiwicnVudGltZUNsYXNzIjoicGhvbmVfaHVtYW4iLCJ0YXNrS2luZCI6Imh1bWFuX2RlbW9uc3RyYXRpb24iLCJ0ZXJtc0RpZ2VzdCI6Ijg3OWMxZjAxMjU3MDVkM2I4MzEyODY2MGNkM2Q2MmZiMTJiZDBmNTkxMmQ0NTZjZTk4NzU1NDkwYTEzZjVhMjkiLCJ0dGxNcyI6NDUwMDAsInR5cGUiOiJhZ3VzLm5hdGl2ZS53b3JrbG9hZCIsInYiOjF9",
+      "sha256": "f7a2ec1f85d39e145962f7e808bd3d5033d3a8c235d7654681963d482831baa4",
+      "signature": "MEYCIQCT2X2yQP5oylm+VndjGOKg0k+N+/1O/VR9FMfFoXc4aQIhAI3cLO9seC+RugwNIfFZQj7YL1P6br1O4YMraewFBNbR"
+    },
+    "report": {
+      "sha256": "5960f3dc0222a111eed5f620f44d6ed4cc90fe897df4155e1609373ff29f4eca",
+      "receivedAt": 1795780431348,
+      "proof": {
+        "payload": "eyJ2IjoxLCJraW5kIjoicmVwb3J0IiwiaW5zdGFsbGF0aW9uSWQiOiI2MzYzOWI2MC1mMGYzLTQ4NDYtOTQ1NC04YzZhODBlNmUzYTAiLCJsZWFzZUlkIjoiMmI0NDhmYjctNWM0OS00ZDFmLTk3ZTItOTc5YjRkMjMwZTI1IiwiY2hhbGxlbmdlIjoiTDF1QTJJRUp6bHdBa21sc3B0ekktNXhmcWZwbC1naURVajFlTUlHUUZmZyIsImZlbmNlIjoxLCJtYW5pZmVzdFNoYTI1NiI6ImY3YTJlYzFmODVkMzllMTQ1OTYyZjdlODA4YmQzZDUwMzNkM2E4YzIzNWQ3NjU0NjgxOTYzZDQ4MjgzMWJhYTQiLCJvdXRjb21lIjoiY29tcGxldGVkIiwib2JzZXJ2YXRpb25zIjpbeyJhY3Rpb24iOiJjb250aW51ZSIsInJlc3VsdCI6ImFkdmFuY2VkIiwib2Zmc2V0TXMiOjIzMTN9LHsiYWN0aW9uIjoicmV2aWV3IiwicmVzdWx0IjoicmVhZHkiLCJvZmZzZXRNcyI6NDM1Nn0seyJhY3Rpb24iOiJjb250aW51ZSIsInJlc3VsdCI6ImFkdmFuY2VkIiwib2Zmc2V0TXMiOjYzODh9XX0=",
+        "signature": "MEQCIDvByMrlyTWM1mdxm6fSH4m8QnTgF+p3ehrlaEepHtEOAiAE8+PCDke/yZq9WtjzRdTGPaWntIbSHgqJx02+rGFhOQ=="
+      },
+      "outcome": "completed",
+      "observations": [
+        {
+          "action": "continue",
+          "result": "advanced",
+          "offsetMs": 2313
+        },
+        {
+          "action": "review",
+          "result": "ready",
+          "offsetMs": 4356
+        },
+        {
+          "action": "continue",
+          "result": "advanced",
+          "offsetMs": 6388
+        }
+      ],
+      "evaluation": "unverified",
+      "provenance": "installation_signed_preview_claim"
+    },
+    "cleanup": {
+      "sha256": "05a042b640cd6755c8f2d310196f5f31a0a23683d854fbe3cebd1e130789895c",
+      "confirmedAt": 1795780440806,
+      "proof": {
+        "payload": "eyJ2IjoxLCJraW5kIjoiY2xlYW51cCIsImluc3RhbGxhdGlvbklkIjoiNjM2MzliNjAtZjBmMy00ODQ2LTk0NTQtOGM2YTgwZTZlM2EwIiwibGVhc2VJZCI6IjJiNDQ4ZmI3LTVjNDktNGQxZi05N2UyLTk3OWI0ZDIzMGUyNSIsImNoYWxsZW5nZSI6IkwxdUEySUVKemx3QWttbHNwdHpJLTV4ZnFmcGwtZ2lEVWoxZU1JR1FGZmciLCJmZW5jZSI6MSwibWFuaWZlc3RTaGEyNTYiOiJmN2EyZWMxZjg1ZDM5ZTE0NTk2MmY3ZTgwOGJkM2Q1MDMzZDNhOGMyMzVkNzY1NDY4MTk2M2Q0ODI4MzFiYWE0IiwicGFja2FnZUFic2VudCI6dHJ1ZSwiaW5zdGFsbFJlc3RyaWN0ZWQiOnRydWV9",
+        "signature": "MEQCIBSjGwLLJ8MP5HBvS/EjjeOEkZrAV6u+Pfp1ZUB72XgBAiBps7059RHTx+2yMhYa3Qw/WGyGCZOTsrTkk4tr+RpDKg=="
+      },
+      "provenance": "installation_signed_preview_claim"
+    },
+    "algorithm": "ECDSA-P256-SHA256-DER",
+    "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEhmTidfjtHqR5BPFqsiRymnt/W9Nlg7Ee0K5mQXdVPT21jKtojS82ugF1BY7KRzSjhTnUsiwuIyOV7bFERTZcdw=="
+  }
+}

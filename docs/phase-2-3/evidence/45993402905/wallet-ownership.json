@@ -1,0 +1,8 @@
+{
+  "scope": "AOSP and disposable Fake Wallet, off-chain signatures",
+  "checks": [
+    "Declined signature leaves the account without a verified payout wallet",
+    "Signed MWA ownership message verified by the local control plane",
+    "Disconnect cleared the verified destination"
+  ]
+}
