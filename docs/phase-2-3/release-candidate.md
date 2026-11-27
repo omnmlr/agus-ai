@@ -15,6 +15,8 @@ The downloaded preview archive matched its GitHub digest. Every internal checksu
 
 ## Evidence and deployment boundary
 
+See the [27 November live verification](live-verification-2026-11-27.md) for the current hosted and Devnet checks.
+
 | Gate | Evidence | Activation |
 | --- | --- | --- |
 | Funded campaigns | Archived `ad225f7` tests used disposable Localnet and Postgres. They finalized 700,000 atoms for automated work, 200,000 for a partial dispute award, and an 800,000-atom refund. The funded balance reached zero. The candidate repeated those results with disposable PostgreSQL 17 and Agave 2.3.13. Concurrent worker ticks settled the partial award and the accepted destination survived replacement. | Use the separately mounted campaign operator and test USDC in a disposable Devnet campaign. Localnet receipts cannot establish Devnet activity. [Original evidence](evidence/final-campaign-localnet.json) · [Candidate results](evidence/release-candidate-localnet.json) |
@@ -41,7 +43,7 @@ The working directory contains six private key files restricted to their owner. 
 | SAS authority | `AwUK8G9xKu2vtYGrvhAgTegmFnhSD7pEwSsuCcdckBYZ` | 0.05 Devnet SOL |
 | SAS issuer | `J8c1sNxTunxYJyji3nLrDWjsn6vFSNn1RMxbw6k5U7YE` | 0.05 Devnet SOL |
 
-Total reserve for fresh accounts is **0.27 Devnet SOL and 1.7 Devnet test USDC**. The USDC amount funds the quoted example with two coverage slots. Use the actual immutable quote if the demo changes. Give the test USDC to the campaign funder. Let the quote send it to the operator token account.
+Total reserve for fresh accounts is **0.27 Devnet SOL and 1.7 Devnet test USDC**. The USDC amount funds the quoted example with two assigned slots and one unused slot. Use the actual immutable quote if the demo changes. Give the test USDC to the campaign funder. Let the quote send it to the operator token account.
 
 ```bash
 npm ci --prefix services/settlement
@@ -62,7 +64,7 @@ Use the [founder-controlled signing setup](founder-signing.md) to retain the app
 4. To enable private Android AOSP preview, use registered person IDs in `AGUS_PILOT_MEMBER_IDS`. Place independent reviewer IDs in `AGUS_PILOT_REVIEWER_IDS`. Review APK bytes, signer, publisher and component, then set `AGUS_NATIVE_REVIEWED_BUILDS`. Set `AGUS_PRODUCT_PILOT=private-preview`. Use a restricted signing store to populate `AGUS_NATIVE_MANIFEST_PKCS8`. Build the HTTPS runtime with the corresponding public key and approved workload package list. [SDK and builds](../../packages/cooperative-android/README.md)
 5. If Devnet settlement is needed, check Stockholm headroom and independent TLS routing. Use the isolated Compose package and authorize an AGUS AI cutover with a single write origin. Mount only that environment’s disposable campaign signer. Keep the financial service and its edge route separate. In the portal, download the funded revision quote and run the commands below. Verify funding, publish, accept work, pay once to the pinned destination, and reconcile the refund.
 6. Initialize SAS on Devnet with the disposable authority, then independently verify the accepted receipt against the runner key obtained from approved enrollment. Issue using the delegated issuer. Record the finalized attestation, credential, schema and nonce. [SAS commands](../../services/attestation/README.md)
-7. Run the Android model job on an authorized Android runner with Gemini access. Set `AGUS_GEMINI_API_KEY` from the existing authorized binding and `AGUS_GEMINI_MODEL=gemini-3.1-flash-lite`. Dispatch Android wallet acceptance with `provider_only`, `agent_wallet` and `gemini_agent` enabled, or follow the local dedicated commands. Keep API/network failure separate from evidentiary outcome. [Runner instructions](../../services/provider-runner/README.md)
+7. Run the Android model job on an authorized Android runner with Gemini access. Set `AGUS_GEMINI_API_KEY` from the existing authorized binding and `AGUS_GEMINI_MODEL=gemini-3.5-flash-lite` for the local run. Dispatch Android wallet acceptance with `provider_only`, `agent_wallet` and `gemini_agent` enabled, or follow the local dedicated commands. Keep API/network failure separate from evidentiary outcome. [Runner instructions](../../services/provider-runner/README.md)
 8. Assign the Windows hardware run to Antigravity. Keep public onboarding and retail Work runtime activation gated until device-specific safety and evidence pass.
 
 ```bash

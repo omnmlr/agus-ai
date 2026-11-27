@@ -1,0 +1,54 @@
+{
+  "network": "disposable Localnet",
+  "genesis": "8oHfWTWkhkyKkBYGs33ujeq1PxoL6Ma5GrFntL1hM5wN",
+  "mint": "2KSmcUKQpBAVy3KjXo3xN9J2UiTRFQMHq3KB9hifu3i4",
+  "funding": {
+    "signature": "2Gez72TqF8CS4Ya1d68FJBwJkubbmeqVJbY3hHBkB4vxYwhFA7DqcXmV26uAVVoiFqv49Nxxamqoj3z89N3EHCfJ",
+    "slot": 1697,
+    "commitment": "finalized",
+    "cluster": "localnet",
+    "mint": "2KSmcUKQpBAVy3KjXo3xN9J2UiTRFQMHq3KB9hifu3i4",
+    "amountAtoms": "1700000",
+    "source": "4CcfXQxvZY5Jj4z3UDJ73bGja1HeHWgRjePxzwpVJM3W",
+    "destination": "BPETedsaavGeUqDCtZJNavRrp9EHFBu6pGXkpiZ8PwNT",
+    "payer": "7jmhkKjFnEg3tPRKTmN8JXu7bEYwhBxEk86omZ2w1NvP",
+    "recipient": "HkA7bP62H6pzu1hbkR8cHinRYUBdW6kopuXefp1oxh4L"
+  },
+  "automatic": {
+    "signature": "3v8nhnivfvFBXA5bJaRxkGSRsLzQWZQaTckgRCx9T9VL6yW95gszLPiG9y9DP9D3MYVtoPyFwjM8LhkC8WcZhEL7",
+    "slot": 1731,
+    "commitment": "finalized",
+    "cluster": "localnet",
+    "mint": "2KSmcUKQpBAVy3KjXo3xN9J2UiTRFQMHq3KB9hifu3i4",
+    "amountAtoms": "700000",
+    "source": "BPETedsaavGeUqDCtZJNavRrp9EHFBu6pGXkpiZ8PwNT",
+    "destination": "4dRkNhzMyebTmQG9eKgb3VqCG1ey1dXoU2YtxHXp3TZn",
+    "payer": "HkA7bP62H6pzu1hbkR8cHinRYUBdW6kopuXefp1oxh4L",
+    "recipient": "DfmwDQyGHg5KStHi5zKqUyAU46sJKecDY3iHdq28YEj5"
+  },
+  "partial": {
+    "mint": "2KSmcUKQpBAVy3KjXo3xN9J2UiTRFQMHq3KB9hifu3i4",
+    "slot": 1764,
+    "payer": "HkA7bP62H6pzu1hbkR8cHinRYUBdW6kopuXefp1oxh4L",
+    "source": "BPETedsaavGeUqDCtZJNavRrp9EHFBu6pGXkpiZ8PwNT",
+    "cluster": "localnet",
+    "recipient": "2sZ1Luo7xizhcTsXm1XafNR1myWJUrcK178cQMF5DKaU",
+    "signature": "35qzLQ37rXLTR8UkzL3k4wZ8iynRzaF2xsnDJRue7infsM3tub6bGbecDr14LFGbpLyhFvRgsmTEGcDe3kXLsa9D",
+    "commitment": "finalized",
+    "amountAtoms": "200000",
+    "destination": "AvfmaUkrrphMU1iBmBTdVcHxhS4JmqHmA8CyFWoyojpe"
+  },
+  "refund": {
+    "signature": "iuWCM98tpv5F8eCgk2tLaZWzLKJWLSATAPgH7zkFN7oR5FNvaVbekXcJzmhcDedjr9N6SMuTJapQJp99FdKVuKi",
+    "slot": 1800,
+    "commitment": "finalized",
+    "cluster": "localnet",
+    "mint": "2KSmcUKQpBAVy3KjXo3xN9J2UiTRFQMHq3KB9hifu3i4",
+    "amountAtoms": "800000",
+    "source": "BPETedsaavGeUqDCtZJNavRrp9EHFBu6pGXkpiZ8PwNT",
+    "destination": "4CcfXQxvZY5Jj4z3UDJ73bGja1HeHWgRjePxzwpVJM3W",
+    "payer": "HkA7bP62H6pzu1hbkR8cHinRYUBdW6kopuXefp1oxh4L",
+    "recipient": "7jmhkKjFnEg3tPRKTmN8JXu7bEYwhBxEk86omZ2w1NvP"
+  },
+  "finalDepositAtoms": "0"
+}

@@ -44,6 +44,7 @@ let server;
 let store;
 let provider;
 let providerError;
+let enrolledRunner;
 const secret = () => randomBytes(32).toString("base64url");
 
 async function poll(label, operation, time = 90_000) {
@@ -83,7 +84,10 @@ try {
         AGUS_LOCAL_DATA_DIR: join(temporary, "control"),
         AGUS_PROVIDER_BOOTSTRAP_TOKEN: secret(),
         AGUS_ALLOW_LEGACY_POOL: "0",
-        ...(expectedTransaction ? { AGUS_LOCALNET_RPC_URL: "http://127.0.0.1:8899" } : {}),
+        ...(expectedTransaction ? {
+          AGUS_LOCALNET_RPC_URL: "http://127.0.0.1:8899",
+          AGUS_LOCALNET_GENESIS_HASH: config.localnet.genesis,
+        } : {}),
       },
     }));
     server.listen(0, "127.0.0.1");
@@ -107,8 +111,17 @@ try {
   const { token: developer } = await request("/auth/register", null, { email: "android-dev@example.test", password: secret() });
   const { token: owner } = await request("/auth/register", null, { email: "android-provider@example.test", password: secret() });
   const { pairing } = await request("/me/devices/pairings", owner, {});
+  const providerApi = makeApi(base);
   provider = runProvider({
-    api: makeApi(base), config, endpoint: base, credential: { pairingCode: pairing.code },
+    api: {
+      ...providerApi,
+      async enroll(credential, input, signal) {
+        const result = await providerApi.enroll(credential, input, signal);
+        enrolledRunner = { id: result.providerId, publicKeyPem: input.publicKeyPem };
+        return result;
+      },
+    },
+    config, endpoint: base, credential: { pairingCode: pairing.code },
     device: android, signal: control.signal, lockDirectory: tmpdir(),
     log: (line) => process.stderr.write(line + "\n"),
   }).catch((error) => {
@@ -189,33 +202,49 @@ try {
 
   const output = resolve(outputDirectory);
   await mkdir(output, { recursive: true, mode: 0o700 });
+  assert.ok(enrolledRunner, "The acceptance runner must enroll before it can sign evidence");
+  await writeFile(join(output, "runner-enrollment.pub.pem"), enrolledRunner.publicKeyPem);
+  async function attachment(receipt, kind) {
+    const evidence = receipt.evidence.find(item => item.kind === kind && item.url);
+    assert.ok(evidence, "Approved " + kind + " attachment is missing");
+    const response = await fetch(base + evidence.url, {
+      headers: { Authorization: "Bearer " + developer },
+      signal: AbortSignal.timeout(15_000),
+    });
+    assert.ok(response.ok);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    assert.equal(sha256(bytes), evidence.sha256);
+    assert.ok(receipt.manifest.evidence.some(item => item.kind === kind && item.sha256 === evidence.sha256));
+    return bytes;
+  }
   async function verifyCompleted(runId, source) {
     const run = await poll(source + " result", async () => {
       const current = await runState(runId);
       if (["failed", "cancelled", "expired", "unverified"].includes(current.state)) throw new Error(JSON.stringify(current));
       return current.state === "passed" ? current : null;
     });
-    const { manifest, publicKeyPem, signature, manifestSha256 } = run.receipt;
+    const { manifest, issuer, publicKeyPem, signature, manifestSha256 } = run.receipt;
     const canonical = Buffer.from(stableJson(manifest));
     assert.equal(run.acceptedWork.source, source);
     assert.equal(run.leaseState, "released");
     assert.equal(manifest.buildSha256, digest);
     assert.equal(manifestSha256, sha256(canonical));
-    assert.equal(verify(null, canonical, publicKeyPem, Buffer.from(signature, "base64")), true);
+    assert.equal(issuer, enrolledRunner.id);
+    assert.equal(publicKeyPem.trim(), enrolledRunner.publicKeyPem.trim());
+    assert.equal(verify(null, canonical, enrolledRunner.publicKeyPem, Buffer.from(signature, "base64")), true);
     assert.equal(manifest.checks.find(({ id }) => id === "cleanup")?.passed, true);
     assert.equal(await android.present(FIXTURE, control.signal), false);
     if (wallet) assert.equal(await android.present(FAKE_WALLET, control.signal), false);
-    const screenshot = run.receipt.evidence.find(({ kind, url }) => kind === "screenshot" && url);
-    assert.ok(screenshot, "Approved screenshot attachment is missing");
-    const response = await fetch(base + screenshot.url, {
-      headers: { Authorization: "Bearer " + developer },
-      signal: AbortSignal.timeout(15_000),
-    });
-    assert.ok(response.ok);
-    const png = Buffer.from(await response.arrayBuffer());
+    const png = await attachment(run.receipt, "screenshot");
     assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
-    assert.equal(sha256(png), screenshot.sha256);
     await writeFile(join(output, source + ".png"), png);
+    if (source === "private" && planner === "gemini") {
+      const trajectory = await attachment(run.receipt, "trajectory");
+      const actions = JSON.parse(trajectory);
+      assert.equal(actions.length, manifest.execution.modelActionCount);
+      assert.ok(actions.every(action => action.selectedBy === "gemini"));
+      await writeFile(join(output, "gemini-trajectory.json"), trajectory);
+    }
     await writeFile(join(output, source + ".json"), JSON.stringify({
       deviceProfile: device.profile, acceptedWork: run.acceptedWork,
       evaluationOutcome: run.evaluationOutcome, verification: run.verification, receipt: run.receipt,

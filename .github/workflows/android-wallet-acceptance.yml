@@ -15,6 +15,10 @@ on:
         description: Use the configured Gemini secret instead of the deterministic remote controller
         type: boolean
         default: false
+      gemini_model:
+        description: Gemini model ID for live acceptance
+        type: string
+        default: gemini-3.5-flash-lite
 
 permissions:
   contents: read
@@ -67,6 +71,8 @@ jobs:
             -p "$ANDROID_AVD_HOME/agus_ci.avd" -k 'system-images;android-35;default;x86_64' --force
           printf 'avd.ini.encoding=UTF-8\npath=%s\ntarget=android-35\n' "$ANDROID_AVD_HOME/agus_ci.avd" > "$ANDROID_AVD_HOME/agus_ci.ini"
           test -f "$ANDROID_AVD_HOME/agus_ci.avd/config.ini"
+          sed -i 's@^image.sysdir.1=.*@image.sysdir.1=system-images/android-35/default/x86_64/@' "$ANDROID_AVD_HOME/agus_ci.avd/config.ini"
+          test -f "$ANDROID_HOME/system-images/android-35/default/x86_64/system.img"
           "$ANDROID_HOME/emulator/emulator" -list-avds | grep -x agus_ci
           npm ci --no-audit --no-fund
           npm ci --prefix services/control-plane --no-audit --no-fund
@@ -88,7 +94,7 @@ jobs:
           AGENT_WALLET: ${{ inputs.agent_wallet }}
           GEMINI_AGENT: ${{ inputs.gemini_agent }}
           AGUS_GEMINI_API_KEY: ${{ inputs.gemini_agent && secrets.AGUS_GEMINI_API_KEY || '' }}
-          AGUS_GEMINI_MODEL: gemini-3.1-flash-lite
+          AGUS_GEMINI_MODEL: ${{ inputs.gemini_model }}
         run: |
           set -euxo pipefail
           export AGUS_TEST_CONFIG="$AGUS_LAB/runner.json" AGUS_TEST_EVIDENCE="$AGUS_LAB/evidence"
@@ -171,4 +177,5 @@ jobs:
             ${{ env.AGUS_LAB }}/emulator.log
             ${{ env.AGUS_LAB }}/provider-acceptance/*.json
             ${{ env.AGUS_LAB }}/provider-acceptance/*.png
+            ${{ env.AGUS_LAB }}/provider-acceptance/runner-enrollment.pub.pem
           retention-days: 7
