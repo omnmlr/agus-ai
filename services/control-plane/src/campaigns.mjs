@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { evidenceExpiresAt, purgeExpiredCampaignEvidence } from './campaign-retention.mjs';
 import { createRun, getOwned, notice, publicRun, requestStop, terminal } from './domain.mjs';
 import { refreshLifecycles } from './person-routes.mjs';
 import { array, digest, requireCondition, stableJson, string } from './security.mjs';
@@ -152,6 +153,7 @@ export function stopAssignment(state, assignment, reason, now) {
 
 export function refreshCampaigns(state, now) {
   refreshLifecycles(state, now);
+  purgeExpiredCampaignEvidence(state, now);
   for (const lease of Object.values(state.nativeLeases)) {
     expireNativeLease(state, lease, now);
     const assignment = state.assignments[lease.assignmentId];
@@ -266,7 +268,7 @@ function assignmentView(state, assignment, user, now) {
   const owned = assignment.ownerId === user.id;
   const attempt = mine || owned ? assignment.attempt : null;
   const lease = own(state.nativeLeases, attempt?.leaseId);
-  const retentionDeadline = assignment.deadlineAt + state.campaigns[assignment.campaignId].revisions[assignment.campaignRevision - 1].retentionDays * 86_400_000;
+  const retentionDeadline = evidenceExpiresAt(state, assignment);
   const retain = retentionDeadline > now;
   return {
     id: assignment.id, campaignId: assignment.campaignId, campaignRevision: assignment.campaignRevision,
@@ -386,6 +388,7 @@ export function reviewSubmission(state, user, id, input, now) {
   requireCondition(['accept', 'revise', 'reject', 'partial'].includes(input.decision), 'Unknown review action');
   const attempt = assignment.attempt;
   const latest = attempt?.submissions.at(-1);
+  conflict(evidenceExpiresAt(state, assignment) > now, 'Review retention has expired', 'grant_expired');
   if (input.decision === 'partial') {
     const lease = own(state.nativeLeases, attempt?.leaseId);
     conflict(assignment.state === 'interrupted' && attempt?.id === input.attemptId && attempt?.contributorId !== user.id
@@ -427,7 +430,7 @@ export function campaignReport(state, user, id, now) {
       if (assignment.runId) return state.runs[assignment.runId].evaluationOutcome ?? null;
       const lease = own(state.nativeLeases, assignment.attempt?.leaseId);
       return task.runtimeClass === 'phone_human'
-        ? assignment.state === 'accepted' ? assignment.attempt?.submissions.at(-1)?.evidence.result ?? null : null
+        ? assignment.state === 'accepted' ? (assignment.attempt?.submissions.at(-1)?.evidence ?? assignment.attempt?.submissions.at(-1)?.finding)?.result ?? null : null
         : lease?.report?.evaluation ?? null;
     });
     return { taskIndex, kind: task.kind, runtimeClass: task.runtimeClass, planned: task.count,
@@ -440,7 +443,8 @@ export function campaignReport(state, user, id, now) {
     };
   });
   const findings = entries.flatMap(entry => {
-    const evidence = entry.attempt?.submissions.at(-1)?.evidence;
+    const latest = entry.attempt?.submissions.at(-1);
+    const evidence = latest?.evidence ?? latest?.finding;
     if (entry.state !== 'accepted' || !evidence || evidence.result === 'passed') return [];
     return [{ assignmentId: entry.id, taskIndex: entry.taskIndex, category: evidence.category, result: evidence.result,
       findingSha256: entry.attempt.submissions.at(-1).sha256 }];
@@ -454,9 +458,8 @@ export function campaignReport(state, user, id, now) {
 export function signedAssignmentReceipt(state, user, id, now) {
   const assignment = own(state.assignments, id);
   missing(assignment && (assignment.ownerId === user.id || assignment.attempt?.contributorId === user.id), 'Assignment');
-  const revision = state.campaigns[assignment.campaignId].revisions[assignment.campaignRevision - 1];
   const lease = own(state.nativeLeases, assignment.attempt?.leaseId);
-  missing(lease?.report && assignment.deadlineAt + revision.retentionDays * 86_400_000 > now, 'Evidence receipt');
+  missing(lease?.report && evidenceExpiresAt(state, assignment) > now, 'Evidence receipt');
   const installation = state.runtimes[lease.installationId];
   return { receipt: { manifest: lease.manifest, report: lease.report, cleanup: lease.cleanup,
     algorithm: 'ECDSA-P256-SHA256-DER', publicKey: installation.publicKey } };

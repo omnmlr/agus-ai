@@ -1,3 +1,4 @@
+import { evidenceExpiresAt } from './campaign-retention.mjs';
 import { randomUUID } from 'node:crypto';
 import { array, digest, requireCondition, stableJson } from './security.mjs';
 import { conflict, exact, missing, own } from './pilot-policy.mjs';
@@ -25,13 +26,12 @@ export function trainingConsent(state, user, id, method, input, now) {
     developerGrantedAt: consent.developer?.grantedAt ?? null };
 }
 
-function eligibleSource(state, assignment, campaign, now) {
-  const revision = campaign.revisions[assignment.campaignRevision - 1];
+function eligibleSource(state, assignment, now) {
   const attempt = assignment.attempt;
   const evidence = attempt?.submissions.at(-1);
   conflict(assignment.state === 'accepted' && assignment.terms.trainingEligible && evidence?.evidence &&
     attempt.review?.submissionVersion === evidence.version &&
-    assignment.deadlineAt + revision.retentionDays * 86_400_000 > now,
+    evidenceExpiresAt(state, assignment) > now,
   'Accepted evidence is outside the authorized retention scope', 'training_unavailable');
   requireCondition(attempt.consent.contributor && attempt.consent.developer,
     'Both participants must grant training rights', 'training_consent_required', 403);
@@ -59,7 +59,7 @@ export function createCampaignExport(state, user, id, input, now) {
   requireCondition(ids.length > 0 && new Set(ids).size === ids.length
     && ids.every(assignmentId => typeof assignmentId === 'string' && campaign.assignmentIds.includes(assignmentId)),
   'Invalid assignment export scope');
-  const sources = ids.map(assignmentId => eligibleSource(state, state.assignments[assignmentId], campaign, now));
+  const sources = ids.map(assignmentId => eligibleSource(state, state.assignments[assignmentId], now));
   for (const record of Object.values(state.campaignExports)) {
     if (record.expiresAt <= now) delete state.campaignExports[record.id];
   }
@@ -79,7 +79,7 @@ export function readCampaignExport(state, user, campaignId, exportId, now) {
   const campaign = ownCampaign(state, user, campaignId);
   const record = own(state.campaignExports, exportId);
   missing(record?.campaignId === campaign.id && record.expiresAt > now, 'Training export');
-  const sources = record.sources.map(reference => eligibleSource(state, state.assignments[reference.assignmentId], campaign, now));
+  const sources = record.sources.map(reference => eligibleSource(state, state.assignments[reference.assignmentId], now));
   requireCondition(stableJson(sources.map(source => source.reference)) === stableJson(record.sources),
     'Consent or source changed after export creation', 'consent_withdrawn', 403);
   const data = dataset(sources);

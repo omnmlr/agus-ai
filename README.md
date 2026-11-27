@@ -32,3 +32,5 @@ npm run mobile-test -- --help
 The local scenario pack uses a dedicated Android AVD or test handset, an official Fake Wallet APK and a disposable Solana validator. [Android lab instructions](docs/mobile-test/DEMO.md)
 
 The previous financial application is maintained independently at `omnmlr/hackaholics-financial-agent`. Its signed Android release is this platform's first external test target.
+
+The [Phase 2 and 3 local preview handoff](docs/phase-2-3/handoff.md) links the functionality matrix, audit results, and independent verification assignment.

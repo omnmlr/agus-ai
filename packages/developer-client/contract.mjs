@@ -262,6 +262,10 @@ get('/me/devices/{deviceId}', 'Read a provider-owned device', ownedDevice);
 operation('/me/devices/{deviceId}', 'patch', 'Update device availability preferences', ownedDevice, { body: of('UpdateDevice') });
 operation('/me/devices/{deviceId}', 'delete', 'Revoke device authorization', ownedDevice);
 post('/me/devices/{deviceId}/diagnostics', 'Inspect the latest device diagnostics', envelope('diagnostics', of('Diagnostic')));
+get('/me/payout-wallet', 'Read the verified account payout wallet', walletResult);
+operation('/me/payout-wallet', 'delete', 'Disconnect the account payout wallet', walletResult);
+post('/me/payout-wallet/challenge', 'Create an account-scoped Devnet ownership challenge', envelope('challenge', record), envelope('wallet', string));
+post('/me/payout-wallet/verify', 'Verify exact account wallet ownership', walletResult, obj({ challengeId: string, signature: string }));
 get('/me/devices/{deviceId}/payout-wallet', 'Read the verified payout wallet', walletResult);
 operation('/me/devices/{deviceId}/payout-wallet', 'delete', 'Disconnect the payout wallet for future work', walletResult);
 post('/me/devices/{deviceId}/payout-wallet/challenge', 'Create a domain-bound Devnet wallet challenge',

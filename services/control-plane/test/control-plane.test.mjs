@@ -416,6 +416,12 @@ test('payout wallet proof binds the owner, origin and exact wallet through repla
   await f.request(path, { token: other.token, method: 'DELETE', status: 404 });
   await f.request(path, { token: owner.token, method: 'DELETE' });
   assert.equal((await f.request(path, { token: owner.token })).payoutWallet, null);
+  const accountPath = '/me/payout-wallet';
+  const accountChallenge = await f.request(accountPath + '/challenge', { token: owner.token, body: { wallet: wallet(first.publicKey) } });
+  await f.request(path + '/verify', { token: owner.token, status: 404, body: proofFor(first, accountChallenge.challenge) });
+  await f.request(accountPath + '/verify', { token: owner.token, body: proofFor(first, accountChallenge.challenge) });
+  assert.equal((await f.request(accountPath, { token: owner.token })).payoutWallet.address, wallet(first.publicKey));
+  assert.equal((await f.request(path, { token: owner.token })).payoutWallet, null);
 });
 
 test('public decline suppresses matching on its owned device and inbox preferences are scoped', async t => {

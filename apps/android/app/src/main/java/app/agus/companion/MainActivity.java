@@ -603,7 +603,7 @@ public final class MainActivity extends Activity {
 
     private String walletRoute() {
         String device = snapshot == null ? "" : snapshot.deviceScope;
-        return device.isEmpty() ? null : ProviderApi.item(ProviderApi.MY_DEVICES, device) + "/payout-wallet";
+        return device.isEmpty() ? "/me/payout-wallet" : ProviderApi.item(ProviderApi.MY_DEVICES, device) + "/payout-wallet";
     }
 
     boolean hasCurrentWallet() {

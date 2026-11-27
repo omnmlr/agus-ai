@@ -104,7 +104,11 @@ export async function handlePersonRoutes({ response, request, route, url, user, 
   }
 
   if (route[0] !== 'me') return false;
-  const [, resource, id, operation, part] = route;
+  const [, resource, id, operation] = route;
+  if (resource === 'payout-wallet') {
+    const withWallet = work => execute((state, now) => work(state, state.users[user.id], now));
+    return walletRoutes({ request, response, suffix: route.slice(2), withWallet, config, send });
+  }
   if (resource === 'devices') {
     if (route.length === 2 && method === 'GET') {
       const devices = await execute((state, now) => Object.values(state.devices)
@@ -136,7 +140,9 @@ export async function handlePersonRoutes({ response, request, route, url, user, 
       return true;
     }
     if (operation === 'payout-wallet') {
-      return walletRoutes({ request, response, route, part, deviceAction, config, send });
+      const withWallet = (work, active = false) => deviceAction((state, device, now) =>
+        work(state, state.providers[device.providerId], now), active);
+      return walletRoutes({ request, response, suffix: route.slice(4), withWallet, config, send });
     }
   }
   if (resource === 'sessions') {
@@ -219,15 +225,15 @@ function publicPayout(provider) {
     : null;
 }
 
-async function walletRoutes({ request, response, route, part, deviceAction, config, send }) {
-  if (route.length === 4 && request.method === 'GET') {
-    const payoutWallet = await deviceAction((state, device) => publicPayout(state.providers[device.providerId]));
+async function walletRoutes({ request, response, suffix, withWallet, config, send }) {
+  const [part] = suffix;
+  if (suffix.length === 0 && request.method === 'GET') {
+    const payoutWallet = await withWallet((_state, subject) => publicPayout(subject));
     send(response, { payoutWallet });
     return true;
   }
-  if (route.length === 4 && request.method === 'DELETE') {
-    await deviceAction((state, device) => {
-      const provider = state.providers[device.providerId];
+  if (suffix.length === 0 && request.method === 'DELETE') {
+    await withWallet((state, provider) => {
       provider.payoutWallet = null;
       provider.payoutWalletVerifiedAt = null;
       for (const [id, challenge] of Object.entries(state.walletChallenges)) {
@@ -237,15 +243,15 @@ async function walletRoutes({ request, response, route, part, deviceAction, conf
     send(response, { payoutWallet: null });
     return true;
   }
-  if (route.length !== 5 || request.method !== 'POST') return false;
+  if (suffix.length !== 1 || request.method !== 'POST') return false;
   if (part === 'challenge') {
     requireCondition(config.publicOrigin, 'Payout wallet proof is unavailable', 'payment_unavailable', 503);
     const { wallet } = await readJson(request, 8_192);
     const { createPayoutWalletChallenge } = await import('../../settlement/wallet-proof.mjs');
-    const challenge = await deviceAction((state, device, now) => {
-      const challenge = createPayoutWalletChallenge({ providerId: device.providerId, wallet, origin: config.publicOrigin, now });
+    const challenge = await withWallet((state, provider, now) => {
+      const challenge = createPayoutWalletChallenge({ providerId: provider.id, wallet, origin: config.publicOrigin, now });
       for (const [id, entry] of Object.entries(state.walletChallenges)) {
-        if (entry.providerId === device.providerId || Date.parse(entry.expiresAt) <= now) delete state.walletChallenges[id];
+        if (entry.providerId === provider.id || Date.parse(entry.expiresAt) <= now) delete state.walletChallenges[id];
       }
       state.walletChallenges[challenge.id] = challenge;
       return challenge;
@@ -256,12 +262,11 @@ async function walletRoutes({ request, response, route, part, deviceAction, conf
   if (part === 'verify') {
     const { challengeId, signature } = await readJson(request, 8_192);
     const { verifyPayoutWalletProof } = await import('../../settlement/wallet-proof.mjs');
-    const payoutWallet = await deviceAction(async (state, device, now) => {
+    const payoutWallet = await withWallet(async (state, provider, now) => {
       const challenge = state.walletChallenges[challengeId];
-      requireCondition(challenge?.providerId === device.providerId,
+      requireCondition(challenge?.providerId === provider.id,
         'Wallet proof challenge not found', 'not_found', 404);
       await verifyPayoutWalletProof({ challenge, signature, now });
-      const provider = state.providers[device.providerId];
       provider.payoutWallet = challenge.wallet;
       provider.payoutWalletVerifiedAt = timestamp(now);
       delete state.walletChallenges[challengeId];

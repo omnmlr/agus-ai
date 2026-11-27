@@ -624,9 +624,12 @@ final class ProviderScreens {
     private void wallet(LinearLayout content) {
         LinearLayout card = ui.card(content);
         ui.add(card, ui.heading("Devnet payout wallet", 18), 0);
-        if (host.snapshot == null || host.snapshot.deviceScope.isEmpty()) {
-            detail(card, "Pair a dedicated test device to configure its payout wallet.", false);
+        if (host.snapshot == null) {
+            detail(card, "Loading the account’s payout wallet scope.", false);
             return;
+        }
+        if (host.snapshot.deviceScope.isEmpty()) {
+            detail(card, "This verifies an account-level disposable wallet. Campaign payments are unavailable.", false);
         }
         detail(card, "The official Fake Wallet signs an exact ownership challenge for a disposable Devnet account.", false);
         if (host.hasCurrentWallet()) {

@@ -58,14 +58,24 @@ def tap(label, scroll=True):
         clicked = touch({label.lower()})
         count += 1
         if not clicked and scroll and count % 2 == 0:
-            adb("shell", "input", "swipe", "190", "750", "190", "360", "220")
+            scroll_view = next((node for node in tree().iter("node") if node.get("package") == APP
+                                and node.get("class") == "android.widget.ScrollView"), None)
+            if scroll_view is not None:
+                left, top, right, bottom = map(int, re.findall(r"\d+", scroll_view.get("bounds")))
+                x = str((left + right) // 2)
+                y0 = str(top + (bottom - top) // 4)
+                y1 = str(top + (bottom - top) * 3 // 4)
+                if (count // 2) % 6 in (4, 5, 0):
+                    y0, y1 = y1, y0
+                adb("shell", "input", "swipe", x, y1, x, y0, "220")
         return clicked
     return until(find, "Missing visible control: " + label)
 
 
 def fill(hint, value):
-    tap(hint, scroll=False)
+    tap(hint)
     adb("shell", "input", "text", value)
+    print("Entered synthetic field:", hint, flush=True)
 
 
 

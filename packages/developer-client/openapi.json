@@ -2305,6 +2305,230 @@
         }
       }
     },
+    "/api/v1/me/payout-wallet": {
+      "get": {
+        "summary": "Read the verified account payout wallet",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "payoutWallet": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/PayoutWallet"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payoutWallet"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Disconnect the account payout wallet",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "payoutWallet": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/PayoutWallet"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payoutWallet"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/payout-wallet/challenge": {
+      "post": {
+        "summary": "Create an account-scoped Devnet ownership challenge",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "wallet": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "wallet"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challenge": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "challenge"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/payout-wallet/verify": {
+      "post": {
+        "summary": "Verify exact account wallet ownership",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "challengeId": {
+                    "type": "string"
+                  },
+                  "signature": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "challengeId",
+                  "signature"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "payoutWallet": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/PayoutWallet"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payoutWallet"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/devices/{deviceId}/payout-wallet": {
       "get": {
         "summary": "Read the verified payout wallet",

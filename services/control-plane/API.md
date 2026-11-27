@@ -114,3 +114,13 @@ Runner traffic is outbound only. The existing runner owns its own Ed25519 key an
 ## Executable contract coverage
 
 Run `npm test --prefix services/control-plane` for invitation, authorization, offline readiness, exclusive reservation, stop and cleanup, signed report and transaction replay cases. Tests use synthetic APK bytes and disposable accounts. The chain test uses a mocked authorized RPC transport to validate decisions. Android execution, external identity delivery, physical hardware and live-chain settlement require independent deployment acceptance.
+
+## Local campaign and Android preview
+
+The additive API is gated by `AGUS_PRODUCT_PILOT=1` with a local non-production listener, a disposable P-256 private key in `AGUS_NATIVE_MANIFEST_PKCS8`, and operator-reviewed APK digests/package/signers in `AGUS_NATIVE_REVIEWED_BUILDS`. The APK pilot runtime is restricted to the supported AOSP preview image. Production and non-loopback configuration fail closed. Generate disposable configuration with the [preview build script](../../apps/android/native-preview/build.sh). View [the generated OpenAPI contract](../../packages/developer-client/openapi.json).
+
+- A person session owns projects, immutable campaign revisions, allocation/consent, assignment submissions/reviews, qualifying exercises, receipt access, and separate training grants and deliveries. Person responses contain neither runtime nor lease bearer credentials except the one-time scoped credential returned to the enrollment owner on completion.
+- An installation registers a P-256 public key and signs its one-time enrollment binding. It sends signed policy heartbeats and exchanges one current reservation for a separate lease. Current lease or outstanding cleanup prevents further admission on the installation.
+- A lease contains a separately server-signed base64 manifest with the installation audience, exact artifact and signer, approved actions, terms hash, deadline and signed challenge. The lease bearer scopes APK download, renewal, report, and cleanup routes. Terminal and stale authority cannot download artifacts. Cleanup can be authenticated after expiry without renewing work. Receipt and cleanup proofs use ECDSA P-256/SHA-256 DER signatures encoded as padded Base64.
+- Campaign earnings records represent nontransferable test obligations. Partial credit requires published terms, identity-bound review and acknowledged cleanup. Dedicated test-chain settlement remains separately gated.
+- `/me/notifications/preferences` reads or changes optional inbox categories. Preferences do not silence required safety messages. `/marketplace/jobs/:runId/decline` removes only the queued offer for the specified owned device.

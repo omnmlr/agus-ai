@@ -148,4 +148,14 @@ test('redacted export requires both purpose grants, rejects foreign access and i
   await as(developer, 'GET', routes + '/' + output.id, undefined, 403);
   await as(first, 'PUT', agreement, { termsDigest: offer.termsDigest, grant: true });
   await as(developer, 'GET', routes + '/' + output.id, undefined, 403);
+  pilot.clock.now += 32 * 86_400_000;
+  const renewed = await pilot.request('POST', '/auth/login',
+    { body: { email: developer.user.email, password: 'disposable test only' } });
+  const { report } = await as(renewed, 'GET', path + '/report');
+  assert.equal(report.cells[0].failed, 1);
+  assert.deepEqual(report.assignments[0].attempt.submissions, []);
+  const stored = await pilot.store.transaction(state => state.assignments[offer.id].attempt.submissions[0]);
+  assert.equal(stored.evidence, undefined);
+  assert.deepEqual(stored.finding, { category: 'bug', result: 'failed' });
+  await as(renewed, 'GET', '/assignments/' + offer.id + '/receipt', undefined, 404);
 });

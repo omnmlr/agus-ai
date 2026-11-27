@@ -1,3 +1,4 @@
+import { purgeExpiredCampaignEvidence } from './campaign-retention.mjs';
 import { createServer } from 'node:http';
 import { createApi } from './api.mjs';
 import { pilotConfig } from './pilot-policy.mjs';
@@ -68,5 +69,17 @@ export async function createControlPlane({ env = process.env, overrides = {} } =
     throw error;
   }
   const server = createServer({ requestTimeout: 45_000, headersTimeout: 15_000 }, createApi({ store, config, settlement }));
+  if (config.pilot) {
+    let sweep;
+    server.once('listening', () => {
+      sweep = setInterval(() => {
+        store.transaction(state => purgeExpiredCampaignEvidence(state, config.now())).catch(error => {
+          console.error('Campaign retention sweep failed', error.code ?? error.name);
+        });
+      }, 60_000);
+      sweep.unref();
+    });
+    server.once('close', () => clearInterval(sweep));
+  }
   return { config, server, store };
 }
