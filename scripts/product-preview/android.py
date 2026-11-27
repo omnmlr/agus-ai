@@ -53,7 +53,9 @@ def touch(labels):
     scrolled = set(scroll_view.iter("node")) if scroll_view is not None else set()
     for node in root.iter("node"):
         label = (node.get("text") or node.get("content-desc") or "").lower()
-        if label in labels and node.get("enabled") == "true":
+        identifier = node.get("resource-id", "").lower()
+        match = next((value for value in (identifier, label) if value in labels), None)
+        if match and node.get("enabled") == "true":
             x0, y0, x1, y1 = bounds(node)
             if node in scrolled:
                 left, top, right, bottom = bounds(scroll_view)
@@ -61,9 +63,9 @@ def touch(labels):
             if x1 <= x0 or y1 - y0 < 14:
                 continue
             x, y = (x0 + x1) // 2, (y0 + y1) // 2
-            print(f"Touch {node.get('package')} {label!r} at ({x}, {y})", flush=True)
+            print(f"Touch {node.get('package')} {match!r} at ({x}, {y})", flush=True)
             adb("shell", "input", "tap", str(x), str(y))
-            return label
+            return match
     return None
 
 
@@ -248,15 +250,16 @@ def run():
     record("Personal launcher restored after removing the test profile")
 
 
-try:
-    run()
-except Exception:
-    print("Final synthetic screen:", [item.get("text") for item in tree().iter("node") if item.get("text")], flush=True)
-    print("Focus:", next((line.strip() for line in adb("shell", "dumpsys", "window").splitlines()
-                          if "mCurrentFocus=" in line), "not reported"), flush=True)
-    print(adb("logcat", "-d", "-t", "1000", "-s", "AndroidRuntime:E", "*:S"), flush=True)
-    raise
-finally:
-    (OUT / "android-checks.json").write_text(json.dumps(marks, indent=2) + "\n")
-    (OUT / "android-markers.log").write_text(log() + "\n")
-    print(log(), flush=True)
+if __name__ == "__main__":
+    try:
+        run()
+    except Exception:
+        print("Final synthetic screen:", [item.get("text") for item in tree().iter("node") if item.get("text")], flush=True)
+        print("Focus:", next((line.strip() for line in adb("shell", "dumpsys", "window").splitlines()
+                              if "mCurrentFocus=" in line), "not reported"), flush=True)
+        print(adb("logcat", "-d", "-t", "1000", "-s", "AndroidRuntime:E", "*:S"), flush=True)
+        raise
+    finally:
+        (OUT / "android-checks.json").write_text(json.dumps(marks, indent=2) + "\n")
+        (OUT / "android-markers.log").write_text(log() + "\n")
+        print(log(), flush=True)

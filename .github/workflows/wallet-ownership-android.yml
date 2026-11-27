@@ -1,0 +1,61 @@
+name: AGUS Android payout wallet ownership
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-wallet:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Verify ownership with the reference app and Fake Wallet
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/agus-wallet-ownership"
+          mkdir -p "$out"
+          sudo chown "$USER" /dev/kvm
+          sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f -print -quit)"
+          "$sdkmanager" "platform-tools" "emulator" "platforms;android-35" "build-tools;35.0.0" "system-images;android-35;default;x86_64"
+          npm ci --prefix services/control-plane --no-audit --no-fund
+          npm ci --prefix services/settlement --no-audit --no-fund
+          (cd apps/android && ./gradlew --no-daemon assembleDebug)
+          cp apps/android/app/build/outputs/apk/debug/app-debug.apk "$out/companion.apk"
+          curl -fsSL 'https://github.com/solana-mobile/mobile-wallet-adapter/releases/download/%40solana-mobile/wallet-adapter-mobile%403.0.1/fakewallet-v1-debug.apk' -o "$out/fakewallet.apk"
+          (cd "$out" && printf '269c0357b05d039dc544d777a06fb10092c340d9606a89d192911d7ba82da3aa  fakewallet.apk\n' | sha256sum --check)
+          git rev-parse HEAD > "$out/revision.txt"
+          export ANDROID_AVD_HOME="$out/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          printf 'no\n' | "$(dirname "$sdkmanager")/avdmanager" create avd -n agus_wallet -k 'system-images;android-35;default;x86_64'
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          "$ANDROID_HOME/emulator/emulator" -avd agus_wallet -port 5554 -no-window -no-audio \
+            -no-snapshot -no-boot-anim -gpu swiftshader_indirect -memory 3072 > "$out/emulator.log" 2>&1 &
+          AGUS_LOCAL_DATA_DIR="$out/database" AGUS_PROVIDER_BOOTSTRAP_TOKEN=disposable-local-fixture-only \
+            AGUS_PUBLIC_ORIGIN=http://127.0.0.1:18767 HOST=127.0.0.1 PORT=18767 node services/control-plane/src/start.mjs &
+          backend=$!
+          trap 'kill "$backend" || true; adb -s emulator-5554 emu kill >/dev/null 2>&1 || true' EXIT
+          curl -fsS --retry 5 --retry-delay 1 --retry-connrefused http://127.0.0.1:18767/health
+          timeout 240 bash -c 'adb -s emulator-5554 wait-for-device; until [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
+          python3 scripts/product-preview/wallet-ownership.py "$out"
+      - name: Retain sanitized ownership observations
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: agus-wallet-ownership-observations
+          path: |
+            ${{ runner.temp }}/agus-wallet-ownership/wallet-ownership.json
+            ${{ runner.temp }}/agus-wallet-ownership/revision.txt
+          retention-days: 14
