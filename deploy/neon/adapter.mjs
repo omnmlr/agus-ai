@@ -58,7 +58,7 @@ function proxyToControlPlane(port, request, url) {
   });
 }
 
-export function createNeonHandler({ assets, createService, reportError = () => {} }) {
+export function createNeonHandler({ assets, createService, maintenance = false, reportError = () => {} }) {
   let startup;
 
   function getPort() {
@@ -81,6 +81,11 @@ export function createNeonHandler({ assets, createService, reportError = () => {
     async fetch(request) {
       const url = new URL(request.url);
       if (['/health', '/api/v1', '/.well-known/assetlinks.json', '/auth/android'].includes(url.pathname) || url.pathname.startsWith('/api/v1/')) {
+        if (maintenance) {
+          return Response.json({ error: { code: 'maintenance', message: 'This AGUS AI endpoint is paused for an approved cutover.' } }, {
+            status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '60' },
+          });
+        }
         try {
           return await proxyToControlPlane(await getPort(), request, url);
         } catch (error) {

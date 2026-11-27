@@ -5,6 +5,7 @@ import { neonRuntimeEnv } from './bindings.mjs';
 
 export default createNeonHandler({
   assets,
+  maintenance: process.env.AGUS_NEON_API_MAINTENANCE === '1',
   createService: () => createControlPlane({ env: neonRuntimeEnv(process.env) }),
   reportError: error => {
     if (error.name !== 'AbortError') console.error('AGUS AI control-plane request unavailable', error.name);

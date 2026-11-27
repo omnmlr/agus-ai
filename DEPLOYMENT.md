@@ -114,7 +114,16 @@ bash apps/android/native-preview/build.sh /tmp/agus-private-runtime
 "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs /tmp/agus-private-runtime/runtime.apk
 ```
 
-The safest existing Devnet settlement path is a planned AGUS AI cutover to the isolated Compose service. Test the candidate against a disposable database locally first. Verify the host has spare memory, disk and CPU credits and a separate HTTPS route for `agusai.grindcity.app`. Before switching the write origin, drain existing AGUS AI work and stop its writes on Neon. Run one canonical AGUS AI control plane and one campaign reconciliation worker. The worker holds a renewable Postgres claim and reuses durable signed bytes. It only advances accepted payouts and requested refunds. The Compose application has a distinct project name, health port and read-only signer mount. The existing financial applications have separate projects, routes and databases.
+The safest existing Devnet settlement path is a planned AGUS AI cutover to the isolated Compose service. Test the candidate against a disposable database locally first. Verify the host has spare memory, disk and CPU credits and a separate HTTPS route for `agusai.grindcity.app`. Before switching the write origin, drain existing AGUS AI work and set the candidate Neon Function to API maintenance. The original Neon invocation URL must also return the maintenance response before Compose receives production database access or public traffic. Run one canonical AGUS AI control plane and one campaign reconciliation worker. The worker holds a renewable Postgres claim and reuses durable signed bytes. It only advances accepted payouts and requested refunds. The Compose application has a distinct project name, health port and read-only signer mount. The existing financial applications have separate projects, routes and databases.
+
+After the candidate is on Neon and the founder approves the settlement cutover, create an environment-only deployment with the maintenance flag. This pauses the API at the original Function URL and preserves the current bundle and secret bindings. Confirm deployment completion, then check for HTTP 503 with `error.code` equal to `maintenance` at both origin URLs. Drain in-flight requests before the next step. To resume Neon after Compose has stopped, submit the same command with flag `0`.
+
+```bash
+printf 'Authorization: Bearer %s\n' "$NEON_API_KEY" | \
+  curl --fail-with-body --silent --show-error --header @- \
+    --form-string 'environment={"AGUS_NEON_API_MAINTENANCE":"1"}' "$function_url/deployments" | \
+  jq '{id, status, deployment_id: .deployment.id, deployment_status: .deployment.status}'
+```
 
 ```bash
 # Build on an authorized workstation, or use the checksummed CI package.

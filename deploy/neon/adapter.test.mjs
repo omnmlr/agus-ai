@@ -63,3 +63,14 @@ test('requires explicit least-privilege bindings instead of using injected owner
   assert.throws(() => neonRuntimeEnv({ ...env, DATABASE_URL_UNPOOLED: undefined }), /Override both/);
   assert.throws(() => neonRuntimeEnv({ ...env, AGUS_SETTLEMENT_ENABLED: '1' }), /mounted Devnet keypair/);
 });
+
+test('maintenance refuses API requests at the original Neon origin before starting the backend', async () => {
+  let startups = 0;
+  const handler = createNeonHandler({ maintenance: true, assets: new Map(), createService: () => { startups++; } });
+  for (const [method, path] of [['GET', '/health'], ['GET', '/api/v1/projects'], ['POST', '/api/v1/auth/login']]) {
+    const response = await handler.fetch(new Request(origin + path, { method }));
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).error.code, 'maintenance');
+  }
+  assert.equal(startups, 0);
+});
