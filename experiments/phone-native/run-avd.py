@@ -57,8 +57,8 @@ def ui():
         return ET.Element("empty")
 
 
-def click(texts):
-    nodes = ui().iter("node")
+def click(texts, tree=None):
+    nodes = (ui() if tree is None else tree).iter("node")
     for node in nodes:
         label = (node.get("text") or node.get("content-desc") or "").strip().lower()
         if label not in texts or node.get("enabled") != "true":
@@ -120,11 +120,17 @@ def run():
     progress = {"accept & continue", "accept and continue", "agree", "continue", "next", "set up",
                 "set up work profile", "got it", "done", "i agree", "start"}
     approvals = []
+    seen_screens = set()
 
     def provisioned():
         if "PROFILE_OWNER_POLICY_APPLIED" in markers() and profile():
             return profile()
-        approved = click(progress)
+        tree = ui()
+        screen = tuple(node.get("text") for node in tree.iter("node") if node.get("text"))
+        if screen and screen not in seen_screens:
+            seen_screens.add(screen)
+            print("provisioning screen:", screen, flush=True)
+        approved = click(progress, tree)
         if approved:
             approvals.append(approved)
         return None
@@ -180,11 +186,17 @@ try:
     run()
 except Exception:
     try:
-        (OUT / "last-ui.xml").write_text(ET.tostring(ui(), encoding="unicode") + "\n")
+        tree = ui()
+        print("last UI:", [node.get("text") for node in tree.iter("node") if node.get("text")], flush=True)
+        (OUT / "last-ui.xml").write_text(ET.tostring(tree, encoding="unicode") + "\n")
+        print(adb("shell", "pm", "list", "users"), flush=True)
+        print(adb("logcat", "-d", "-t", "800", "-s", "ManagedProvisioning:V", "AndroidRuntime:E", "*:S"), flush=True)
     except Exception:
         pass
     raise
 finally:
     (OUT / "checks.json").write_text(json.dumps({"recordedAtUtc": datetime.now(timezone.utc).isoformat(),
                                                 "checks": results}, indent=2) + "\n")
-    (OUT / "markers.log").write_text(markers() + "\n")
+    log = markers()
+    print(log, flush=True)
+    (OUT / "markers.log").write_text(log + "\n")
