@@ -2,6 +2,12 @@ name: AGUS Android payout wallet ownership
 
 on:
   workflow_dispatch:
+  push:
+    branches: [feature/phase-2-3-product]
+    paths:
+      - 'apps/android/app/**'
+      - 'scripts/product-preview/wallet-ownership.py'
+      - '.github/workflows/wallet-ownership-android.yml'
 
 permissions:
   contents: read
