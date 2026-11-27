@@ -50,6 +50,7 @@ public class Controller extends Activity {
         if (isProfileOwner()) {
             say("Managed testing profile");
             add("Enroll disposable AGUS account", this::connect);
+            add("Allow AGUS source for this install", this::authorizeInstall);
             add("Install reviewed fixture", this::install);
             add("Review Android package operation", () -> {
                 Intent confirmation = InstallResult.pendingConfirmation;
@@ -160,8 +161,21 @@ public class Controller extends Activity {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE).getIntentSender();
     }
 
-    private void install() {
+    private void authorizeInstall() {
         if (!isProfileOwner()) throw new SecurityException();
+        getSystemService(DevicePolicyManager.class).clearUserRestriction(
+                Admin.component(this), UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES);
+        if (!getPackageManager().canRequestPackageInstalls()) {
+            startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    android.net.Uri.parse("package:" + getPackageName())));
+        }
+    }
+
+    private void install() {
+        if (!isProfileOwner() || !getPackageManager().canRequestPackageInstalls()) {
+            say("ANDROID_INSTALL_SOURCE_NOT_APPROVED");
+            return;
+        }
         try (var fixture = getAssets().open("fixture.apk");
              var untrusted = getAssets().open("untrusted.apk")) {
             stage(untrusted.readAllBytes(), UNTRUSTED, "UNTRUSTED_INSTALL", 3);
@@ -257,6 +271,7 @@ public class Controller extends Activity {
         if (!isProfileOwner()) throw new SecurityException();
         nonce = null;
         if (emergency) mark("EMERGENCY_STOP_LOCAL");
+        Admin.restrictInstalls(this);
         if (installed(FIXTURE)) {
             DevicePolicyManager policy = getSystemService(DevicePolicyManager.class);
             if (policy.setPackagesSuspended(Admin.component(this), new String[]{FIXTURE}, true).length != 0) {

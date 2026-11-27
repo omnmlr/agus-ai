@@ -144,8 +144,16 @@ def run():
     tap("Enroll disposable AGUS account")
     mark("BACKEND_REGISTER_AND_AUTH_ME_OK")
     record("app_registered_and_authenticated_to_existing_control_plane")
+    tap("Install reviewed fixture")
+    mark("ANDROID_INSTALL_SOURCE_NOT_APPROVED")
+    assert not installed(user, FIXTURE)
+    record("install_requires_explicit_work_profile_source_approval")
 
     for attempt in (1, 2):
+        tap("Allow AGUS source for this install")
+        if attempt == 1:
+            tap("Allow from this source")
+            adb("shell", "input", "keyevent", "KEYCODE_BACK")
         tap("Install reviewed fixture")
         package_operation("FIXTURE_INSTALL", attempt)
         mark("ARTIFACT_REJECTED", attempt)

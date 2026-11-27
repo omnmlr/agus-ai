@@ -11,6 +11,7 @@ public class InstallResult extends BroadcastReceiver {
         int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
         String operation = intent.getAction();
         if (status == PackageInstaller.STATUS_SUCCESS) {
+            if ("FIXTURE_INSTALL".equals(operation)) Admin.restrictInstalls(context);
             Controller.mark(operation + "_SUCCESS");
         } else if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
             pendingConfirmation = intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent.class);

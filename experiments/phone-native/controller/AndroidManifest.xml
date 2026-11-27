@@ -2,6 +2,7 @@
     <permission android:name="app.agus.phase1.EXECUTE_FIXTURE" android:protectionLevel="signature"/>
     <uses-permission android:name="app.agus.phase1.EXECUTE_FIXTURE"/>
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <queries>
         <package android:name="app.agus.phase1.fixture"/>
         <package android:name="app.agus.phase1.untrusted"/>

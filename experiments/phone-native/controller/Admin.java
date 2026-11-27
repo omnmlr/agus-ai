@@ -19,8 +19,14 @@ public class Admin extends DeviceAdminReceiver {
             throw new IllegalStateException("Requires managed profile owner");
         }
         policy.addUserRestriction(component(context), UserManager.DISALLOW_CROSS_PROFILE_COPY_PASTE);
+        restrictInstalls(context);
         policy.setProfileEnabled(component(context));
         Controller.mark("PROFILE_OWNER_POLICY_APPLIED");
+    }
+
+    static void restrictInstalls(Context context) {
+        context.getSystemService(DevicePolicyManager.class).addUserRestriction(
+                component(context), UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES);
     }
 
     @Override public void onProfileProvisioningComplete(Context context, Intent intent) {
