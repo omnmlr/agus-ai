@@ -19,12 +19,13 @@ export function apiOrigin(input) {
 
 export function createClient({ origin, token, fetchImpl = fetch }) {
   const base = apiOrigin(origin);
-  const request = async (method, segments, body) => {
+  const request = async (method, segments, body, idempotencyKey) => {
     const path = segments.map(encodeURIComponent).join('/');
     const response = await fetchImpl(`${base}/api/v1/${path}`, {
       method, headers: {
         accept: 'application/json',
         ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
         ...(body === undefined ? {} : { 'content-type': 'application/json' }),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -51,7 +52,9 @@ export function createClient({ origin, token, fetchImpl = fetch }) {
     builds: () => request('GET', ['builds']),
     createBuild: (build) => request('POST', ['builds'], build),
     runs: () => request('GET', ['runs']),
-    createRun: (input) => request('POST', ['runs'], input),
+    createRun: (input, idempotencyKey) => request('POST', ['runs'], input, idempotencyKey),
+    invitations: () => request('GET', ['invitations']),
+    createInvitation: (input, idempotencyKey) => request('POST', ['invitations'], input, idempotencyKey),
     run: (id) => request('GET', ['runs', id]),
     events: (id) => request('GET', ['runs', id, 'events']),
     cancel: (id) => request('POST', ['runs', id, 'cancel'], {}),

@@ -15,7 +15,7 @@ Use the [frontend contract](FRONTEND_CONTRACT.md) to run the reference portal ag
 
 Set `AGUS_API_URL` to the control-plane origin and `AGUS_API_TOKEN_FILE` to a private file outside the repository. The CLI can create it from a disposable account using `AGUS_API_PASSWORD` from a local secret store or masked prompt. The token stays out of command output. From the repository root, run `node packages/developer-client/src/cli.mjs login <email>` and unset the password input after sign-in.
 
-Configure a stdio client with command `node`, arguments `[/absolute/path/to/agus-ai/packages/developer-client/src/cli.mjs, mcp]`, and the same `AGUS_API_URL` and `AGUS_API_TOKEN_FILE` environment variables. It can discover devices, queue and inspect runs, send scenario-scoped agent actions, and request stop. Use `node packages/developer-client/src/cli.mjs --help` for the CLI equivalents.
+Configure a stdio client with command `node`, arguments `[/absolute/path/to/agus-ai/packages/developer-client/src/cli.mjs, mcp]`, and the same `AGUS_API_URL` and `AGUS_API_TOKEN_FILE` environment variables. It can discover devices, queue and inspect runs, request a private device with owner review, send scenario-scoped agent actions, and request stop. Use `node packages/developer-client/src/cli.mjs --help` for the CLI equivalents.
 
 ## Local mobile-test suite
 

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { actions, modes, scenarios } from './api.mjs';
 
 const runId = z.uuid();
+const idempotencyKey = z.string().regex(/^[\w.-]{1,128}$/).optional();
 const expectedTransaction = z.object({
   network: z.enum(['devnet', 'localnet']),
   recipient: z.string().min(32).max(44),
@@ -33,7 +34,18 @@ export async function serveMcp(client) {
   add('start_run', 'Queue a supported scenario on a dedicated device. Wallet scenarios may use disposable test funds.', {
     projectId: z.uuid(), buildId: z.uuid(), scenario: z.enum(scenarios), mode: z.enum(modes),
     deviceId: z.string().max(120).optional(), expectedTransaction: expectedTransaction.optional(),
-  }, false, (input) => client.createRun(input));
+    idempotencyKey,
+  }, false, ({ idempotencyKey, ...input }) => client.createRun(input, idempotencyKey));
+  add('list_private_requests', 'List private invitations involving this account.', {}, true,
+    () => client.invitations());
+  add('request_private_device', 'Request an unpaid private test on a known dedicated device. The provider must explicitly review and accept.', {
+    projectId: z.uuid(), buildId: z.uuid(), deviceId: z.string().min(1).max(120),
+    scenario: z.enum(scenarios), mode: z.enum(modes),
+    expectedTransaction: expectedTransaction.optional(), idempotencyKey,
+  }, false, async ({ idempotencyKey, ...input }) => {
+    const { invitation } = await client.createInvitation({ ...input, kind: 'developer_request' }, idempotencyKey);
+    return { invitation };
+  });
   add('get_run', 'Read status, runner-signed evidence, and independent chain status for one run.', { runId }, true,
     ({ runId }) => client.run(runId));
   add('list_run_events', 'Inspect recent ordered events and look for evidence or recovery states.', { runId }, true,

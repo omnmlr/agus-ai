@@ -41,7 +41,7 @@ test('typed client accepts the actual API contract and switches to a refreshed s
 });
 
 test('hosted stdio MCP queues, reads and stops an authorized API run', async (t) => {
-  const { createHash } = await import('node:crypto');
+  const { createHash, generateKeyPairSync } = await import('node:crypto');
   const { fileURLToPath } = await import('node:url');
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
   const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
@@ -88,4 +88,27 @@ test('hosted stdio MCP queues, reads and stops an authorized API run', async (t)
   assert.equal((await call('get_run', input)).run.buildId, build.id);
   assert.equal((await call('cancel_run', input)).run.state, 'cancelled');
   assert.deepEqual((await call('list_run_events', input)).events.map(event => event.type), ['run.queued', 'run.cancelled']);
+
+  const owner = await api.POST('/api/v1/auth/register', {
+    body: { email: 'mcp-provider@example.com', password: 'synthetic-provider-acceptance' },
+  });
+  const ownerApi = createAgusClient({ baseUrl: origin, getToken: () => owner.data.token });
+  const { data: { pairing } } = await ownerApi.POST('/api/v1/me/devices/pairings');
+  const { publicKey } = generateKeyPairSync('ed25519');
+  const enrollment = await fetch(origin + '/api/v1/provider/enroll', {
+    method: 'POST', headers: { authorization: 'Bearer ' + pairing.code, 'content-type': 'application/json' },
+    body: JSON.stringify({ displayName: 'Synthetic provider', publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }),
+      devices: [{ id: 'private', dedicated: true, profile: { kind: 'emulator' }, scenarios: ['app-launch'] }] }),
+  });
+  assert.equal(enrollment.status, 200);
+  const { providerId } = await enrollment.json();
+  const privateInput = { projectId: project.id, buildId: build.id, deviceId: providerId + ':private',
+    scenario: 'app-launch', mode: 'agent', idempotencyKey: 'test-mcp-private' };
+  const requested = await call('request_private_device', privateInput);
+  assert.equal(requested.token, undefined);
+  assert.equal(requested.invitation.state, 'pending');
+  assert.equal((await call('request_private_device', privateInput)).invitation.id, requested.invitation.id);
+  const { data: { invitations } } = await ownerApi.GET('/api/v1/invitations');
+  assert.equal(invitations[0].id, requested.invitation.id);
+  assert.equal((await call('list_runs', {})).runs.length, 1);
 });
