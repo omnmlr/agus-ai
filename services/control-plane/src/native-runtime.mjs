@@ -130,6 +130,7 @@ export function issueNativeLease(state, installation, assignment, task, build, p
   const credential = token();
   const manifest = {
     v: 1, type: 'agus.native.workload', audience: installation.id, assignmentId: assignment.id,
+    installationKeySha256: digest(Buffer.from(installation.publicKey, 'base64')),
     attemptId: assignment.attempt.id, leaseId: id, fence, runtimeClass: installation.runtimeClass,
     campaignRevision: assignment.campaignRevision, actionContract: sdkVersion,
     taskKind: task.kind ?? 'automated_test',

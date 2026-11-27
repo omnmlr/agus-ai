@@ -14,6 +14,7 @@ const path = process.argv[2];
 const keys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
 const text = keys.publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
 writeFileSync(path + '/manifest.pkcs8', keys.privateKey.export({ type: 'pkcs8', format: 'der' }).toString('base64'), { mode: 0o600, flag: 'wx' });
+writeFileSync(path + '/manifest.public.b64', text + '\n', { flag: 'wx' });
 for (const [name, pkg] of [['runtime', 'app.agus.runtime.preview'], ['fixture', 'app.agus.preview.fixture']]) {
   writeFileSync(path + '/' + name + '-PreviewConfig.java', 'package ' + pkg
     + '; final class PreviewConfig { static final String MANIFEST_KEY = "' + text + '"; }\n');

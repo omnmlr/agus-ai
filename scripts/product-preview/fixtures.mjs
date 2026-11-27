@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { digest } from '../../services/control-plane/src/security.mjs';
 import { createControlPlane } from '../../services/control-plane/src/server.mjs';
+import { verifyNativeReceipt } from '../../packages/developer-client/src/native-receipt.mjs';
 
 const directory = resolve(process.argv[2]);
 const action = process.argv[3];
@@ -71,10 +72,20 @@ if (action === 'serve') {
   const { token, campaignId } = JSON.parse(await readFile(resolve(directory, 'seed.private.json'), 'utf8'));
   const path = '/campaigns/' + campaignId + '/report';
   const { report } = await request('GET', path, token);
+  const trustedKey = (await readFile(resolve(directory, 'manifest.public.b64'), 'utf8')).trim();
   for (const assignment of report.assignments) {
     const successful = ['human_demonstration', 'automated_test'].includes(assignment.task.kind);
     if (assignment.state !== (successful ? 'submitted' : 'interrupted')) {
       throw Error(assignment.task.title + ' is ' + assignment.state);
+    }
+    if (successful) {
+      const evidence = await request('GET', '/assignments/' + assignment.id + '/receipt', token);
+      const verified = verifyNativeReceipt(evidence.receipt, trustedKey);
+      if (!verified.cleanupConfirmed || verified.buildSha256 !== reviewed.sha256
+        || verified.assignmentId !== assignment.id || verified.attemptId !== assignment.attempt.id) {
+        throw Error('Receipt did not verify against the built fixture, reviewed assignment and cleanup');
+      }
+      await writeFile(resolve(directory, assignment.task.runtimeClass + '-receipt.json'), JSON.stringify(evidence, null, 2) + '\n');
     }
     await request('POST', '/assignments/' + assignment.id + '/reviews', token, {
       attemptId: assignment.attempt.id, version: successful ? 1 : 0, decision: successful ? 'accept' : 'partial',

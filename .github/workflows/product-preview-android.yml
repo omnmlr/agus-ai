@@ -73,6 +73,8 @@ jobs:
             ${{ runner.temp }}/agus-product-preview/android-markers.log
             ${{ runner.temp }}/agus-product-preview/campaign-evidence.json
             ${{ runner.temp }}/agus-product-preview/emulator.log
+            ${{ runner.temp }}/agus-product-preview/manifest.public.b64
+            ${{ runner.temp }}/agus-product-preview/phone_*-receipt.json
             ${{ runner.temp }}/agus-product-preview/revision.txt
           if-no-files-found: warn
           retention-days: 14

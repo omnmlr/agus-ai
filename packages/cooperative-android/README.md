@@ -35,3 +35,13 @@ node scripts/product-preview/fixtures.mjs "$preview_output" review
 ```
 
 The artifact directory contains a disposable private signing key, local state, and disposable authentication data. Keep it local and delete it after testing. Publish only the explicit sanitized evidence files from CI.
+
+## Verify a downloaded receipt
+
+Download the receipt through the campaign report or `GET /api/v1/assignments/{assignmentId}/receipt`. Obtain `manifest.public.b64` from the trusted operator or the exact audited lab build. The CLI takes the pinned key separately from the downloadable receipt.
+
+```sh
+node packages/developer-client/src/cli.mjs verify-native-receipt receipt.json "$preview_output/manifest.public.b64"
+```
+
+Check the returned assignment ID, attempt ID and build digest against the intended run. The verifier authenticates the manifest, installation key, structured report and any cleanup proof. The result represents the scoped preview claims and supplies no hardware attestation. Receipts issued before the installation-key binding require their original hosted verification record.

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { verifyNativeReceipt } from '../../../packages/developer-client/src/native-receipt.mjs';
 import { apk, enroll, heartbeat, leaseProof, review, startTestPilot } from '../test-support/pilot-fixtures.mjs';
 
 const answers = {
@@ -83,6 +84,17 @@ test('campaign reservation, native human submission, revision, review and earnin
   const [winner, runtime, loser, loserRuntime] = winnerIndex === 0 ? [first, one, second, two] : [second, two, first, one];
   const { body } = await executeHuman({ pilot, as, person: winner, runtime, offer: a,
     accepted: results[winnerIndex].result.assignment });
+  const receiptPath = '/assignments/' + a.id + '/receipt';
+  await as(loser, 'GET', receiptPath, undefined, 404);
+  const { receipt } = await as(developer, 'GET', receiptPath);
+  const issuer = pilot.manifestKeys.publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
+  const verified = verifyNativeReceipt(receipt, issuer);
+  assert.equal(verified.assignmentId, a.id);
+  assert.equal(verified.cleanupConfirmed, true);
+  assert.throws(() => verifyNativeReceipt(receipt, receipt.publicKey), /key or algorithm differs/);
+  assert.throws(() => verifyNativeReceipt({ ...receipt, publicKey: issuer }, issuer), /bind the installation key/);
+  assert.throws(() => verifyNativeReceipt({ ...receipt, report: { ...receipt.report, sha256: '0'.repeat(64) } }, issuer),
+    /digest or signature verification failed/);
   const reviewBody = { attemptId: body.attemptId, version: 1, decision: 'revise', reason: 'Add the review-screen transition' };
   await as(winner, 'POST', '/assignments/' + a.id + '/reviews', reviewBody, 404);
   await as(developer, 'POST', '/assignments/' + a.id + '/reviews', reviewBody);
