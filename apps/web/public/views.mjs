@@ -103,6 +103,7 @@ export function deviceOptions(devices, scenario) {
 function transactionFields(visible = false) {
   return `<fieldset data-transaction-fields${visible ? '' : ' disabled hidden'}><legend>Expected transaction</legend>
     <label class="field">Network<select name="network"><option value="devnet">Solana Devnet</option><option value="localnet">Configured Localnet</option></select></label>
+    <label class="field">Disposable Devnet test payer<input name="payer" maxlength="44" autocomplete="off"></label>
     <label class="field">Recipient wallet<input name="recipient" required maxlength="44" autocomplete="off"></label>
     <label class="field">Amount in lamports<input name="lamports" type="number" required min="1" max="9007199254740991" step="1"></label>
   </fieldset>`;
@@ -128,6 +129,7 @@ export function runsView({ projects, builds, devices, runs }, selected) {
     <label class="field">Maximum duration in seconds<input name="maximumDurationSeconds" type="number" min="15" max="600" step="1" value="120" required><small>Unpaid marketplace offers require provider acceptance under the device's availability settings.</small></label>
     <label class="field">Execution mode<select name="mode">${selectOption('scripted', 'Scripted')}${selectOption('agent', 'Agent-driven')}</select></label>
     ${transactionFields()}
+    <label class="field">Devnet USDC funding wallet (optional)<input name="fundingWallet" maxlength="44" autocomplete="off"><small>Paid Devnet work requires a specific provider device, test payer and verified payout wallet.</small></label>
     ${evidenceFields('Choose which workload attachments the provider may collect.')}
     <button type="submit" class="button button-primary">Post marketplace job</button>
   </form>` : empty('Register a build in Workspace to start a run.');

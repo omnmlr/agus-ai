@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { deviceMeasurements, parseUi } from "../../../packages/mobile-test/src/android.ts";
-import { FAKE_WALLET, FIXTURE, RunnerFailure, packagePattern } from "./protocol.mjs";
+import { FAKE_WALLET, FIXTURE, RunnerFailure, packagePattern, sha256 } from "./protocol.mjs";
 
 const exec = promisify(execFile);
 const imageHeader = Buffer.from("89504e470d0a1a0a", "hex");
@@ -115,6 +115,14 @@ export class AndroidDevice {
       throw new RunnerFailure("APK_PACKAGE_STATE");
     }
     return output.split("\n").includes("package:" + packageName);
+  }
+
+  async installedTestWalletDigest(signal) {
+    const location = await this.shell(["pm", "path", "--user", "0", FAKE_WALLET], signal);
+    const match = /^package:(\/data\/app\/(?:~~[\w+=-]+\/)?com\.solana\.mobilewalletadapter\.fakewallet-[\w+=-]+\/base\.apk)$/.exec(location);
+    if (!match) throw new RunnerFailure("DEVNET_WALLET_NOT_PREPARED");
+    const bytes = await this.command(["exec-out", "cat", match[1]], signal);
+    return sha256(bytes);
   }
 
   async install(path, signal) {

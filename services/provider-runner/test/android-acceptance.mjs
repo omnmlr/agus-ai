@@ -26,6 +26,7 @@ if (!serial || !fixturePath || !outputDirectory) {
   throw new Error("Usage: node --import tsx services/provider-runner/test/android-acceptance.mjs SERIAL FIXTURE_APK WALLET_APK_OR_DASH OUTPUT_DIR");
 }
 const planner = process.env.AGUS_ANDROID_ACCEPTANCE_GEMINI === "1" ? "gemini" : "remote";
+if (planner === "gemini" && !process.env.AGUS_GEMINI_API_KEY) throw new Error("Configure AGUS_GEMINI_API_KEY for model-driven acceptance");
 const wallet = walletPath && walletPath !== "-";
 const scenario = wallet ? (process.env.AGUS_ANDROID_ACCEPTANCE_TRANSFER === "1" ? "wallet-transfer" : "wallet-connect") : "app-launch";
 const expectedTransaction = scenario === "wallet-transfer" ? {

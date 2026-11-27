@@ -82,8 +82,7 @@ try {
   $valProc = Start-Process -FilePath "wsl.exe" -ArgumentList @(
     "-d", "Ubuntu", "--",
     "$wslHome/agus-lab/solana-release/bin/solana-test-validator",
-    "--ledger", "$wslHome/agus-lab/ledger",
-    "--reset",
+    "--ledger", "$wslHome/agus-lab/ledger-$([guid]::NewGuid().ToString('N'))",
     "--bind-address", "127.0.0.1",
     "--rpc-port", "8899",
     "--faucet-per-request-sol-cap", "1",
@@ -103,6 +102,7 @@ try {
   if (-not $genesis) { throw "Validator unavailable on http://127.0.0.1:8899" }
   Write-Host "Validator genesis: $genesis"
 
+  $env:AGUS_TEST_CHAIN = "localnet"
   $env:AGUS_TEST_LOCAL_GENESIS = $genesis
   $env:AGUS_TEST_CONFIG = $configPath
   $env:AGUS_TEST_EVIDENCE = $evidenceDir

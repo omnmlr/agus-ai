@@ -211,7 +211,8 @@ function expectedTransaction(data) {
   if (!data.has('network')) return undefined;
   const lamports = Number(data.get('lamports'));
   if (!Number.isSafeInteger(lamports) || lamports < 1) throw new Error('Enter a whole number of lamports between 1 and 9007199254740991.');
-  return { network: data.get('network'), recipient: data.get('recipient').trim(), lamports };
+  const payer = data.get('payer')?.trim();
+  return { network: data.get('network'), recipient: data.get('recipient').trim(), lamports, ...(payer ? { payer } : {}) };
 }
 
 function renderInvitation(invitation, reviewed = false) {
@@ -265,6 +266,8 @@ const forms = {
       expectedTransaction: expectedTransaction(data),
     };
     if (data.get('deviceId')) body.deviceId = data.get('deviceId');
+    const developerWallet = data.get('fundingWallet')?.trim();
+    if (developerWallet) body.payment = { kind: 'devnet', developerWallet };
     const { run } = await api.post('/runs', body);
     beginRun(run);
   },

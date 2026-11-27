@@ -295,6 +295,7 @@ test('lease expires with unconfirmed stop; later authentic cleanup acknowledges 
 
 test('run-bound signature, consent, and independent finalized transfer replay checks', async (t) => {
   let f;
+  const payer = 'So11111111111111111111111111111111111111112';
   let count = 0;
   f = await fixture(t, {
     fetchImpl: async (_url, request) => {
@@ -310,8 +311,8 @@ test('run-bound signature, consent, and independent finalized transfer replay ch
         result: {
           blockTime: Math.floor(f.now() / 1000), slot: 99, meta: { err: null }, transaction: {
             signatures: [transactionSignature],
-            message: { instructions: [{ program: 'system', parsed: {
-              type: 'transfer', info: { destination: recipient, lamports: 1_000_000 },
+            message: { accountKeys: [{ pubkey: payer, signer: true }], instructions: [{ program: 'system', parsed: {
+              type: 'transfer', info: { source: payer, destination: recipient, lamports: 1_000_000 },
             } }] },
           },
         },
@@ -326,7 +327,7 @@ test('run-bound signature, consent, and independent finalized transfer replay ch
     const { invitation } = await f.request('/invitations', {
       token: developer.token, status: 201, body: {
         ...privateRequest(app, runner.id), scenario: 'wallet-transfer', evidence: { trajectory: true },
-        expectedTransaction: { network: 'devnet', recipient, lamports: 1_000_000 },
+        expectedTransaction: { network: 'devnet', payer, recipient, lamports: 1_000_000 },
       },
     });
     const path = '/invitations/' + invitation.id;

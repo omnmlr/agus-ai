@@ -1,0 +1,7 @@
+{
+  "name": "@agus/receipt-attestation",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test" },
+  "dependencies": { "sas-lib": "1.0.10" }
+}

@@ -11,6 +11,10 @@ on:
         description: Exercise the experimental agent-driven Localnet wallet transfer
         type: boolean
         default: false
+      gemini_agent:
+        description: Use the configured Gemini secret instead of the deterministic remote controller
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -82,6 +86,9 @@ jobs:
         env:
           PROVIDER_ONLY: ${{ inputs.provider_only }}
           AGENT_WALLET: ${{ inputs.agent_wallet }}
+          GEMINI_AGENT: ${{ inputs.gemini_agent }}
+          AGUS_GEMINI_API_KEY: ${{ inputs.gemini_agent && secrets.AGUS_GEMINI_API_KEY || '' }}
+          AGUS_GEMINI_MODEL: gemini-3.1-flash-lite
         run: |
           set -euxo pipefail
           export AGUS_TEST_CONFIG="$AGUS_LAB/runner.json" AGUS_TEST_EVIDENCE="$AGUS_LAB/evidence"
@@ -113,6 +120,9 @@ jobs:
           provider_acceptance() {
             local wallet_arg=-
             if [[ "$AGENT_WALLET" == true ]]; then wallet_arg="$AGUS_LAB/wallet.apk"; fi
+            if [[ "$GEMINI_AGENT" == true ]]; then
+              export AGUS_ANDROID_ACCEPTANCE_GEMINI=1
+            fi
             AGUS_ANDROID_ACCEPTANCE_TRANSFER=1 AGUS_AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt" \
               node --import tsx services/provider-runner/test/android-acceptance.mjs emulator-5554 \
               "$AGUS_LAB/agus-mwa-lab.apk" "$wallet_arg" "$AGUS_LAB/provider-acceptance"

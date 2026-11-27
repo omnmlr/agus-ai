@@ -94,3 +94,11 @@ Review shows requesting person, exact APK and test, bounded duration, requested 
 ## Recovery states
 
 Use a retry for read failures, an inline remedy for validation and unavailable devices, reauthentication for 401, and a combined resource-unavailable state for missing or unauthorized records. Preserve form inputs across ordinary errors. During unknown write outcomes, refetch and reconcile before creating a second run or transaction. Treat Offline, job expired, lease expired, action rejected, cleanup unconfirmed, no matching wallet receipt, and payment unavailable as distinct states.
+
+## Devnet payer, model provenance and training export
+
+Paid Devnet `wallet-transfer` requests include `expectedTransaction.payer`, an explicitly authorized disposable test payer, in addition to network, recipient and integer lamports. `payment.developerWallet` funds the distinct USDC quote. Provider selection and confirmed funding are both required before paid execution. The runner only claims jobs for the locally approved APK digest and wallet network.
+
+A signed runner receipt can include `execution.planner="gemini"`, `modelId` and `modelActionCount`. Render this as model-selected actions reported by the runner. Fixture results continue to use separate labels for a scripted run or external controller. A signed report does not establish that a third party observed model execution.
+
+Use `GET /api/v1/runs/:id/training-consent` as either run participant. `PUT` grants and `DELETE` withdraws that participant’s separate training permission. The response is `{consent:{developer: timestamp|null,provider: timestamp|null}}`. `GET /api/v1/runs/:id/training-export` is developer-only and requires both grants, plus an existing signed trajectory collected with workload consent. The `agus.training-trajectory.v1` JSON contains relative timestamps, action types and outcomes, allowlisted phases, selection provenance and source receipt digests. It excludes screenshots, raw observations, free-text logs, wallet credentials and account identifiers. Withdrawal blocks future exports. Previously downloaded copies remain subject to the recipient’s retention obligations. Treat `training_unavailable` as an unavailable feature and `training_consent_required` as an incomplete or withdrawn grant.

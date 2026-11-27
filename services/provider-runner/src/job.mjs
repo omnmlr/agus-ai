@@ -191,8 +191,13 @@ export async function executeJob({ api, config, identity, device, rawJob, shutdo
     const verifier = spec && chainFactory(config, spec);
     const needsWallet = job.scenario !== "app-launch";
     const approvedPackages = new Set([packageName, ...(needsWallet ? [FAKE_WALLET] : [])]);
+    const retainWallet = spec?.network === "devnet";
     for (const name of approvedPackages) {
-      if (await device.present(name, signal)) throw new RunnerFailure("PREEXISTING_PACKAGE");
+      if (name === FAKE_WALLET && retainWallet) {
+        if (await device.installedTestWalletDigest(signal) !== FAKE_WALLET_SHA) throw new RunnerFailure("APK_DIGEST");
+      } else if (await device.present(name, signal)) {
+        throw new RunnerFailure("PREEXISTING_PACKAGE");
+      }
     }
     staged = await mkdtemp(join(config.stateDirectory, "job-"));
     const buildPath = join(staged, "target.apk");
@@ -211,7 +216,7 @@ export async function executeJob({ api, config, identity, device, rawJob, shutdo
       await device.install(path, signal);
       uncertainInstall = false;
     };
-    if (needsWallet) {
+    if (needsWallet && !retainWallet) {
       const walletPath = join(staged, "wallet.apk");
       await stage(createReadStream(config.walletPath), walletPath, FAKE_WALLET_SHA, signal);
       if (await device.packageOf(walletPath, signal) !== FAKE_WALLET) throw new RunnerFailure("APK_MANIFEST");

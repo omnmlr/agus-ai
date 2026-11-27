@@ -46,7 +46,8 @@ test("a generic MCP client schedules a known scenario and polls its real runner 
     const { runId } = run.structuredContent as { runId: string };
     assert.match(runId, /^[0-9a-f-]{36}$/);
     phase = "poll scenario";
-    for (let attempt = 0; attempt < 20; attempt++) {
+    const deadline = performance.now() + 20_000;
+    while (performance.now() < deadline) {
       const result = await client.callTool({ name: "get_test_run", arguments: { runId } });
       const report = result.structuredContent as { state: string; failure?: { code: string } };
       if (report.state === "failed") {
