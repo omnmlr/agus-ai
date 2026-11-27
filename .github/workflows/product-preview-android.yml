@@ -53,7 +53,7 @@ jobs:
           curl -sf --retry 5 --retry-delay 1 --retry-connrefused http://127.0.0.1:18765/health
           node scripts/product-preview/fixtures.mjs "$out" seed
           timeout 240 bash -c 'adb -s emulator-5554 wait-for-device; until [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
-          python3 scripts/product-preview/android.py "$out"
+          AGUS_PREVIEW_BACKEND_PID="$backend" python3 scripts/product-preview/android.py "$out"
           node scripts/product-preview/fixtures.mjs "$out" review
       - name: Retain sanitized preview observations
         if: always()

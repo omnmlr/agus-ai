@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -140,9 +141,13 @@ def run():
     fill("Preview password", "DisposablePilotPassword123")
     tap("Sign in to AGUS")
     expect("PROFILE_PERSON_AUTHENTICATED")
-    for number, mode in enumerate(("human", "cooperative"), start=1):
-        tap("Enroll this phone for " + mode + " testing")
-        expect("PROFILE_RUNTIME_ENROLLED", number)
+    enrollments = 0
+    finished = 0
+    for number, mode in enumerate(("human", "owner-stop", "offline", "cooperative"), start=1):
+        if mode in ("human", "cooperative"):
+            tap("Enroll this phone for " + mode + " testing")
+            enrollments += 1
+            expect("PROFILE_RUNTIME_ENROLLED", enrollments)
         if number == 1:
             tap("Enable stop notification")
             tap("Allow", scroll=False)
@@ -167,22 +172,51 @@ def run():
             until(lambda: any(node.get("text") == "Onboarding submissions: 2" for node in tree().iter("node")),
                   "Did not reproduce the second onboarding submission")
             tap("Finish attended test")
-        expect("PROFILE_REPORT_VERIFIED", number)
+        if mode == "owner-stop":
+            tap("Continue")
+            adb("shell", "cmd", "statusbar", "expand-notifications")
+            tap("Stop test", scroll=False)
+            expect("WATCHDOG_OWNER_STOP")
+            adb("shell", "cmd", "statusbar", "collapse")
+        if mode == "offline":
+            tap("Continue")
+            backend = int(os.environ["AGUS_PREVIEW_BACKEND_PID"])
+            os.kill(backend, signal.SIGSTOP)
+            try:
+                until(lambda: "WATCHDOG_AUTHORITY_LOST" in log(), "Offline watchdog did not stop", 57)
+            finally:
+                os.kill(backend, signal.SIGCONT)
+        successful = mode in ("human", "cooperative")
+        if successful:
+            finished += 1
+            expect("PROFILE_REPORT_VERIFIED", finished)
+        else:
+            until(lambda: "suspended=true" in adb("shell", "dumpsys", "package", FIXTURE),
+                  "Android did not mark the stopped fixture suspended")
+            open_work(profile)
         tap("Remove fixture")
         confirm_action("remove_status_0", number, {"review android confirmation", "uninstall", "ok"})
         until(lambda: not package_present(profile), "Fixture remains installed")
         tap("Confirm clean profile")
         expect("PROFILE_CLEANED", number)
-        tap("Show my assignments")
-        tap("Prepare structured submission")
-        fill("Reproduction steps, one per line", "Open%sonboarding%sand%sinspect%sthe%sreview")
-        fill("Expected outcome", "One%sonboarding%ssubmission")
-        fill("Actual outcome", "Duplicate%ssubmission%sobserved" if mode == "human" else "Automated%sstep%spassed")
-        tap("Review submission")
-        tap("Send report", scroll=False)
-        expect("PERSON_SUBMISSION_SAVED", number)
-        record(mode + " profile enrollment, signed evidence, cleanup and submission passed")
-        if mode == "human":
+        if successful:
+            tap("Show my assignments")
+            tap("Prepare structured submission")
+            fill("Reproduction steps, one per line", "Open%sonboarding%sand%sinspect%sthe%sreview")
+            fill("Expected outcome", "One%sonboarding%ssubmission")
+            fill("Actual outcome", "Duplicate%ssubmission%sobserved" if mode == "human" else "Automated%sstep%spassed")
+            tap("Review submission")
+            tap("Send report", scroll=False)
+            expect("PERSON_SUBMISSION_SAVED", finished)
+            record(mode + " profile enrollment, signed evidence, cleanup and submission passed")
+            if mode == "human":
+                tap("Show my assignments")
+                tap("Training consent")
+                tap("Grant", scroll=False)
+                tap("Show my assignments")
+        else:
+            record(mode + " independently suspended the fixture and confirmed cleanup")
+        if mode == "offline":
             tap("Revoke installation")
             tap("Revoke", scroll=False)
     tap("Remove test work profile")

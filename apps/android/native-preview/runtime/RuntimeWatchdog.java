@@ -11,6 +11,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.util.Log;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -24,6 +25,7 @@ public class RuntimeWatchdog extends Service {
             var work = RuntimeState.live;
             if (work == null) { stopSelf(); return; }
             if (!work.eligible()) {
+                if (!work.stopped) Log.i("AgusPreview", "WATCHDOG_AUTHORITY_LOST");
                 work.stop();
                 stopSelf();
                 return;
@@ -51,7 +53,10 @@ public class RuntimeWatchdog extends Service {
             .setContentTitle("AGUS testing window").setContentText("Stop immediately to reclaim your screen.")
             .setOngoing(true).addAction(new Notification.Action.Builder(null, "Stop test", stop).build()).build(),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-        if (intent != null && "stop".equals(intent.getAction()) && RuntimeState.live != null) RuntimeState.live.stop();
+        if (intent != null && "stop".equals(intent.getAction()) && RuntimeState.live != null) {
+            RuntimeState.live.stop();
+            Log.i("AgusPreview", "WATCHDOG_OWNER_STOP");
+        }
         timer.removeCallbacks(check);
         timer.post(check);
         return START_NOT_STICKY;

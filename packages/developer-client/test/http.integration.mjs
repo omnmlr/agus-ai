@@ -47,7 +47,12 @@ test('hosted stdio MCP queues, reads and stops an authorized API run', async (t)
   const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
   const directory = await mkdtemp(join(tmpdir(), 'agus-mcp-'));
   const app = await createControlPlane({
-    env: { AGUS_LOCAL_DATA_DIR: directory, AGUS_PROVIDER_BOOTSTRAP_TOKEN: 'fixture-bootstrap-authorization' },
+    env: {
+      AGUS_LOCAL_DATA_DIR: directory, AGUS_PROVIDER_BOOTSTRAP_TOKEN: 'fixture-bootstrap-authorization',
+      AGUS_PRODUCT_PILOT: '1', AGUS_NATIVE_MANIFEST_PKCS8: generateKeyPairSync('ec', {
+        namedCurve: 'prime256v1',
+      }).privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64'),
+    },
   });
   app.server.listen(0, '127.0.0.1');
   await once(app.server, 'listening');
@@ -111,4 +116,18 @@ test('hosted stdio MCP queues, reads and stops an authorized API run', async (t)
   const { data: { invitations } } = await ownerApi.GET('/api/v1/invitations');
   assert.equal(invitations[0].id, requested.invitation.id);
   assert.equal((await call('list_runs', {})).runs.length, 1);
+  const draft = { projectId: project.id, title: 'Dedicated release coverage', objective: 'Check the approved launch scenario',
+    deadlineAt: Date.now() + 3_600_000, tasks: [{
+      title: 'Launch on the dedicated fixture', buildId: build.id, count: 1, instructions: 'Observe the reviewed launch result',
+      runtimeClass: 'dedicated_runner', kind: 'automated_test',
+    }] };
+  const { campaign } = await call('create_campaign_draft', { draft, idempotencyKey: 'mixed-client-check' });
+  assert.equal((await call('list_campaigns', {})).campaigns[0].id, campaign.id);
+  assert.equal((await call('get_campaign_report', { campaignId: campaign.id })).report.cells[0].missing, 1);
+  const published = await api.POST('/api/v1/campaigns/{campaignId}/launch', {
+    params: { path: { campaignId: campaign.id } }, body: { expectedRevision: 1 },
+  });
+  assert.equal(published.data.campaign.state, 'active');
+  const report = await api.GET('/api/v1/campaigns/{campaignId}/report', { params: { path: { campaignId: campaign.id } } });
+  assert.equal(report.data.report.assignments[0].run.buildId, build.id);
 });

@@ -51,11 +51,15 @@ if (action === 'serve') {
   const task = { buildId: build.id, count: 1, maximumDurationSeconds: 180, testUnits: 5 };
   const { campaign } = await request('POST', '/campaigns', token, { projectId: project.id, title: 'Onboarding regression',
     objective: 'Compare a structured human finding with a deterministic cooperative run.',
-    deadlineAt: Date.now() + 3_600_000, budgetTestUnits: 10, tasks: [
-      { ...task, kind: 'human_test', runtimeClass: 'phone_human', title: 'Detect duplicate onboarding',
-        instructions: 'Tap Continue, return to review, and tap Continue again. Record what differs.' },
+    deadlineAt: Date.now() + 3_600_000, budgetTestUnits: 20, tasks: [
+      { ...task, kind: 'human_demonstration', runtimeClass: 'phone_human', title: 'Detect duplicate onboarding',
+        trainingEligible: true, instructions: 'Tap Continue, return to review, and tap Continue again. Record what differs.' },
       { ...task, kind: 'automated_test', runtimeClass: 'phone_cooperative', title: 'Cooperative onboarding check',
         instructions: 'Run the reviewed action sequence.' },
+      { ...task, kind: 'human_test', runtimeClass: 'phone_human', title: 'Owner interruption', stopTestUnits: 2,
+        instructions: 'Stop the foreground assignment using the Android notification.' },
+      { ...task, kind: 'human_test', runtimeClass: 'phone_human', title: 'Offline authority expiry', stopTestUnits: 2,
+        instructions: 'Confirm the watchdog suspends the app when authority expires offline.' },
     ] });
   await request('POST', '/campaigns/' + campaign.id + '/launch', token, { expectedRevision: 1 });
   await writeFile(resolve(directory, 'seed.private.json'), JSON.stringify({ token, campaignId: campaign.id }), { mode: 0o600 });
@@ -64,18 +68,37 @@ if (action === 'serve') {
   const path = '/campaigns/' + campaignId + '/report';
   const { report } = await request('GET', path, token);
   for (const assignment of report.assignments) {
-    if (assignment.state !== 'submitted') throw Error(assignment.task.title + ' is ' + assignment.state);
+    const successful = ['human_demonstration', 'automated_test'].includes(assignment.task.kind);
+    if (assignment.state !== (successful ? 'submitted' : 'interrupted')) {
+      throw Error(assignment.task.title + ' is ' + assignment.state);
+    }
     await request('POST', '/assignments/' + assignment.id + '/reviews', token, {
-      attemptId: assignment.attempt.id, version: 1, decision: 'accept', reason: 'Completed the authorized preview workflow.',
+      attemptId: assignment.attempt.id, version: successful ? 1 : 0, decision: successful ? 'accept' : 'partial',
+      reason: 'Completed the authorized preview workflow.',
     });
   }
   await request('POST', '/campaigns/' + campaignId + '/complete', token, { expectedRevision: 1 });
   const updated = (await request('GET', path, token)).report;
-  if (updated.acceptedTestUnits !== 10 || updated.cells[0].failed !== 1 || updated.cells[1].passed !== 1) {
+  if (updated.acceptedTestUnits !== 14 || updated.cells[0].failed !== 1 || updated.cells[1].passed !== 1) {
     throw Error('Unexpected campaign report');
   }
+  const demo = updated.assignments.find(assignment => assignment.task.kind === 'human_demonstration');
+  const consentPath = '/me/assignments/' + demo.id + '/training-consent';
+  await request('PUT', consentPath, token, { termsDigest: demo.termsDigest, grant: true });
+  const exportPath = '/campaigns/' + campaignId + '/exports';
+  const prepared = (await request('POST', exportPath, token, { purpose: 'training', assignmentIds: [demo.id] })).export;
+  const exported = (await request('GET', exportPath + '/' + prepared.id, token)).export;
+  const actions = exported.data.rows[0].actions.map(action => action.action);
+  if (actions.join(',') !== 'continue,review,continue') throw Error('Unexpected native demonstration actions');
+  if (JSON.stringify(exported).includes('Duplicate submission observed')) throw Error('Narrative leaked into training export');
+  const contributor = await request('POST', '/auth/login', null, testUser);
+  await request('DELETE', consentPath, contributor.token);
+  const denied = await fetch(endpoint + exportPath + '/' + prepared.id, { headers: { Authorization: 'Bearer ' + token } });
+  if (denied.status !== 403) throw Error('Withdrawn export remained accessible');
   const evidence = { cells: updated.cells, acceptedTestUnits: updated.acceptedTestUnits,
     scope: 'AOSP emulator, synthetic identities, nontransferable test units',
-    evidence: updated.assignments.map(assignment => assignment.attempt.evidence) };
+    evidence: updated.assignments.map(assignment => assignment.attempt.evidence),
+    rehearsal: { approvedHumanActions: actions, existingExportDeniedAfterWithdrawal: true,
+      interrupted: updated.assignments.filter(item => item.state === 'partially_accepted').length } };
   await writeFile(resolve(directory, 'campaign-evidence.json'), JSON.stringify(evidence, null, 2) + '\n');
 } else throw Error('Expected serve, seed or review');

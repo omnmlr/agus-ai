@@ -9,6 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { createControlPlane } from '../../services/control-plane/src/server.mjs';
 import { digest } from '../../services/control-plane/src/security.mjs';
 import { createWebServer } from '../../apps/web/scripts/serve.mjs';
+import { enroll, heartbeat, leaseProof } from '../../services/control-plane/test-support/pilot-fixtures.mjs';
 
 const directory = await mkdtemp(join(tmpdir(), 'agus-browser-'));
 const artifact = Buffer.from([80, 75, 3, 4, 1, 0, 0, 0]);
@@ -103,6 +104,8 @@ try {
   await fill('#campaign-form [name=deadline]', new Date(Date.now() + 3_600_000).toISOString().slice(0, 16));
   await fill('[name=taskTitle]', 'Attended onboarding');
   await fill('[name=instructions]', 'Try the reviewed app and report structured results.');
+  await fill('[name=testUnits]', '5');
+  await fill('[name=budget]', '5');
   await click('[data-action=add-campaign-task]');
   await fill('[data-campaign-task]:last-child [name=lane]', 'dedicated_runner:automated_test');
   await fill('[data-campaign-task]:last-child [name=taskTitle]', 'Dedicated coverage');
@@ -118,6 +121,45 @@ try {
   await click('[data-operation=resume]');
   await wait("document.querySelector('[data-operation=pause]')");
   evidence.push('Mixed campaign draft, publish, coverage, dedicated link, pause and resume passed');
+  const request = async (method, route, { credential, body } = {}) => {
+    const response = await fetch(api + '/api/v1' + route, { method,
+      headers: { ...(credential && { Authorization: 'Bearer ' + credential }),
+        ...(body && { 'Content-Type': 'application/json' }) },
+      body: body ? JSON.stringify(body) : undefined });
+    const value = await response.json();
+    assert(response.ok, JSON.stringify(value));
+    return value;
+  };
+  const contributor = await request('POST', '/auth/register', { body: {
+    email: 'browser-test-contributor@example.invalid', password: 'disposable-browser-password',
+  } });
+  await request('POST', '/me/qualifications/duplicate-onboarding-v1/submissions', { credential: contributor.token,
+    body: { sequence: ['continue', 'review', 'continue'], expectedCode: 'single_continue', actualCode: 'multiple_continue',
+      walletAnswer: 'skip', evidenceNote: 'One expected action and two observed actions.' } });
+  const runtime = await enroll({ request }, contributor, 'phone_human');
+  await request('POST', '/runtime/installations/' + runtime.id + '/heartbeat', {
+    credential: runtime.credential, body: heartbeat(runtime, 1) });
+  const { assignments: [offer] } = await request('GET', '/me/assignments', { credential: contributor.token });
+  const { assignment } = await request('POST', '/me/assignments/' + offer.id + '/accept', {
+    credential: contributor.token, body: { termsDigest: offer.termsDigest, installationId: runtime.id, consent: true } });
+  const { lease } = await request('POST', '/runtime/installations/' + runtime.id + '/claim', {
+    credential: runtime.credential, body: { assignmentId: offer.id } });
+  const leasePath = '/runtime/leases/' + lease.id;
+  await request('POST', leasePath + '/report', { credential: lease.credential,
+    body: leaseProof(runtime, lease, 'report', { outcome: 'completed', observations: [] }) });
+  await request('POST', leasePath + '/cleanup', { credential: lease.credential,
+    body: leaseProof(runtime, lease, 'cleanup', { packageAbsent: true, installRestricted: true }) });
+  await request('POST', '/assignments/' + offer.id + '/submissions', { credential: contributor.token, body: {
+    attemptId: assignment.attempt.id, expectedVersion: 0, steps: ['Continue', 'Return to review', 'Continue'],
+    expected: 'One submission', actual: 'Two submissions', category: 'bug', result: 'failed',
+  } });
+  await click('[data-action=retry]');
+  await wait("document.querySelector('form[data-form=campaign-review]')");
+  await fill('form[data-form=campaign-review] [name=reason]', 'Exact steps and outcomes supplied for triage.');
+  await click('form[data-form=campaign-review] button[type=submit]');
+  await wait("document.body.innerText.includes('1 accepted, 1 failed')");
+  assert.equal(await run("document.body.innerText.includes('5 accepted and 0 reserved')"), true);
+  evidence.push('Developer browser reviewed a separately submitted software-signed fixture finding and recorded test compensation');
   await click('[data-action=sign-out]');
   await wait("document.querySelector('#auth-form')");
   evidence.push('Sign-out returned to authentication');
