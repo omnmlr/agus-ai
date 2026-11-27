@@ -43,18 +43,33 @@ zip -q -9 -X -j "$bundle_dir/function.zip" "$bundle_dir/index.mjs"
 sha256sum "$bundle_dir/function.zip"
 ```
 
-Deploy `function.zip` to `old-fog-27608369` / `br-super-firefly-bgzy7s7x` using the chosen stable slug `mobileinfra` and the secret bindings above. The Get Function response supplies the authoritative `invocation_url`. The candidate from documented hostname format and compute cell is `https://br-super-firefly-bgzy7s7x-mobileinfra.compute.c-9.eu-central-1.aws.neon.tech`. Use the actual returned origin for the console, Android, CLI and MCP configurations. The expected paths are `/`, `/console.html`, `/health` and `/api/v1`. [Deploy API](https://neon.com/docs/compute/functions/deploy)
+The existing Function is `mobileinfra` on `old-fog-27608369` / `br-super-firefly-bgzy7s7x`. The permanent origin is `https://agusai.grindcity.app`. Keep the current deployment ZIP and bindings for rollback. After the founder approves the update, use the existing authorized Neon API key from the secret store. The deployment API inherits omitted bindings. The status filter avoids printing environment values. [Neon Deploy API](https://neon.com/docs/compute/functions/deploy)
 
 ```bash
-origin='https://<invocation_url-host>'
+function_url='https://console.neon.tech/api/v2/projects/old-fog-27608369/branches/br-super-firefly-bgzy7s7x/functions/mobileinfra'
+: "${NEON_API_KEY:?Bind the approved Neon credential on the operator machine}"
+unzip -tq agus-neon-function.zip
+printf 'Authorization: Bearer %s\n' "$NEON_API_KEY" | \
+  curl --fail-with-body --silent --show-error --header @- \
+    --form 'zip=@agus-neon-function.zip;type=application/zip' \
+    --form-string 'runtime=nodejs24' "$function_url/deployments" | \
+  jq '{id, status, deployment_id: .deployment.id, deployment_status: .deployment.status}'
+printf 'Authorization: Bearer %s\n' "$NEON_API_KEY" | \
+  curl --fail-with-body --silent --show-error --header @- "$function_url" | \
+  jq '{invocation_url, function_url: .function.invocation_url, status, latest_deployment: (.latest_deployment | if . then {id,status} else null end)}'
+```
+
+Confirm the new deployment is `completed` in the Neon console before checking the permanent origin. Set the approved companion fingerprint through the console as `AGUS_ANDROID_CERT_SHA256`. It must be the SHA-256 certificate of the installed release APK, in colon-delimited hexadecimal. `/.well-known/assetlinks.json` is served as JSON from this configuration. Keep both settlement switches disabled on Neon.
+
+```bash
+origin='https://agusai.grindcity.app'
 curl --fail --silent --show-error "$origin/health"
 curl --fail --silent --show-error --output /dev/null "$origin/console.html"
 curl --silent --show-error --output /dev/null --write-out '%{http_code}\n' "$origin/api/v1/projects"
+curl --fail --silent --show-error "$origin/.well-known/assetlinks.json" | jq .
 ```
 
-Readiness should report `{"ok":true,"persistence":"postgres"}` and unauthenticated projects should return `401`. Then sign in with a disposable account, create a test project, upload a permitted build and open the run's event stream. Verify a second client can sign in and read the same project. Private invitation URLs can use `/console.html#invite/<token>` so the invitation token stays out of the HTTP request path. Android App Links require the final application ID and the corresponding verified signing certificate before publishing `/.well-known/assetlinks.json`.
-
-For rollback, redeploy the last verified bundle and reference the existing AGUS AI runtime secrets. Check `/health` again. Reserve migrations that remove or rewrite state for a scheduled operation with a backup and an explicit roll-forward path.
+Expect PostgreSQL health, console HTTP 200, and projects HTTP 401 without authorization. Verify the release certificate association, an invited sign-in, a permitted test project and an authenticated event stream. Restore the previous ZIP and recorded settings if readiness fails. Retain the existing Google callback `https://agusai.grindcity.app/api/v1/auth/google/callback` and web return URL `https://agusai.grindcity.app/console.html`.
 
 ## Stockholm EC2 packaging
 
@@ -83,23 +98,37 @@ To exercise settlement on this stack, fund a disposable Devnet operator through 
 
 For API or web rollback, reapply an earlier verified AGUS AI release using its files and the same isolated runtime configuration. Check the AGUS AI and financial readiness paths afterward. The Compose project does not manage the financial edge or persistence.
 
-## Existing service access and remaining setup
+## Private HTTPS runtime and campaign settlement
 
-- Gemini `AI_API_KEY` passed a read-only model listing. Keep any model invocation on the authorized runner and verify the selected model independently during agent evaluation.
-- Firecrawl and ElevenLabs bindings exist in the managed environment. The control plane has no feature requiring either provider.
-- Google OAuth, Resend and Android signing settings were not available to this workspace. Bind approved values through their existing secret stores when the corresponding integration is ready. OAuth requires the approved AGUS AI callback origin. Android release signing requires the new Android application ID and a certificate association for the chosen origin.
-- GitHub's secret metadata call returned `403` from this integration. The destination listed no GitHub deployment environment during the initial audit.
-- The Netlify sites API returned `401` with the configured credential. Railway has an existing empty project called `refreshing-playfulness`, with billing eligibility unverified. The Vercel account search returned only the existing financial identity project. The isolated Neon Function is the first deployment path with confirmed Free plan eligibility.
-- Windows runner prerequisites and physical-device enrollment are documented in the provider runner's setup. A phone and its authorized operator are required for physical acceptance. No raw ADB port is part of the hosted package.
+The web and companion can run with `AGUS_PRODUCT_PILOT` unset. Development mode `1` uses the loopback backend and the pinned AOSP Android 15 image. The `private-preview` mode requires production Postgres, the permanent HTTPS origin, invited registration and a nonempty list of approved person IDs. Mobile distribution continues to require the same AOSP image.
 
-## Activation checklist
+`AGUS_PILOT_MEMBER_IDS` contains the approved account UUIDs. `AGUS_PILOT_REVIEWER_IDS` contains independent reviewer UUIDs within that list. Each entry in `AGUS_NATIVE_REVIEWED_BUILDS` contains `sha256`, `packageName`, `signerSha256`, `publisherId` and an optional relative `component` such as `.TestActivity`. Use exact lowercase hex digests. Put the P-256 PKCS#8 base64 value in `AGUS_NATIVE_MANIFEST_PKCS8` through the restricted secret store. The runtime build input holds the corresponding public SPKI base64 key only.
 
-1. Deploy the tested bundle using an approved Neon credential path. Automatic review rejected this session's direct deployment with the scoped Postgres URI and newly generated application secrets. The isolated database and runtime role exist. The Function origin and persistent hosted app still need verification.
-2. For Google and email sign-in, bind `AGUS_GOOGLE_CLIENT_ID`, `AGUS_GOOGLE_CLIENT_SECRET`, `AGUS_GOOGLE_CALLBACK_URL`, `AGUS_AUTH_RETURN_URL`, `AGUS_RESEND_API_KEY`, `AGUS_AUTH_FROM_EMAIL`, and a fresh `AGUS_EMAIL_OTP_SECRET` in the dedicated app environment. Register the exact callback with the existing Google OAuth configuration and use an authorized Resend sender. Keep app registration and credentials scoped to AGUS AI.
-3. For live payout, give the operator a disposable Devnet signer and verify separate disposable developer and provider wallets. The public SOL faucet returned HTTP 410. Use the official sign-in/interactive faucets or authorized pre-funded accounts and follow the [settlement runbook](services/settlement/README.md).
+```bash
+export AGUS_NATIVE_BUILD_TIER=private-preview
+export AGUS_NATIVE_MANIFEST_PUBLIC_FILE=/path/to/approved-manifest.public.b64
+export AGUS_NATIVE_APPROVED_PACKAGES=app.agus.preview.fixture,org.example.agus.checklist
+# Export AGUS_NATIVE_KEYSTORE_FILE, AGUS_NATIVE_KEYSTORE_PASSWORD,
+# AGUS_NATIVE_KEY_ALIAS and AGUS_NATIVE_KEY_PASSWORD through the signing store.
+bash apps/android/native-preview/build.sh /tmp/agus-private-runtime
+"$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs /tmp/agus-private-runtime/runtime.apk
+```
 
-### Founder activation inputs
+The safest existing Devnet settlement path is a planned AGUS AI cutover to the isolated Compose service. Test the candidate against a disposable database locally first. Verify the host has spare memory, disk and CPU credits and a separate HTTPS route for `agusai.grindcity.app`. Before switching the write origin, drain existing AGUS AI work and stop its writes on Neon. Run one canonical AGUS AI control plane and one campaign reconciliation worker. The worker holds a renewable Postgres claim and reuses durable signed bytes. It only advances accepted payouts and requested refunds. The Compose application has a distinct project name, health port and read-only signer mount. The existing financial applications have separate projects, routes and databases.
 
-- **Google OAuth** · Use an approved client on this preview environment, with `AGUS_GOOGLE_CLIENT_ID`, `AGUS_GOOGLE_CLIENT_SECRET`, `AGUS_GOOGLE_CALLBACK_URL=https://<api-host>/api/v1/auth/google/callback` and `AGUS_AUTH_RETURN_URL=https://<web-host>/console.html`. Register the exact callback with Google. Exercise PKCE and the return flow with an authorized test account.
-- **Resend** · Set `AGUS_RESEND_API_KEY`, `AGUS_AUTH_FROM_EMAIL` from the verified sender domain and an independent `AGUS_EMAIL_OTP_SECRET` of at least 32 characters. Test actual delivery, expiry and throttled resend with an authorized mailbox.
-- **Devnet** · Provision the disposable fixture payer with test SOL, the distinct quote funder with test USDC and SOL, and the isolated operator with SOL and an appropriate USDC token account. Verify the provider’s payout wallet ownership before posting paid work. Use `AGUS_SETTLEMENT_ENABLED=1`, a mounted `AGUS_SETTLEMENT_KEYPAIR_FILE`, and optional `AGUS_SETTLEMENT_AMOUNT_ATOMS` on the EC2/Compose runtime. Keep settlement disabled on the Neon Function adapter. [Funding and reconciliation](services/settlement/README.md)
+```bash
+# Build on an authorized workstation, or use the checksummed CI package.
+bash deploy/package.sh HEAD /tmp
+# Extract the distribution in its own directory on the approved host.
+sha256sum --strict --check SHA256SUMS.txt
+sudo docker load -i images.tar.gz
+# Install /etc/agus-ai/runtime.env and /etc/agus-ai/campaign-operator.json from the approved stores.
+# runtime.env must be mode 0600. The mounted signer must be readable by container UID 1000 only.
+sudo docker compose --project-name agus-ai --env-file release.env \
+  -f compose.yml -f compose.campaign-settlement.yml config --quiet
+sudo docker compose --project-name agus-ai --env-file release.env \
+  -f compose.yml -f compose.campaign-settlement.yml up --detach --wait
+curl --fail --silent --show-error http://127.0.0.1:4174/health
+```
+
+Verify the isolated service through loopback, then perform the authorized AGUS AI route cutover. Check AGUS AI and financial readiness separately. Abort the cutover if the live edge requires a disruptive restart, the operator signer differs from funded quotes, or capacity does not meet the checks above. For rollback, remove the AGUS AI route and stop the Compose worker before restoring the previous Neon write origin. Preserve the PostgreSQL evidence and existing escrow state. Keep the legacy dedicated settlement signer distinct if both lanes are configured during an approved deployment. [Founder activation](docs/phase-2-3/release-candidate.md)

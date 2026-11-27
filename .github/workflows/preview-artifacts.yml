@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [feature/phase-2-3-product]
-    paths: ['.github/workflows/preview-artifacts.yml', 'scripts/product-preview/package.sh', 'apps/android/app/**']
+    paths: ['.github/workflows/preview-artifacts.yml', 'scripts/product-preview/package.sh', 'apps/android/app/**', 'apps/android/native-preview/**']
 
 permissions:
   contents: read

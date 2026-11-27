@@ -81,5 +81,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
   const receipt = JSON.parse(await readFile(file, 'utf8'));
   console.log(JSON.stringify(command === 'payload'
     ? { schema: name, version: 1, data: receiptClaim(receipt) }
-    : await verifyDevnetAttestation({ receipt, credential, signer, nonce }), null, 2));
+    : await verifyDevnetAttestation({ receipt, credential, signer, nonce,
+      rpc: (method, params) => publicRpc(method, params, process.env.AGUS_SAS_DEVNET_RPC_URL),
+    }), null, 2));
 }

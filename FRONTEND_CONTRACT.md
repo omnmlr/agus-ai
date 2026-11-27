@@ -106,3 +106,16 @@ Use `GET /api/v1/runs/:id/training-consent` as either run participant. `PUT` gra
 ## Phase 2 and 3 local product preview
 
 Use the [functional handoff](docs/phase-2-3/frontend.md) for campaign authoring and review, native enrollment, assignment submission, evidence, earnings, and purpose-specific consent. The original visual files were unavailable during this work. The historical Chisom handoff and this contract remain the functional reference. Compare release claims against [the final functionality matrix](docs/phase-2-3/functionality-matrix.md).
+
+## Private phone campaigns and test settlement
+
+The phone campaign controls use the generated [OpenAPI contract](packages/developer-client/openapi.json) and reuse the current reference components. [Campaign and Android integration handoff](docs/phase-2-3/frontend.md)
+
+| Surface | Contract |
+| --- | --- |
+| Capability and draft | `GET /campaigns` includes `fundingNetwork`. Draft tasks can specify `compensation.amountAtoms` and `partialAtoms` as decimal strings. Verify the exact revision’s test-chain funding before publish. |
+| Quote, verification and refund | `/campaigns/{campaignId}/funding` reads authoritative escrow. Its `quote`, `verify` and `refund` operations fix the revision, independently check the transfer and reconcile the remaining funds. |
+| Review, payout and dispute | An assignment returns its entitlement and payout state. The payment route idempotently reconciles the original signature. A contributor sees `disputeEligible` only for a currently disputable attempt. A configured independent reviewer can award or uphold. |
+| Earnings and ownership | `/me/campaign-earnings` provides account-level nontransferable units and per-asset pending, finalized and needs-review balances. `/me/earnings` covers dedicated device settlements. Account and dedicated device wallet proofs are separate. |
+| Consent and correction | An accepted action correction refers to an owned, sealed source trajectory. Training requires both grants and delivers the minimized action mapping. The server checks consent again on delivery. |
+| Android sign-in | `/auth/google/start` accepts `client: "android"` and an attempt challenge. The fixed HTTPS App Link carries an opaque exchange code in the fragment, with the attempt identifier. `/auth/google/exchange` requires the retained verifier. |

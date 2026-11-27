@@ -1,0 +1,51 @@
+{
+  "network": "disposable Localnet",
+  "genesis": "E7Ba1b8J1uWVgTN1UobyTyh8268BHbrTykbKw1Xcj2ZP",
+  "mint": "6GzzAPwp5WhEWAHwnJfWKv6vGqRx9UwXTBksMBd3VC9J",
+  "funding": "3FZvv2jFG4peQxR11uPwzydbM6mrFxVvgNyG68fy3prSX7rcKKbW36Qj87SsY3gCQUbN1FBU8qfqTEqcrz5LbCpG",
+  "automatic": {
+    "signature": "4YocgFm8hsD7v8EXZ8dnM271jHDEBPHpQ8ByZRtyuEhVuzbchqpeQupzQZR4355VpA35KsfdmER5gYPk2bsGbpz4",
+    "slot": 304,
+    "commitment": "finalized",
+    "cluster": "localnet",
+    "mint": "6GzzAPwp5WhEWAHwnJfWKv6vGqRx9UwXTBksMBd3VC9J",
+    "amountAtoms": "700000",
+    "source": "H3XGAdyCpiaAugd4m7EEdaS9upkrhM8Sgc8GWW8vBfyv",
+    "destination": "USvT72zgFrinp73DF3eDvFZ8AhKBzJR2qEsfw3131aD",
+    "payer": "HMQcj9jVLS7JdW7WhGXDUUUq9beUerDrq5w4yrEWQq87",
+    "recipient": "Dgi5LkRPpSjLNCZRbxLYtzFbXwTSK8LGqhk7cUuJsRR6"
+  },
+  "partial": {
+    "mint": "6GzzAPwp5WhEWAHwnJfWKv6vGqRx9UwXTBksMBd3VC9J",
+    "slot": 337,
+    "payer": "HMQcj9jVLS7JdW7WhGXDUUUq9beUerDrq5w4yrEWQq87",
+    "source": "H3XGAdyCpiaAugd4m7EEdaS9upkrhM8Sgc8GWW8vBfyv",
+    "cluster": "localnet",
+    "recipient": "4zdMDWtQDs6DCjVbxqxsJadEaVaPmEXAxsgLWQT6g49B",
+    "signature": "4cCXpazduB3JFy7nPqLd64yXTdTxr2zsd4FoFKcidvyGbLkHXu5P2tsY5b842EM28yjWVzrVJpxtCBDUAeWDsnFH",
+    "commitment": "finalized",
+    "amountAtoms": "200000",
+    "destination": "JEB2eoDQmuPSe97FMZsvZj8B536gL5LjvGP6BfbAYbFz"
+  },
+  "refund": {
+    "signature": "23kz3ivNChSZ3Wkfaojt1RTkwwTv8BEHXbKr6iySTvkeb2L1voGGJttdjqAnPGzLrJAUy6dHyvQ2R83wAt3U6Vvb",
+    "slot": 378,
+    "commitment": "finalized",
+    "cluster": "localnet",
+    "mint": "6GzzAPwp5WhEWAHwnJfWKv6vGqRx9UwXTBksMBd3VC9J",
+    "amountAtoms": "800000",
+    "source": "H3XGAdyCpiaAugd4m7EEdaS9upkrhM8Sgc8GWW8vBfyv",
+    "destination": "2pGJVLfanWNjFwaApEmh1jWdSS2qBpKdngsuvcsdbGgF",
+    "payer": "HMQcj9jVLS7JdW7WhGXDUUUq9beUerDrq5w4yrEWQq87",
+    "recipient": "6zomGSDs2r36fkGrLPPWFUpdHfDgJvaois1fJZ4M81ey"
+  },
+  "revision": "e78a1a6471457a15531355e14b54065751186a5c",
+  "validator": "Agave v2.3.13",
+  "database": "disposable Postgres 17",
+  "results": {
+    "finalizedEscrowAtoms": "0",
+    "concurrentPayoutSignatureCount": 1,
+    "walletReplacementPreservedDestination": true,
+    "partialAwardSettledByWorkerWithConcurrentWorkerTicks": true
+  }
+}

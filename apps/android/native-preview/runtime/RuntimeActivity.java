@@ -126,20 +126,26 @@ public class RuntimeActivity extends Activity {
             button("Sign in to AGUS", () -> {
                 String account = email.getText().toString().trim();
                 String secret = password.getText().toString();
-                run(() -> {
-                    var result = PilotApi.request("POST", "/auth/login", null,
-                        new JSONObject().put("email", account).put("password", secret));
-                    String identifier = result.getJSONObject("user").getString("id");
-                    if (!RuntimeState.prefs(this).getString("personId", identifier).equals(identifier)) {
-                        throw new SecurityException("Sign in as this profile’s enrolled preview account.");
-                    }
-                    person = result.getString("token");
-                    personId = identifier;
-                    runOnUiThread(this::render);
-                    mark("PROFILE_PERSON_AUTHENTICATED");
-                    return "Signed in.";
-                });
+                run(() -> acceptProfileIdentity(PilotApi.request("POST", "/auth/login", null,
+                    new JSONObject().put("email", account).put("password", secret))));
             });
+            if ("private-preview".equals(PreviewConfig.TIER)) {
+                EditText code = input("Six-digit email code", InputType.TYPE_CLASS_NUMBER);
+                button("Send email code", () -> {
+                    String account = email.getText().toString().trim();
+                    run(() -> {
+                        PilotApi.request("POST", "/auth/email/start", null, new JSONObject().put("email", account));
+                        return "If this address can sign in, check your inbox for the email code.";
+                    });
+                });
+                button("Verify email code", () -> {
+                    String account = email.getText().toString().trim();
+                    String value = code.getText().toString().trim();
+                    if (!value.matches("[0-9]{6}")) { status("Enter the six-digit email code."); return; }
+                    run(() -> acceptProfileIdentity(PilotApi.request("POST", "/auth/email/verify", null,
+                        new JSONObject().put("email", account).put("code", value))));
+                });
+            }
         } else {
             if (!RuntimeState.prefs(this).contains("installation")) {
                 button("Enroll this phone for human testing", () -> enroll("phone_human"));
@@ -171,6 +177,19 @@ public class RuntimeActivity extends Activity {
             .setMessage("Android removes the apps and data in this work profile.")
             .setNegativeButton("Back", null).setPositiveButton("Remove profile", (dialog, which) ->
                 getSystemService(DevicePolicyManager.class).wipeData(0)).show());
+    }
+
+    private String acceptProfileIdentity(JSONObject result) throws Exception {
+        String identifier = result.getJSONObject("user").getString("id");
+        if (!RuntimeState.prefs(this).getString("personId", identifier).equals(identifier)) {
+            PilotApi.request("POST", "/auth/logout", result.getString("token"), new JSONObject());
+            throw new SecurityException("Sign in as this profile’s enrolled preview account.");
+        }
+        person = result.getString("token");
+        personId = identifier;
+        runOnUiThread(this::render);
+        mark("PROFILE_PERSON_AUTHENTICATED");
+        return "Signed in.";
     }
 
     private void provision() {

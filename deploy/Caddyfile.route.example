@@ -1,6 +1,6 @@
 # Import on the established TLS edge after attaching only that edge to the
-# agus-ai-edge Docker network. Replace the example hostname before import.
-infra.grindcity.app {
+# agus-ai-edge Docker network, during the independently approved AGUS AI cutover.
+agusai.grindcity.app {
 	header Strict-Transport-Security "max-age=31536000"
 	reverse_proxy agus-ai-web:8080
 }

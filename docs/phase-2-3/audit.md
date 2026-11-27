@@ -37,3 +37,9 @@ P-256 replaced the initial Ed25519 manifest choice after the AVD rejected Ed2551
 - The local regression run passed all 51 tests across the workspace, control plane, runner, attestation, settlement, web and typed client integration. Disposable PostgreSQL 17 exercised the earlier settlement skip and verified campaign persistence and reservation concurrency. The Chromium journey ran separately. All money testing used disposable fixtures or Localnet. No cloud deployment was performed.
 
 Reproduce with Node 24 and the installed root workspace, control-plane, settlement, and SAS verifier dependencies. Set `AGUS_TEST_PRODUCT_DATABASE_URL` and `AGUS_TEST_SETTLEMENT_DATABASE_URL` only to disposable databases. Run `npm test`, the control-plane, settlement, attestation, web and provider-runner tests, the developer client HTTP/MCP integration tests, and `node scripts/product-preview/browser.mjs`.
+
+## Release candidate results
+
+The reopened branch adds private HTTPS AOSP eligibility, publisher authorization, revision-bound funding, separate Devnet tooling and Android Google callback handling. Current results and live activation gates supersede the earlier status notes. [Functionality and security matrix](functionality-matrix.md) · [Release candidate report](release-candidate.md)
+
+The renewed funded run used disposable PostgreSQL 17 and Agave Localnet 2.3.13. Concurrent HTTP payout requests retained one signature. The accepted destination stayed fixed after wallet replacement. Concurrent worker ticks finalized the partial award, and independent RPC reads verified zero escrow after the refund. [Fresh chain evidence](evidence/release-candidate-localnet.json)

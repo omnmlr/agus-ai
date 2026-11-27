@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { verify } from 'node:crypto';
 import test from 'node:test';
 import { apk, enroll, heartbeat, leaseProof, review, safePolicy, startTestPilot } from '../test-support/pilot-fixtures.mjs';
+import { pilotConfig, reviewedWorkload } from '../src/pilot-policy.mjs';
 
 test('native pilot defaults off, runtime credentials are purpose-bound and enrollment is single-use', async t => {
   const disabled = await startTestPilot(t, { env: { AGUS_PRODUCT_PILOT: '0' } });
@@ -24,6 +25,33 @@ test('native pilot defaults off, runtime credentials are purpose-bound and enrol
   const unsafe = await pilot.request('POST', path, { credential: runtime.credential,
     body: heartbeat(runtime, 2, { ...safePolicy, thermalStatus: 4 }) });
   assert.equal(unsafe.installation.readiness, 'unavailable');
+});
+
+test('private preview restricts publishers, accounts and existing runtime credentials', async t => {
+  const pilot = await startTestPilot(t);
+  const member = await pilot.register('member');
+  const outsider = await pilot.register('outsider');
+  const developmentRuntime = await enroll(pilot, member);
+  const env = {
+    NODE_ENV: 'production', AGUS_DATABASE_URL: 'postgresql://preview.invalid/agus_ai',
+    AGUS_REGISTRATION_TOKEN: 'fixture-private-registration-invite', AGUS_PUBLIC_ORIGIN: 'https://agusai.grindcity.app',
+    AGUS_PRODUCT_PILOT: 'private-preview', AGUS_PILOT_MEMBER_IDS: member.user.id,
+    AGUS_NATIVE_MANIFEST_PKCS8: pilot.manifestKeys.privateKey.export({ type: 'pkcs8', format: 'der' }).toString('base64'),
+  };
+  assert.throws(() => pilotConfig({ ...env, AGUS_NATIVE_REVIEWED_BUILDS: JSON.stringify([review]) }));
+  pilot.config.pilot = pilotConfig({ ...env, AGUS_NATIVE_REVIEWED_BUILDS: JSON.stringify([{ ...review, publisherId: member.user.id }]) });
+  assert.ok(reviewedWorkload(pilot.config.pilot, review, member.user.id));
+  assert.equal(reviewedWorkload(pilot.config.pilot, review, outsider.user.id), null);
+  const denied = await pilot.request('GET', '/me/runtime-installations', { credential: outsider.token, status: 403 });
+  assert.equal(denied.error.code, 'pilot_access_required');
+  const route = runtime => '/runtime/installations/' + runtime.id + '/heartbeat';
+  await pilot.request('POST', route(developmentRuntime), {
+    credential: developmentRuntime.credential, body: heartbeat(developmentRuntime, 1), status: 404,
+  });
+  const hostedRuntime = await enroll(pilot, member);
+  await pilot.request('POST', route(hostedRuntime), { credential: hostedRuntime.credential, body: heartbeat(hostedRuntime, 1) });
+  pilot.config.pilot.memberIds.delete(member.user.id);
+  await pilot.request('POST', route(hostedRuntime), { credential: hostedRuntime.credential, body: heartbeat(hostedRuntime, 2), status: 404 });
 });
 
 test('lease signs reviewed scope, fences tampering and expiry, and quarantines until signed cleanup', async t => {
