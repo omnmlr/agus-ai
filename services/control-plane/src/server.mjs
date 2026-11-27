@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { createApi } from './api.mjs';
+import { pilotConfig } from './pilot-policy.mjs';
 import { identityConfig } from './identity.mjs';
 import { createFileStore, createPgStore } from './store.mjs';
 
@@ -38,6 +39,7 @@ export function configFromEnv(env) {
     idempotencySecret: env.AGUS_IDEMPOTENCY_SECRET ?? providerBootstrapToken,
     registrationToken: env.AGUS_REGISTRATION_TOKEN,
     identity: identityConfig(env),
+    pilot: pilotConfig(env),
     corsOrigin: env.AGUS_CORS_ORIGIN,
     publicOrigin: env.AGUS_PUBLIC_ORIGIN,
     host: env.HOST ?? '127.0.0.1',

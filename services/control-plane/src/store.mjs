@@ -6,6 +6,8 @@ import pg from 'pg';
 const blank = () => ({
   users: {}, sessions: {}, projects: {}, builds: {}, providers: {},
   devices: {}, runs: {}, leases: {}, events: {}, actions: {},
+  runtimeEnrollments: {}, runtimes: {}, nativeLeases: {}, campaigns: {}, assignments: {},
+  qualifications: {}, compensation: {}, campaignExports: {},
   pairings: {}, invitations: {}, notifications: {}, walletChallenges: {}, idempotencyKeys: {},
 });
 

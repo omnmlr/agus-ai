@@ -6,6 +6,7 @@ import {
   authSession, createRun, getOwned, newAction, notice, publicBuild, publicDevice,
   publicProject, publicRun, publicUser, requestStop, timestamp, validPackage, visibleTo,
 } from './domain.mjs';
+import { handlePilotRoutes } from './pilot-routes.mjs';
 import { handlePersonRoutes, refreshLifecycles } from './person-routes.mjs';
 import { trainingAccess, trainingExport } from './training.mjs';
 import { idempotencyRecord } from './idempotency.mjs';
@@ -95,6 +96,8 @@ export function createApi({ store, config, settlement }) {
         await providerRoutes({ request, response, route, services });
         return;
       }
+
+      if (await handlePilotRoutes({ services, route, request, response, send, sendBytes })) return;
 
       const user = await store.transaction((state) => authSession(state, services.credential, config.now()));
       if (route.join('/') === 'auth/me' && request.method === 'GET') {

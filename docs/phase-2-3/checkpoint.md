@@ -4,3 +4,5 @@
 - Working branch `feature/phase-2-3-product`. Commercial dossier merged from `38930241079212c7a025bf972fccd4f93ea1ed95`. [Dossier](../research/README.md)
 - Baseline matrix distinguishes current UI wiring, historical acceptance, and missing journeys. [Original matrix](baseline-matrix.md)
 - Next P0 work is private runtime identity, artifact and policy binding, fenced lease, signed evidence and cleanup quarantine. Native execution starts in an isolated pilot environment.
+- P0 control-plane increment implements default-off preview configuration, separate cryptographic enrollment and runtime/lease credentials, signed reviewed manifests, short authority renewal, signed receipt verification, and denial of reuse before cleanup. Local HTTP tests cover expiry, credential separation, foreign signers, invalid actions and signed late cleanup. The Android controller and operator acceptance are pending.
+- The original visual handoff and token filenames were absent from the checkout, provided files, remote branches, and connected Drive filename search. The frontend contract and historical handoff remain authoritative for functional integration.
