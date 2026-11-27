@@ -1,0 +1,87 @@
+{
+  "cells": [
+    {
+      "taskIndex": 0,
+      "kind": "human_demonstration",
+      "runtimeClass": "phone_human",
+      "planned": 1,
+      "attempted": 1,
+      "accepted": 1,
+      "measured": 1,
+      "passed": 0,
+      "failed": 1,
+      "blocked": 0,
+      "unverified": 0,
+      "missing": 0
+    },
+    {
+      "taskIndex": 1,
+      "kind": "automated_test",
+      "runtimeClass": "phone_cooperative",
+      "planned": 1,
+      "attempted": 1,
+      "accepted": 1,
+      "measured": 1,
+      "passed": 1,
+      "failed": 0,
+      "blocked": 0,
+      "unverified": 0,
+      "missing": 0
+    },
+    {
+      "taskIndex": 2,
+      "kind": "human_test",
+      "runtimeClass": "phone_human",
+      "planned": 1,
+      "attempted": 1,
+      "accepted": 0,
+      "measured": 0,
+      "passed": 0,
+      "failed": 0,
+      "blocked": 0,
+      "unverified": 0,
+      "missing": 1
+    },
+    {
+      "taskIndex": 3,
+      "kind": "human_test",
+      "runtimeClass": "phone_human",
+      "planned": 1,
+      "attempted": 1,
+      "accepted": 0,
+      "measured": 0,
+      "passed": 0,
+      "failed": 0,
+      "blocked": 0,
+      "unverified": 0,
+      "missing": 1
+    }
+  ],
+  "acceptedTestUnits": 14,
+  "scope": "AOSP emulator, synthetic identities, nontransferable test units",
+  "evidence": [
+    {
+      "sha256": "25a54b4ba35391079daca644cc4dda528ba040d5545c3e1bd0070d5071080c69",
+      "outcome": "completed",
+      "evaluation": "unverified",
+      "provenance": "installation_signed_preview_claim"
+    },
+    {
+      "sha256": "7be9ed002678cf2db9d779026d6cfe26e5a2cec3bca9b8bd1e26556fd2864bde",
+      "outcome": "completed",
+      "evaluation": "passed",
+      "provenance": "installation_signed_preview_claim"
+    },
+    null,
+    null
+  ],
+  "rehearsal": {
+    "interrupted": 2,
+    "approvedHumanActions": [
+      "continue",
+      "review",
+      "continue"
+    ],
+    "existingExportDeniedAfterWithdrawal": true
+  }
+}

@@ -2,6 +2,8 @@
 
 Use the [preview release matrix](functionality-matrix.md), [audit](audit.md) and [commercial dossier](../research/README.md). The public product and payments remain unavailable pending a separate decision.
 
+Start from branch `feature/phase-2-3-product`. Native campaign acceptance passed at `0283a0ac953f909686b4fd8bccce960625661362`. Compare the code and artifacts you test with the revision file in that run. [AOSP run](https://github.com/omnmlr/agus-ai/actions/runs/45991796479) · [Sanitized campaign evidence](evidence/45991796479/campaign-evidence.json)
+
 ## Antigravity assignment
 
 1. Start from the published feature branch and verify the recorded commit and CI artifacts. Preserve your existing Windows/Seeker setup. Build the preview with the exact APK SHA-256, signer, manifest key fingerprint, OS and runtime policy. Reproduce the CI run using your disposable emulator. ADB bootstraps and observes the lab. Record every interaction and proof with its privilege.
@@ -14,8 +16,8 @@ Use the [preview release matrix](functionality-matrix.md), [audit](audit.md) and
 ## Founder activation checklist
 
 - Review the local emulator and independent audit evidence. Choose the smallest supported test scope, reviewed first-party build and authorized devices after review.
-- Approve a separate hosting and PostgreSQL environment and choose the public HTTPS origin. Follow [deployment instructions](../../DEPLOYMENT.md) after separate authorization. Plan rate limits, secret isolation, backup restore and telemetry.
-- Approve actual email sender and Google callback/return settings and the signed Android App Links association. Verify on the selected distribution signer and test recovery with disposable accounts.
+- Approve a separate hosting and PostgreSQL environment. Set `AGUS_DATABASE_URL` with the dedicated restricted database role, and `AGUS_PUBLIC_ORIGIN` to the exact HTTPS API origin. Verify restore, rate limiting, tenant separation and alerting before activation. [Deployment instructions](../../DEPLOYMENT.md)
+- Approve the verified Resend sender and a dedicated OTP secret. Register `/api/v1/auth/google/callback` for the chosen HTTPS API origin and set the web return URL to the approved console. Verify both flows with disposable accounts. Publish `/.well-known/assetlinks.json` for the companion package and the chosen production signer only after the Android callback is complete. [Identity configuration](../../DEPLOYMENT.md)
 - Confirm legal and distribution approval for DPC, workload installs and user disclosures. Verify role removal, privacy, retention and export deletion independently before any retail onboarding.
 - Authorize disposable Localnet/Devnet wallet identities and funding only after the relevant workflow passes. Validate the dedicated refund/escalation/reconciliation process. General campaign funding and disputes require a completed policy and software acceptance.
 - For genuine Seeker and SAS, authorize the devices, disposable issuer, schema and RPC policy. Publish evidence claims only after actual hardware and finalized on-chain verification.
@@ -27,6 +29,6 @@ Use the [preview release matrix](functionality-matrix.md), [audit](audit.md) and
 | --- | --- |
 | 0:00–0:30 | A release owner wants repeatable onboarding and Solana wallet coverage without requiring a Seeker of their own. Open a pinned build in the portal. |
 | 0:30–1:15 | Build and publish a mixed campaign. Point to exact APK, reviewer rubric, eligibility criteria, device lanes and visible missing denominator. Use the actual Chromium path. |
-| 1:15–2:10 | Show AOSP Android's consented Work-profile testing. In the human fixture reproduce the duplicate onboarding count, inspect signed evidence and show Android cleanup. Use only the stages evidenced by the current verified run. |
+| 1:15–2:10 | Show AOSP Android’s consented Work-profile testing. Reproduce the duplicate onboarding count, review and send the structured finding, then show signed evidence and confirmed Android cleanup. |
 | 2:10–2:55 | Open the dedicated Android Localnet result. Show callback-only versus the independently finalized expected transaction. Show issuer signature and evidence provenance. |
-| 2:55–3:40 | Show findings, coverage gaps, reviewer decision and nontransferable test obligations as distinct states. Explain the explicit gates for retail use, actual Devnet funding, and model use. Point to the dossier without claiming customers, paid pilots or partnerships. |
+| 2:55–3:40 | Show the accepted finding, the automated pass, two interrupted coverage slots, and 14 nontransferable test units including partial credits. Contrast the buyer’s coverage report with the contributor’s earnings record. End with the retail, funding and model gates in the release matrix. |

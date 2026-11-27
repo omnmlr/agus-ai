@@ -15,22 +15,22 @@ Cross-publisher trust, installed-version collisions, hardware attestation, non-A
 
 ## Reproduce the end-to-end lab
 
-The [CI workflow](../../.github/workflows/product-preview-android.yml) installs Android 35 SDK/tools, builds the actual controller and fixture artifacts, starts an isolated control plane on port 18765, and seeds a campaign with disposable identities. It drives visible controls on an AVD with Android's standard user-consent path. Passing observations must include both fixture loops, signed reports, removal and cleanup, submitted structured reports, developer reviews and distinct campaign outcomes. Log and fixture provenance are in [the audit](../../docs/phase-2-3/audit.md).
+The [CI workflow](../../.github/workflows/product-preview-android.yml) installs Android 35 SDK/tools, builds the actual controller and fixture artifacts, starts an isolated control plane on port 18765, and seeds a campaign with disposable identities. It drives visible controls on an AVD with Android's standard user-consent path. The default `full` journey verifies the mixed campaign. The `cooperative` and `safety` options independently exercise the automated path and the stop and offline path. Log and fixture provenance are in [the audit](../../docs/phase-2-3/audit.md).
 
-To reproduce locally, use Node 24, JDK 21, Python 3, zip tools and an API 35 AOSP x86-64 emulator on the synthetic profile. Use a new output directory for every build. Shell snippets are intended for an isolated developer workstation.
+To reproduce locally, use Node 24, JDK 21, Python 3, zip tools and a clean API 35 AOSP x86-64 `emulator-5554` with no existing work profile. Use a new output directory for every build. Run this in one shell on an isolated developer workstation so the offline test can suspend the disposable server started by that shell.
 
 ```sh
 npm ci --prefix services/control-plane
 preview_output="$(mktemp -d)"
 bash apps/android/native-preview/build.sh "$preview_output"
-node scripts/product-preview/fixtures.mjs "$preview_output" serve
-```
-
-After booting a clean `emulator-5554`, run from another terminal using the same local output path.
-
-```sh
+export AGUS_PREVIEW_JOURNEY=full
+node scripts/product-preview/fixtures.mjs "$preview_output" serve &
+preview_backend_pid=$!
+trap 'kill -CONT "$preview_backend_pid" 2>/dev/null || true
+      kill "$preview_backend_pid" 2>/dev/null || true' EXIT
+curl -fsS --retry 5 --retry-delay 1 --retry-connrefused http://127.0.0.1:18765/health
 node scripts/product-preview/fixtures.mjs "$preview_output" seed
-python3 scripts/product-preview/android.py "$preview_output"
+AGUS_PREVIEW_BACKEND_PID="$preview_backend_pid" python3 scripts/product-preview/android.py "$preview_output"
 node scripts/product-preview/fixtures.mjs "$preview_output" review
 ```
 
