@@ -61,6 +61,10 @@ export async function startTestPilot(t, { env = {}, databaseUrl } = {}) {
     });
     const result = response.headers.get('content-type')?.includes('json')
       ? await response.json() : Buffer.from(await response.arrayBuffer());
+    if (Array.isArray(status)) {
+      assert(status.includes(response.status), JSON.stringify(result));
+      return { status: response.status, result };
+    }
     assert.equal(response.status, status, JSON.stringify(result));
     return result;
   }

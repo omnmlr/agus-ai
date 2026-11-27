@@ -319,6 +319,7 @@ export function expireMarketplace(state, now) {
 
 function matchingMarketJob(state, run, device, now) {
   return run.allocation === 'marketplace' && run.state === 'queued' && run.ownerId !== device.ownerId
+    && !run.campaignPaused && (!run.campaignDeadlineAt || run.campaignDeadlineAt > now)
     && (!run.deviceId || run.deviceId === device.id) && device.scenarios.includes(run.scenario) && walletNetworkMatches(device, run.expectedTransaction)
     && Date.parse(run.createdAt) + marketplaceDurationMs > now && state.builds[run.buildId]
     && (!run.paymentTerms || (run.paymentTerms.status === 'funded' && run.paymentTerms.providerId === device.providerId));
@@ -368,6 +369,7 @@ export function recordMarketAcceptance(state, device, run, now, method) {
 }
 
 export function claimAllowed(state, run, device, config, now) {
+  if (run.campaignPaused || (run.campaignDeadlineAt && run.campaignDeadlineAt <= now)) return false;
   const agreesWithDevice = (!run.deviceId || run.deviceId === device.id) && device.scenarios.includes(run.scenario) && walletNetworkMatches(device, run.expectedTransaction);
   if (!agreesWithDevice) return false;
   if (device.reservedRunId) {

@@ -37,7 +37,7 @@ test('lease signs reviewed scope, fences tampering and expiry, and quarantines u
   await pilot.store.transaction(async (state, addArtifact) => {
     await addArtifact('fixture', apk);
     state.builds.fixture = { id: 'fixture', artifactId: 'fixture', ...review };
-    state.campaigns.campaign = { revisions: [{ tasks: [{ buildId: 'fixture', maximumDurationSeconds: 120,
+    state.campaigns.campaign = { state: 'active', revisions: [{ tasks: [{ buildId: 'fixture', maximumDurationSeconds: 120,
       actions: ['describe', 'advance'] }] }] };
     state.assignments.assignment = { id: 'assignment', campaignId: 'campaign', taskIndex: 0,
       campaignRevision: 1, termsDigest: 'b'.repeat(64), state: 'reserved', installationId: runtime.id,
