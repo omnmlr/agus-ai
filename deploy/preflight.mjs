@@ -38,4 +38,16 @@ export function validateDeployment(env, readable = file => accessSync(file, cons
       throw new Error('Mount the disposable Devnet keypair as a readable AGUS_SETTLEMENT_KEYPAIR_FILE.');
     }
   }
+  if (env.AGUS_CAMPAIGN_SETTLEMENT_CLUSTER || env.AGUS_CAMPAIGN_SETTLEMENT_AUTOMATIC === '1') {
+    if (env.AGUS_CAMPAIGN_SETTLEMENT_CLUSTER !== 'devnet' || env.AGUS_ENABLE_CAMPAIGN_DEVNET !== '1'
+      || env.AGUS_PRODUCT_PILOT !== 'private-preview') {
+      throw new Error('Configure campaign settlement only for the private Devnet preview.');
+    }
+    try {
+      if (!env.AGUS_CAMPAIGN_SETTLEMENT_KEYPAIR_FILE) throw new Error();
+      readable(env.AGUS_CAMPAIGN_SETTLEMENT_KEYPAIR_FILE);
+    } catch {
+      throw new Error('Mount a readable AGUS_CAMPAIGN_SETTLEMENT_KEYPAIR_FILE for private Devnet campaign settlement.');
+    }
+  }
 }

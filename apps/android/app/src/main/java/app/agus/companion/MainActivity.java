@@ -99,6 +99,7 @@ public final class MainActivity extends Activity {
     private boolean loading;
     private boolean mutating;
     private int mutationVersion;
+    private int googleGeneration;
     private String statusMessage = "";
     private boolean statusIsError;
 
@@ -171,6 +172,7 @@ public final class MainActivity extends Activity {
 
     @Override public void onBackPressed() {
         if (screen == Screen.AUTH) {
+            googleGeneration++;
             authStorage.clear("google");
             navigate(Screen.WELCOME, null);
         } else if (screen == Screen.ENROLLMENT || screen == Screen.MY_DEVICE || screen == Screen.PROFILE) {
@@ -299,6 +301,7 @@ public final class MainActivity extends Activity {
     }
 
     void cancelGoogle() {
+        googleGeneration++;
         authStorage.clear("google");
         status("Google sign-in cancelled. You can try again.", false);
     }
@@ -316,6 +319,7 @@ public final class MainActivity extends Activity {
         }
         String verifier = GoogleSignIn.verifier();
         String registration = registrationField.getText().toString().trim();
+        int generation = ++googleGeneration;
         mutating = true;
         status("Opening Google sign-in…", false);
         network.execute(() -> {
@@ -327,7 +331,7 @@ public final class MainActivity extends Activity {
                 if (!GoogleSignIn.browserUrl(browser)) throw new IOException("Unexpected Google sign-in URL");
                 runOnUiThread(() -> {
                     mutating = false;
-                    if (isDestroyed() || screen != Screen.AUTH) return;
+                    if (isDestroyed() || screen != Screen.AUTH || generation != googleGeneration) return;
                     try {
                         authStorage.write("google", new JSONObject().put("verifier", verifier)
                             .put("expiresAt", System.currentTimeMillis() + GOOGLE_ATTEMPT_MS));
@@ -339,7 +343,10 @@ public final class MainActivity extends Activity {
                     }
                 });
             } catch (IOException | JSONException | IllegalArgumentException failure) {
-                runOnUiThread(() -> authFailed(failure));
+                runOnUiThread(() -> {
+                    if (generation == googleGeneration) authFailed(failure);
+                    else mutating = false;
+                });
             }
         });
     }
@@ -369,6 +376,7 @@ public final class MainActivity extends Activity {
             return;
         }
         String code = callback.group(1).substring("authCode=".length());
+        int generation = ++googleGeneration;
         mutating = true;
         status("Finishing Google sign-in…", false);
         network.execute(() -> {
@@ -376,9 +384,18 @@ public final class MainActivity extends Activity {
                 JSONObject reply = new ApiClient(GoogleSignIn.ORIGIN, null).post("/auth/google/exchange",
                     new JSONObject().put("code", code).put("verifier", verifier));
                 Session next = new Session(GoogleSignIn.ORIGIN, reply);
-                runOnUiThread(() -> acceptSession(next));
+                runOnUiThread(() -> {
+                    if (generation == googleGeneration) acceptSession(next);
+                    else {
+                        mutating = false;
+                        if (!isDestroyed()) revoke(next);
+                    }
+                });
             } catch (IOException | JSONException failure) {
-                runOnUiThread(() -> authFailed(failure));
+                runOnUiThread(() -> {
+                    if (generation == googleGeneration) authFailed(failure);
+                    else mutating = false;
+                });
             }
         });
     }

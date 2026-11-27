@@ -7,7 +7,7 @@ export function neonRuntimeEnv(env) {
     || connections.some(url => url && url !== AGUS_DATABASE_URL)) {
     throw new Error('Override both Neon database bindings with the restricted AGUS AI runtime URL.');
   }
-  if (runtime.AGUS_SETTLEMENT_ENABLED === '1') {
+  if (runtime.AGUS_SETTLEMENT_ENABLED === '1' || runtime.AGUS_CAMPAIGN_SETTLEMENT_CLUSTER || runtime.AGUS_CAMPAIGN_SETTLEMENT_AUTOMATIC === '1') {
     throw new Error('Configure the EC2 runner for settlement with a mounted Devnet keypair.');
   }
   const allowed = { ...runtime, AGUS_DATABASE_URL, NODE_ENV: 'production' };

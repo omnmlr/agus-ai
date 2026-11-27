@@ -59,10 +59,11 @@ async function loadData(page, selected) {
     try {
       return Object.assign({}, ...(await Promise.all([
         api.get('/projects'), api.get('/builds'), api.get('/campaigns'),
-        ...(selected ? [api.get('/campaigns/' + encodeURIComponent(selected) + '/report')] : []),
+        ...(selected ? [api.get('/campaigns/' + encodeURIComponent(selected) + '/report'),
+          api.get('/campaigns/' + encodeURIComponent(selected) + '/funding')] : []),
       ])));
     } catch (error) {
-      if (error.code === 'pilot_unavailable') return { unavailable: true };
+      if (['pilot_unavailable', 'pilot_access_required'].includes(error.code)) return { unavailable: true };
       throw error;
     }
   }
@@ -306,6 +307,11 @@ const forms = {
     await navigate();
     notice('Review saved.');
   },
+  'campaign-funding-verify': async (data) => {
+    await api.post('/campaigns/' + encodeURIComponent(state.selected) + '/funding/verify', { signature: data.get('signature').trim() });
+    await navigate();
+    notice('Funding verified on the finalized test chain.');
+  },
   'auth-form': async (data) => {
     const registrationToken = data.get('registrationToken');
     const body = { email: data.get('email').trim(), password: data.get('password') };
@@ -445,7 +451,7 @@ function downloadJson(name, value) {
 const actions = {
   'add-campaign-task': () => {
     const area = document.getElementById('campaign-tasks');
-    if (area.children.length < 12) area.insertAdjacentHTML('beforeend', campaignTask(state.data.builds));
+    if (area.children.length < 12) area.insertAdjacentHTML('beforeend', campaignTask(state.data.builds, {}, state.data.fundingNetwork));
   },
   'remove-campaign-task': button => {
     const row = button.closest('[data-campaign-task]');
@@ -460,6 +466,23 @@ const actions = {
   'campaign-receipt': async button => {
     const { receipt } = await api.get('/assignments/' + button.dataset.assignment + '/receipt');
     downloadJson('agus-native-receipt.json', receipt);
+  },
+  'campaign-funding-quote': async () => {
+    const { campaign } = state.data.report;
+    if (!confirm('Lock this revision to the verified funding wallet and exact test amount?')) return;
+    await api.post('/campaigns/' + campaign.id + '/funding/quote', { expectedRevision: campaign.revision });
+    await navigate();
+  },
+  'campaign-funding-download': () => {
+    downloadJson('agus-campaign-funding-quote.json', state.data.escrow.quote);
+  },
+  'campaign-funding-refund': async () => {
+    await api.post('/campaigns/' + encodeURIComponent(state.selected) + '/funding/refund', {});
+    await navigate();
+  },
+  'campaign-payout': async button => {
+    await api.post('/assignments/' + encodeURIComponent(button.dataset.assignment) + '/payment', {});
+    await navigate();
   },
   'campaign-training-grant': async button => {
     if (!confirm('Grant training rights for this assignment’s redacted, reviewed evidence? Contributor permission is also required.')) return;

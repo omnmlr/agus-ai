@@ -29,9 +29,20 @@ export function missing(condition, label) {
 }
 
 export function pilotConfig(env) {
-  if (env.AGUS_PRODUCT_PILOT !== '1') return null;
-  if (env.NODE_ENV === 'production' || !['127.0.0.1', '::1', 'localhost'].includes(env.HOST ?? '127.0.0.1')) {
+  const flag = env.AGUS_PRODUCT_PILOT;
+  if (!flag || flag === '0') return null;
+  const hosted = flag === 'private-preview';
+  if (!hosted && flag !== '1') throw new Error('AGUS_PRODUCT_PILOT has an unsupported value');
+  if (!hosted && (env.NODE_ENV === 'production' || !['127.0.0.1', '::1', 'localhost'].includes(env.HOST ?? '127.0.0.1'))) {
     throw new Error('AGUS_PRODUCT_PILOT requires a local non-production listener');
+  }
+  const personIds = value => (value ?? '').split(',').map(id => id.trim()).filter(Boolean);
+  const validPersonId = id => /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(id);
+  const members = personIds(env.AGUS_PILOT_MEMBER_IDS);
+  if (hosted && (env.NODE_ENV !== 'production' || !env.AGUS_DATABASE_URL || !env.AGUS_REGISTRATION_TOKEN ||
+    env.AGUS_PUBLIC_ORIGIN !== 'https://agusai.grindcity.app' || !members.length || members.length > 40 ||
+    members.some(id => !validPersonId(id)))) {
+    throw new Error('AGUS_PRODUCT_PILOT private-preview requires production Postgres, the AGUS HTTPS origin, registration invites and an explicit person allowlist');
   }
 
   let key;
@@ -44,14 +55,16 @@ export function pilotConfig(env) {
   let entries;
   try {
     entries = JSON.parse(env.AGUS_NATIVE_REVIEWED_BUILDS ?? '[]');
-    if (!Array.isArray(entries) || entries.length > 16) throw new Error();
+    if (!Array.isArray(entries) || entries.length > 16 || (hosted && !entries.length)) throw new Error();
     for (const entry of entries) {
-      exact(entry, ['sha256', 'packageName', 'signerSha256', 'component'], 'reviewed workload');
+      exact(entry, ['sha256', 'packageName', 'signerSha256', 'component', 'publisherId'], 'reviewed workload');
       if (!hex256(entry.sha256) || !hex256(entry.signerSha256)
         || typeof entry.packageName !== 'string' || entry.packageName.length > 120
         || !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$/.test(entry.packageName)
         || entry.packageName.startsWith('com.android.') || entry.packageName.startsWith('com.google.android.')
-        || ['app.agus.runtime.preview', 'app.agus.companion'].includes(entry.packageName)) throw new Error();
+        || ['app.agus.runtime.preview', 'app.agus.companion'].includes(entry.packageName)
+        || (hosted && !members.includes(entry.publisherId))
+        || (entry.publisherId !== undefined && !validPersonId(entry.publisherId))) throw new Error();
       const component = entry.component ?? '.TestActivity';
       if (typeof component !== 'string' || component.length > 120 || !/^(\.[A-Za-z][A-Za-z0-9_]*)+$/.test(component)) throw new Error();
       entry.component = entry.packageName + component;
@@ -60,16 +73,31 @@ export function pilotConfig(env) {
   } catch {
     throw new Error('AGUS_NATIVE_REVIEWED_BUILDS must list exact local preview APK, package, and signer digests');
   }
-  const reviewerIds = (env.AGUS_PILOT_REVIEWER_IDS ?? '').split(',').map(value => value.trim()).filter(Boolean);
-  if (reviewerIds.length > 30 || reviewerIds.some(id => !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(id))) {
+  const reviewerIds = personIds(env.AGUS_PILOT_REVIEWER_IDS);
+  if (reviewerIds.length > 30 || reviewerIds.some(id => !validPersonId(id) || (hosted && !members.includes(id)))) {
     throw new Error('AGUS_PILOT_REVIEWER_IDS must contain local person IDs');
   }
   return {
+    tier: hosted ? 'private-preview' : 'development',
+    memberIds: hosted ? new Set(members) : null,
     reviewerIds: new Set(reviewerIds),
     manifestSigningKey: key,
     manifestKeyId: digest(createPublicKey(key).export({ format: 'der', type: 'spki' })),
     reviewedBuilds: new Map(entries.map(entry => [entry.sha256, entry])),
   };
+}
+
+export function pilotMember(pilot, id) {
+  return !pilot.memberIds || pilot.memberIds.has(id);
+}
+
+export function reviewedWorkload(pilot, build, publisherId) {
+  const review = pilot.reviewedBuilds.get(build.sha256);
+  if (review?.packageName === build.packageName && (!review.publisherId || review.publisherId === publisherId)) {
+    const { publisherId: _owner, ...workload } = review;
+    return workload;
+  }
+  return null;
 }
 
 export function p256PublicKey(encoded) {

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { authSession, notice } from './domain.mjs';
-import { disputeWindowMs, publicObligation, publicTransfer, recordObligation } from './campaign-compensation.mjs';
+import { disputeDeadline, mayDispute, publicObligation, publicTransfer, recordObligation } from './campaign-compensation.mjs';
 import { ownCampaign, refreshCampaigns } from './campaigns.mjs';
-import { conflict, exact, missing, own } from './pilot-policy.mjs';
+import { conflict, exact, missing, own, pilotMember } from './pilot-policy.mjs';
 import { requireCondition, stableJson, string } from './security.mjs';
 
 const undisputedStates = ['accepted', 'partially_accepted', 'cancelled', 'expired', 'rejected', 'interrupted'];
@@ -18,17 +18,6 @@ function matchingConfiguration(chain, quote) {
     'The settlement signer or asset differs from the original quote', 'settlement_configuration_changed');
 }
 
-function disputeDeadline(state, assignment) {
-  const attempt = assignment.attempt;
-  if (assignment.state === 'rejected' && attempt?.review) return attempt.review.at + disputeWindowMs;
-  if (assignment.state === 'interrupted' && BigInt(assignment.terms.compensation?.partialAtoms ?? 0) > 0n) {
-    const cleanup = own(state.nativeLeases, attempt?.leaseId)?.cleanup;
-    if (cleanup) return cleanup.confirmedAt + disputeWindowMs;
-  }
-  if (['submitted', 'needs_revision'].includes(assignment.state)) return assignment.deadlineAt + disputeWindowMs;
-  return 0;
-}
-
 function reasonText(value) {
   const reason = string(value, 'dispute reason', 400).trim();
   requireCondition(reason.length > 0, 'A dispute reason is required');
@@ -41,7 +30,7 @@ function disputeRoute(state, user, assignment, operation, input, config, now) {
   if (operation === 'dispute') {
     missing(paid && attempt.contributorId === user.id, 'Funded assignment');
     exact(input, ['reason'], 'dispute');
-    conflict(!assignment.dispute && !own(state.compensation, assignment.id) && disputeDeadline(state, assignment) > now,
+    conflict(mayDispute(state, assignment, now),
       'The assignment is outside the dispute window', 'dispute_unavailable');
     const dispute = { state: 'open', openedAt: now, reason: reasonText(input.reason) };
     assignment.dispute = dispute;
@@ -135,6 +124,66 @@ async function advanceTransfer({ edit, chain, quote, transfer, recipient, memo }
   return persisted.current;
 }
 
+export function createCampaignSettlementWorker(store, config) {
+  const owner = randomUUID();
+  const chain = config.campaignChain;
+  const lockMs = 90_000;
+  let active = false;
+
+  async function tick() {
+    if (active) return;
+    active = true;
+    try {
+      const batch = await store.transaction(state => {
+        const now = config.now();
+        const worker = state.campaignSettlementWorker;
+        if (worker?.owner !== owner && worker?.until > now) return [];
+        state.campaignSettlementWorker = { owner, until: now + lockMs };
+        const candidates = [];
+        for (const [id, obligation] of Object.entries(state.compensation)) {
+          if (!obligation.amountAtoms || obligation.payout?.state === 'finalized') continue;
+          candidates.push({ id, obligation, campaign: own(state.campaigns, state.assignments[id]?.campaignId), transfer: obligation.payout });
+        }
+        for (const campaign of Object.values(state.campaigns)) {
+          if (campaign.escrow?.refund && !['empty', 'finalized'].includes(campaign.escrow.refund.state)) {
+            candidates.push({ id: campaign.id, campaign, transfer: campaign.escrow.refund });
+          }
+        }
+        return candidates.filter(({ campaign, transfer }) => campaign?.escrow?.funding && (transfer?.workerCheckedAt ?? 0) + retryIntervalMs <= now)
+          .sort((left, right) => (left.transfer?.workerCheckedAt ?? 0) - (right.transfer?.workerCheckedAt ?? 0))
+          .slice(0, 4).map(({ id, campaign, obligation }) => {
+            const { escrow } = campaign;
+            const transfer = obligation ? obligation.payout ??= { state: 'ready', amountAtoms: obligation.amountAtoms } : escrow.refund;
+            transfer.workerCheckedAt = now;
+            return { id, campaignId: campaign.id, refunding: !obligation, transfer,
+              quote: { ...escrow.quote, fundingSlot: escrow.funding.slot }, recipient: obligation?.payoutWallet ?? escrow.quote.funder };
+          });
+      });
+      for (const entry of batch) {
+        const { id, quote, refunding } = entry;
+        try {
+          matchingConfiguration(chain, quote);
+          const edit = work => store.transaction(state => {
+            const now = config.now();
+            const worker = state.campaignSettlementWorker;
+            conflict(worker?.owner === owner && worker.until > now, 'Settlement worker ownership expired', 'worker_lease_lost');
+            worker.until = now + lockMs;
+            const transfer = refunding ? state.campaigns[entry.campaignId].escrow.refund : state.compensation[id].payout;
+            return work(transfer, now);
+          });
+          const memo = `agus:campaign:${refunding ? 'refund' : 'payout'}:v1:${quote.reference}:${id}`;
+          await advanceTransfer({ ...entry, edit, chain, memo });
+        } catch (error) {
+          console.error('Campaign settlement reconciliation deferred', error.code ?? error.name);
+        }
+      }
+    } finally {
+      active = false;
+    }
+  }
+  return { tick };
+}
+
 export function isEscrowRoute([resource, id, operation, suffix]) {
   return Boolean(id && ((resource === 'campaigns' && operation === 'funding')
     || (resource === 'assignments' && ['payment', 'dispute'].includes(operation) && (!suffix || suffix === 'resolve'))));
@@ -147,6 +196,7 @@ export async function escrowRoute({ services, route, method, input }) {
   const execute = work => store.transaction(state => {
     const now = config.now();
     const user = authSession(state, credential, now);
+    missing(pilotMember(config.pilot, user.id), 'Product pilot');
     refreshCampaigns(state, now);
     return work(state, user, now);
   });

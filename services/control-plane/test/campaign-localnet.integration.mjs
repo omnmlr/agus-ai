@@ -8,11 +8,13 @@ import test from 'node:test';
 import { Connection, Keypair } from '@solana/web3.js';
 import { createMint, getOrCreateAssociatedTokenAccount, mintTo } from '@solana/spl-token';
 import { buildTransfer, readKeypair, signTransfer } from '../../settlement/chain.mjs';
+import { createCampaignSettlementWorker } from '../src/campaign-escrow.mjs';
 import { apk, enroll, heartbeat, leaseProof, review, startTestPilot } from '../test-support/pilot-fixtures.mjs';
 
 const rpc = 'http://127.0.0.1:8899';
 const origin = 'http://127.0.0.1:18765';
 const final = { commitment: 'finalized', preflightCommitment: 'confirmed' };
+const genesisPin = process.env.AGUS_TEST_LOCAL_GENESIS;
 
 async function fundSol(connection, wallet) {
   const lifetime = await connection.getLatestBlockhash('confirmed');
@@ -20,12 +22,14 @@ async function fundSol(connection, wallet) {
   assert.equal((await connection.confirmTransaction({ signature, ...lifetime }, 'finalized')).value.err, null);
 }
 
-test('real Localnet and Postgres reserve, settle full and partial entitlements, and refund the remainder', { timeout: 180_000 }, async t => {
+test('real Localnet and Postgres reserve, settle full and partial entitlements, and refund the remainder', {
+  timeout: 180_000, skip: !genesisPin && 'set AGUS_TEST_LOCAL_GENESIS and AGUS_TEST_PRODUCT_DATABASE_URL for the funded chain test',
+}, async t => {
   const databaseUrl = process.env.AGUS_TEST_PRODUCT_DATABASE_URL;
   assert(databaseUrl?.includes('@127.0.0.1:'), 'Use disposable loopback Postgres');
   const connection = new Connection(rpc, 'finalized');
   const genesis = await connection.getGenesisHash();
-  assert.equal(genesis, process.env.AGUS_TEST_LOCAL_GENESIS, 'Explicitly pin the disposable validator');
+  assert.equal(genesis, genesisPin, 'Explicitly pin the disposable validator');
   const directory = await mkdtemp(join(tmpdir(), 'agus-campaign-escrow-'));
   t.after(() => rm(directory, { force: true, recursive: true }));
   const [cashier, funder, humanWallet, automatedWallet, replacement] = Array.from({ length: 5 }, () => Keypair.generate());
@@ -140,7 +144,22 @@ test('real Localnet and Postgres reserve, settle full and partial entitlements, 
   const automatic = await finalized(buyer, autoPath + '/payment', 'payout');
   assert.equal(automatic.recipient, String(automatedWallet.publicKey));
   assert.equal(automatic.amountAtoms, '700000');
-  const partial = await finalized(human, humanPath + '/payment', 'payout');
+  const firstWorker = createCampaignSettlementWorker(pilot.store, pilot.config);
+  const competingWorker = createCampaignSettlementWorker(pilot.store, pilot.config);
+  await Promise.all([firstWorker.tick(), competingWorker.tick()]);
+  let partial;
+  for (let retry = 0; retry < 70 && !partial; retry++) {
+    const { earnings } = await as(human, 'GET', '/me/campaign-earnings');
+    const payout = earnings.records.find(record => record.assignmentId === humanWork.assignment.id)?.payout;
+    assert.notEqual(payout?.state, 'needs_review', JSON.stringify(payout));
+    if (payout?.state === 'finalized') partial = payout.receipt;
+    else {
+      await delay(700);
+      pilot.clock.now += 700;
+      await Promise.all([firstWorker.tick(), competingWorker.tick()]);
+    }
+  }
+  assert.ok(partial, 'The accepted partial award must settle through the durable worker');
   assert.equal(partial.amountAtoms, '200000');
   assert.equal(partial.recipient, String(humanWallet.publicKey));
   const refund = await finalized(buyer, path + '/funding/refund', 'refund');

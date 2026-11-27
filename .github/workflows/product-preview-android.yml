@@ -38,7 +38,7 @@ jobs:
       - name: Build and exercise signed preview on Android
         shell: bash
         env:
-          AGUS_PREVIEW_JOURNEY: ${{ inputs.journey || 'full' }}
+          AGUS_PREVIEW_JOURNEY: ${{ inputs.journey || 'correction' }}
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/agus-product-preview"
@@ -81,7 +81,6 @@ jobs:
             ${{ runner.temp }}/agus-product-preview/android-checks.json
             ${{ runner.temp }}/agus-product-preview/android-markers.log
             ${{ runner.temp }}/agus-product-preview/correction-reference.json
-            ${{ runner.temp }}/agus-product-preview/dedicated-reference/private.json
             ${{ runner.temp }}/agus-product-preview/campaign-evidence.json
             ${{ runner.temp }}/agus-product-preview/emulator.log
             ${{ runner.temp }}/agus-product-preview/manifest.public.b64

@@ -533,6 +533,23 @@ final class ProviderScreens {
                 button(card, "Open Devnet Explorer", 0, false, view -> host.openDevnetExplorer(signature));
             }
         });
+        JSONObject campaign = host.snapshot == null ? null : host.snapshot.campaignEarnings;
+        if (campaign != null) {
+            LinearLayout card = ui.card(content);
+            ui.add(card, ui.heading("Phone campaign earnings", 18), 0);
+            detail(card, campaign.optLong("testUnits") + " nontransferable test units", false);
+            JSONArray assets = campaign.optJSONArray("funded");
+            if (assets == null || assets.length() == 0) detail(card, "No funded campaign earnings yet.", false);
+            forEach(assets, row -> {
+                JSONObject network = row.optJSONObject("network");
+                if (network == null) return;
+                String label = "devnet".equals(network.optString("cluster")) ? "Devnet test USDC" : "Localnet test SPL";
+                detail(card, label, false);
+                detail(card, "Finalized · " + amount(network, row, "finalizedAtoms"), false);
+                detail(card, "Pending · " + amount(network, row, "pendingAtoms"), false);
+                detail(card, "Under review · " + amount(network, row, "reviewAtoms"), false);
+            });
+        }
         wallet(content);
     }
 

@@ -5,6 +5,22 @@ import { requireCondition } from './security.mjs';
 const maximum = 2n ** 64n - 1n;
 export const disputeWindowMs = 24 * 60 * 60_000;
 
+export function disputeDeadline(state, assignment) {
+  const attempt = assignment.attempt;
+  if (assignment.state === 'rejected' && attempt?.review) return attempt.review.at + disputeWindowMs;
+  if (assignment.state === 'interrupted' && BigInt(assignment.terms.compensation?.partialAtoms ?? 0) > 0n) {
+    const cleanup = own(state.nativeLeases, attempt?.leaseId)?.cleanup;
+    if (cleanup) return cleanup.confirmedAt + disputeWindowMs;
+  }
+  if (['submitted', 'needs_revision'].includes(assignment.state)) return assignment.deadlineAt + disputeWindowMs;
+  return 0;
+}
+
+export function mayDispute(state, assignment, now) {
+  return Boolean(assignment.terms.compensation && assignment.attempt?.payoutWallet && !assignment.dispute &&
+    !own(state.compensation, assignment.id) && disputeDeadline(state, assignment) > now);
+}
+
 function atoms(input) {
   requireCondition(typeof input === 'string' && /^(0|[1-9]\d{0,19})$/.test(input) && BigInt(input) <= maximum,
     'Use a non-negative token amount in whole atoms');

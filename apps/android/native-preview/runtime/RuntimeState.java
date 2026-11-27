@@ -208,6 +208,7 @@ final class RuntimeState {
             component = build.getString("component");
             signerSha256 = build.getString("signerSha256");
             if (!PreviewConfig.REVIEWED_PACKAGES.contains(packageName) || !id.equals(value.getString("leaseId")) ||
+                !PreviewConfig.TIER.equals(value.optString("tier", "development")) ||
                 !prefs(context).getString("installation", "").equals(value.getString("audience")) ||
                 !prefs(context).getString("runtimeClass", "").equals(value.getString("runtimeClass"))) {
                 throw new SecurityException("Workload is bound to a different installation");

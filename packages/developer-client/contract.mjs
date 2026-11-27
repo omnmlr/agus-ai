@@ -18,6 +18,7 @@ const authCode = { ...string, pattern: '^[a-f0-9]{64}$' };
 const date = { ...string, format: 'date-time' };
 const id = { ...string, format: 'uuid' };
 const sha = { ...string, pattern: '^[a-f0-9]{64}$' };
+const atoms = { ...string, pattern: '^(0|[1-9][0-9]{0,19})$' };
 const consent = { screenshots: boolean, logs: boolean, trajectory: boolean };
 const constraints = { chargingRequired: boolean, wifiRequired: boolean };
 const createRun = {
@@ -136,6 +137,7 @@ const taskFields = {
   minimumApi: integer, abi: nullable(string), maximumNetworkLatencyMs: nullable(integer), skill: nullable(string),
   actions: array(values('describe', 'advance')), scenario: of('Scenario'),
   expectedTransaction: of('TransactionExpectation'), testUnits: integer, stopTestUnits: integer, trainingEligible: boolean, referenceRunId: id,
+  compensation: obj({ amountAtoms: atoms, partialAtoms: atoms }, ['amountAtoms']),
 };
 const draftFields = {
   projectId: id, title: string, objective: string, tasks: array(of('CampaignTask')), deadlineAt: integer,
@@ -144,14 +146,28 @@ const draftFields = {
 Object.assign(schemas, {
   CampaignTask: obj(taskFields, ['title', 'kind', 'runtimeClass', 'buildId', 'count', 'instructions']),
   CampaignDraft: obj(draftFields, ['projectId', 'title', 'objective', 'tasks', 'deadlineAt']),
-  CampaignRevision: obj({ ...draftFields, tasks: array(record), sha256: sha }),
+  CampaignRevision: obj({ ...draftFields, tasks: array(record), sha256: sha, fundingAmountAtoms: atoms }, [...Object.keys(draftFields), 'sha256']),
   Campaign: obj({ id, state: values('draft', 'active', 'paused', 'cancelled', 'completed'), revision: integer,
-    revisions: array(of('CampaignRevision')), createdAt: integer, updatedAt: integer, assignmentIds: array(id) }),
+    revisions: array(of('CampaignRevision')), createdAt: integer, updatedAt: integer, assignmentIds: array(id), fundingState: string },
+  ['id', 'state', 'revision', 'revisions', 'createdAt', 'updatedAt', 'assignmentIds']),
+  CampaignNetwork: obj({ cluster: values('localnet', 'devnet'), genesis: string, mint: string, asset: values('TEST-SPL', 'USDC'), decimals: integer }),
+  CampaignTransfer: obj({ state: values('empty', 'ready', 'submitted_or_unknown', 'needs_review', 'finalized'),
+    amountAtoms: atoms, signature: string, receipt: record, reason: string }, ['state', 'amountAtoms']),
+  CampaignQuote: obj({ reference: id, revision: integer, revisionSha256: sha, funder: string, deposit: string,
+    source: string, destination: string, network: of('CampaignNetwork'), memo: string, amountAtoms: atoms,
+    createdAt: integer, expiresAt: integer, afterSlot: integer }),
+  CampaignEscrow: obj({ quote: of('CampaignQuote'), funding: nullable(record), refund: nullable(of('CampaignTransfer')) }),
+  CampaignEntitlement: obj({ id, assignmentId: id, state: values('payout_eligible', 'test_obligation_recorded', 'unpaid_accepted'),
+    testUnits: integer, acceptedAt: integer, amountAtoms: atoms, network: of('CampaignNetwork'), payout: nullable(of('CampaignTransfer')) },
+  ['id', 'assignmentId', 'state', 'testUnits', 'acceptedAt']),
+  CampaignEarnings: obj({ asset: values('TEST_UNITS'), transferable: { const: false }, testUnits: integer,
+    records: array(of('CampaignEntitlement')), funded: array(obj({ network: of('CampaignNetwork'), pendingAtoms: atoms,
+      finalizedAtoms: atoms, reviewAtoms: atoms })) }),
   Assignment: obj({ id, campaignId: id, campaignRevision: integer, task: record, slot: integer,
     state: values('open', 'reserved', 'active', 'cleanup_pending', 'stopping', 'awaiting_submission', 'submitted',
       'needs_revision', 'accepted', 'partially_accepted', 'rejected', 'cancelled', 'interrupted', 'expired', 'dedicated'),
     terms: record, termsDigest: sha, expiresAt: integer, deadlineAt: integer, eligibleInstallationIds: array(id),
-    attempt: record, run: of('Run'), compensation: record, referenceActions: array(record),
+    attempt: record, run: of('Run'), compensation: of('CampaignEntitlement'), referenceActions: array(record), dispute: record, disputeEligible: boolean,
   }, ['id', 'campaignId', 'campaignRevision', 'task', 'slot', 'state', 'terms', 'termsDigest', 'expiresAt', 'deadlineAt']),
   CoverageCell: obj({ taskIndex: integer, kind: string, runtimeClass, planned: integer, attempted: integer,
     accepted: integer, measured: integer, passed: integer, failed: integer, blocked: integer, unverified: integer, missing: integer }),
@@ -208,7 +224,7 @@ post('/auth/email/start', 'Request a single-use email sign-in code',
   { auth: false });
 post('/auth/email/verify', 'Exchange a delivered code for a session', session, obj({ email: string, code: string }), { auth: false });
 post('/auth/google/start', 'Request a browser OAuth flow', envelope('url', string),
-  obj({ challenge: authCode, registrationToken: string }, ['challenge']), { auth: false });
+  obj({ challenge: authCode, registrationToken: string, client: values('android') }, ['challenge']), { auth: false });
 operation('/auth/google/callback', 'get', 'Complete OAuth and redirect with an exchange code', null, {
   auth: false, status: 303, emptyResponse: 'Redirect to configured frontend',
   query: [parameter('code', string), parameter('state', string), parameter('error', string)],
@@ -308,7 +324,8 @@ const assignment = envelope('assignment', of('Assignment'));
 const installation = envelope('installation', of('Installation'));
 const campaignConsent = obj({ purpose: values('training'), termsDigest: sha,
   contributorGrantedAt: nullable(integer), developerGrantedAt: nullable(integer) });
-get('/campaigns', 'List owned campaigns in the local preview', envelopeList('campaigns', of('Campaign')));
+get('/campaigns', 'List owned campaigns and the configured test funding network',
+  obj({ campaigns: array(of('Campaign')), fundingNetwork: nullable(of('CampaignNetwork')) }));
 post('/campaigns', 'Create an immutable first draft revision', campaign, of('CampaignDraft'), { query: idempotency });
 get('/campaigns/{campaignId}', 'Read a campaign and its immutable revisions', campaign);
 operation('/campaigns/{campaignId}', 'patch', 'Revise an owned draft', campaign,
@@ -317,6 +334,12 @@ for (const action of ['launch', 'pause', 'resume', 'cancel', 'complete']) {
   post('/campaigns/{campaignId}/' + action, 'Transition an owned campaign', campaign, envelope('expectedRevision', integer));
 }
 get('/campaigns/{campaignId}/report', 'Read qualified coverage, review and findings', envelope('report', of('CampaignReport')));
+const escrowResponse = envelope('escrow', nullable(of('CampaignEscrow')));
+get('/campaigns/{campaignId}/funding', 'Read authoritative campaign funding and refund state', escrowResponse);
+post('/campaigns/{campaignId}/funding/quote', 'Lock the campaign revision and request a test funding quote', escrowResponse,
+  envelope('expectedRevision', integer));
+post('/campaigns/{campaignId}/funding/verify', 'Verify finalized funding for the exact quote', escrowResponse, envelope('signature', string));
+post('/campaigns/{campaignId}/funding/refund', 'Request or reconcile the unused test balance', envelope('refund', of('CampaignTransfer')), obj({}));
 post('/campaigns/{campaignId}/exports', 'Prepare accepted evidence after both training grants', envelope('export', record),
   obj({ purpose: values('training'), assignmentIds: array(id) }));
 get('/campaigns/{campaignId}/exports/{exportId}', 'Deliver redacted data with current consent', envelope('export', record));
@@ -335,6 +358,10 @@ post('/assignments/{assignmentId}/submissions', 'Submit redacted structured evid
     correction: record }, ['attemptId', 'expectedVersion', 'steps', 'expected', 'actual', 'result', 'category']));
 post('/assignments/{assignmentId}/reviews', 'Review an exact submission or record disclosed partial credit', assignment,
   obj({ attemptId: id, version: integer, decision: values('accept', 'revise', 'reject', 'partial'), reason: string }));
+post('/assignments/{assignmentId}/payment', 'Start or reconcile the accepted test-chain payout', envelope('payout', of('CampaignTransfer')), obj({}));
+post('/assignments/{assignmentId}/dispute', 'Open a funded-assignment dispute', envelope('dispute', record), envelope('reason', string));
+post('/assignments/{assignmentId}/dispute/resolve', 'Resolve a dispute as an independent reviewer', envelope('dispute', record),
+  obj({ decision: values('uphold', 'award'), reason: string }));
 get('/assignments/{assignmentId}/receipt', 'Download the scoped native receipt and key', envelope('receipt', record));
 get('/qualification-appeals', 'List pending appeals for a configured local reviewer', envelopeList('appeals', record));
 post('/qualification-appeals/{qualificationId}/review', 'Adjudicate a current test qualification appeal', envelope('appeal', record),
@@ -343,7 +370,7 @@ get('/me/qualifications', 'Read exercises, current qualification and review hist
 post('/me/qualifications/{version}/submissions', 'Score the reviewed qualification exercise', record,
   obj({ sequence: array(string), expectedCode: string, actualCode: string, walletAnswer: string, evidenceNote: string }));
 post('/me/qualifications/{qualificationId}/appeal', 'Submit a person-owned qualification appeal', record, envelope('reason', string));
-get('/me/campaign-earnings', 'Read nontransferable preview obligations', envelope('earnings', record));
+get('/me/campaign-earnings', 'Read nontransferable credits and authoritative funded earnings', envelope('earnings', of('CampaignEarnings')));
 post('/me/runtime-enrollments', 'Create a single-use native enrollment challenge', envelope('enrollment', record),
   obj({ runtimeClass: values('phone_human', 'phone_cooperative'), appVersion: string, policyVersion: string }));
 post('/me/runtime-enrollments/{installationId}/complete', 'Verify native installation proof', obj({ installation: of('Installation'), credential: string }),

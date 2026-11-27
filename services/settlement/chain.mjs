@@ -134,6 +134,22 @@ export async function createFundingTransaction(quote, lifetime, signer) {
   });
 }
 
+export async function createCampaignFundingTransaction(quote, lifetime, payer) {
+  const network = quote.network;
+  const match = /^agus:campaign:funding:v1:([0-9a-f-]{36}):([a-f0-9]{64})$/.exec(quote.memo ?? '');
+  if (network?.cluster !== DEVNET.cluster || network?.genesis !== DEVNET.genesis || network?.mint !== DEVNET.mint ||
+      network?.asset !== DEVNET.asset || network?.decimals !== DEVNET.decimals ||
+      !match || match[2] !== quote.revisionSha256 || payer.address !== quote.funder ||
+      payer.address === quote.deposit || quote.source !== await associatedTokenAccount(quote.funder) ||
+      quote.destination !== await associatedTokenAccount(quote.deposit)) {
+    throw new SettlementError('BAD_QUOTE', 'The campaign quote does not match the Devnet funding contract.', 400);
+  }
+  if (!Number.isSafeInteger(quote.expiresAt) || quote.expiresAt <= Date.now()) {
+    throw new SettlementError('QUOTE_EXPIRED', 'This quote is outside its funding window.');
+  }
+  return buildTransfer({ payer, recipient: quote.deposit, amountAtoms: quote.amountAtoms, memo: quote.memo, lifetime });
+}
+
 function assertProof(condition) {
   if (!condition) {
     throw new SettlementError('CHAIN_MISMATCH', 'The finalized transfer differs from the expected payment.');

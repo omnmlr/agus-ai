@@ -67,7 +67,7 @@ if (action === 'serve') {
       instructions: 'Confirm the watchdog suspends the app when authority expires offline.' },
   ];
   const tasks = correction ? [{ ...task, kind: 'agent_correction', runtimeClass: 'phone_human', title: 'Correct the sealed relay action',
-    instructions: 'Compare the completed describe action with launching the reviewed app.', referenceRunId: correction.runId }]
+    instructions: 'Compare the completed describe action with launching the reviewed app.', referenceRunId: correction.runId, trainingEligible: true }]
     : journey === 'safety' ? cases.slice(2) : ['cooperative', 'partner', 'signer'].includes(journey) ? [cases[1]] : cases;
   if (journey === 'partner') {
     await request('POST', '/campaigns', token, { projectId: project.id, title: 'Unauthorized action',
@@ -114,7 +114,7 @@ if (action === 'serve') {
     || (['full', 'cooperative', 'partner'].includes(journey) && updated.cells.find(cell => cell.runtimeClass === 'phone_cooperative')?.passed !== 1)) {
     throw Error('Unexpected campaign report');
   }
-  const demo = updated.assignments.find(assignment => assignment.task.kind === 'human_demonstration');
+  const demo = updated.assignments.find(assignment => ['human_demonstration', 'agent_correction'].includes(assignment.task.kind));
   const rehearsal = { interrupted: updated.assignments.filter(item => item.state === 'partially_accepted').length };
   if (journey === 'correction') {
     const reference = JSON.parse(await readFile(resolve(directory, 'correction-reference.json'), 'utf8'));
@@ -131,14 +131,23 @@ if (action === 'serve') {
     const exportPath = '/campaigns/' + campaignId + '/exports';
     const prepared = (await request('POST', exportPath, token, { purpose: 'training', assignmentIds: [demo.id] })).export;
     const exported = (await request('GET', exportPath + '/' + prepared.id, token)).export;
-    const actions = exported.data.rows[0].actions.map(action => action.action);
-    if (actions.join(',') !== 'continue,review,continue') throw Error('Unexpected native demonstration actions');
+    if (journey === 'correction') {
+      const { referenceManifestSha256: _reference, source: _source, ...correction } = rehearsal.correction;
+      const delivered = exported.data.rows[0];
+      if (JSON.stringify(delivered.correction) !== JSON.stringify(correction) || JSON.stringify(delivered).includes(demo.task.referenceRunId)) {
+        throw Error('Correction export did not retain exactly the individually consented action');
+      }
+      rehearsal.exportedCorrection = delivered.correction;
+    } else {
+      const actions = exported.data.rows[0].actions.map(action => action.action);
+      if (actions.join(',') !== 'continue,review,continue') throw Error('Unexpected native demonstration actions');
+      rehearsal.approvedHumanActions = actions;
+    }
     if (JSON.stringify(exported).includes('Duplicate submission observed')) throw Error('Narrative leaked into training export');
     const contributor = await request('POST', '/auth/login', null, testUser);
     await request('DELETE', consentPath, contributor.token);
     const denied = await fetch(endpoint + exportPath + '/' + prepared.id, { headers: { Authorization: 'Bearer ' + token } });
     if (denied.status !== 403) throw Error('Withdrawn export remained accessible');
-    rehearsal.approvedHumanActions = actions;
     rehearsal.existingExportDeniedAfterWithdrawal = true;
   }
   const evidence = { cells: updated.cells, acceptedTestUnits: updated.acceptedTestUnits,

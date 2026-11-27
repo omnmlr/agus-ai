@@ -2,6 +2,11 @@
   "name": "@agus/receipt-attestation",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node --test" },
-  "dependencies": { "sas-lib": "1.0.10" }
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@solana/kit": "5.5.1",
+    "sas-lib": "1.0.10"
+  }
 }

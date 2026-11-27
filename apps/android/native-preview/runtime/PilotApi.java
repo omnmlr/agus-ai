@@ -15,7 +15,6 @@ import java.security.Signature;
 import org.json.JSONObject;
 
 final class PilotApi {
-    private static final String ORIGIN = "http://10.0.2.2:18765/api/v1";
     private static final String ALIAS = "agus-preview-signing-v1";
 
     static JSONObject request(String method, String path, String bearer, JSONObject input) throws Exception {
@@ -28,7 +27,7 @@ final class PilotApi {
 
     private static byte[] exchange(String method, String path, String bearer, JSONObject input, int limit) throws Exception {
         if (!path.matches("/[a-zA-Z0-9/_-]+")) throw new IOException("Invalid pilot path");
-        var connection = (HttpURLConnection) new URL(ORIGIN + path).openConnection();
+        var connection = (HttpURLConnection) new URL(PreviewConfig.ORIGIN + path).openConnection();
         connection.setConnectTimeout(3500);
         connection.setReadTimeout(3500);
         connection.setInstanceFollowRedirects(false);

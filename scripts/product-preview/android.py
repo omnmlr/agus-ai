@@ -266,7 +266,7 @@ def run():
             tap("Send report", scroll=False)
             expect("PERSON_SUBMISSION_SAVED", finished)
             record(mode + " profile enrollment, signed evidence, cleanup and submission passed")
-            if mode == "human" and JOURNEY != "correction":
+            if mode == "human":
                 tap("Show my assignments")
                 tap("Training consent")
                 tap("Grant", scroll=False)

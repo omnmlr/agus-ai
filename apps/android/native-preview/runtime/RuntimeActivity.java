@@ -152,7 +152,16 @@ public class RuntimeActivity extends Activity {
                 button("Qualification exercise", this::qualification);
                 button("Campaign earnings", () -> run(() -> {
                     var earnings = PilotApi.request("GET", "/me/campaign-earnings", person, null).getJSONObject("earnings");
-                    return earnings.getLong("testUnits") + " nontransferable test units. Payment is unavailable in the preview.";
+                    StringBuilder summary = new StringBuilder(earnings.getLong("testUnits") + " nontransferable test units.");
+                    JSONArray funded = earnings.optJSONArray("funded");
+                    if (funded != null) for (int index = 0; index < funded.length(); index++) {
+                        JSONObject row = funded.getJSONObject(index);
+                        JSONObject network = row.getJSONObject("network");
+                        summary.append("\n").append(asset(network)).append("\nFinalized: ").append(amount(row.getString("finalizedAtoms"), network))
+                            .append(" · Pending: ").append(amount(row.getString("pendingAtoms"), network))
+                            .append(" · Under review: ").append(amount(row.getString("reviewAtoms"), network));
+                    }
+                    return summary.toString();
                 }));
                 button("Revoke installation", () -> new AlertDialog.Builder(this).setTitle("Revoke this installation?")
                     .setNegativeButton("Back", null).setPositiveButton("Revoke", (dialog, which) -> revoke()).show());
@@ -185,6 +194,9 @@ public class RuntimeActivity extends Activity {
             JSONObject begin = new JSONObject().put("runtimeClass", kind).put("appVersion", "phone-preview-1")
                 .put("policyVersion", "managed-profile-v1");
             JSONObject enrollment = PilotApi.request("POST", "/me/runtime-enrollments", person, begin).getJSONObject("enrollment");
+            if (!PreviewConfig.TIER.equals(enrollment.getJSONObject("binding").optString("tier", "development"))) {
+                throw new SecurityException("Enrollment belongs to a different preview environment");
+            }
             JSONObject body = new JSONObject().put("publicKey", PilotApi.publicKey())
                 .put("proof", PilotApi.sign(enrollment.getJSONObject("binding")));
             JSONObject result = PilotApi.request("POST", "/me/runtime-enrollments/" + enrollment.getString("id") + "/complete", person, body);
@@ -246,7 +258,14 @@ public class RuntimeActivity extends Activity {
                     label("This task records the fixture’s named actions and relative times as structured evidence.");
                 }
                 label(task.optString("packageName") + "\n" + task.optString("buildSha256"));
-                label(task.optInt("testUnits") + " nontransferable test units · structured evidence only");
+                JSONObject terms = item.optJSONObject("terms").optJSONObject("compensation");
+                if (terms == null) {
+                    label(task.optInt("testUnits") + " nontransferable test units · structured evidence only");
+                } else {
+                    JSONObject network = terms.optJSONObject("network");
+                    label(amount(terms.optString("amountAtoms"), network) + " " + asset(network) + " on acceptance. Partial after eligible interruption: "
+                        + amount(terms.optString("partialAtoms"), network) + ". Verify your account wallet in Companion before accepting.");
+                }
                 String installationId = RuntimeState.prefs(this).getString("installation", "");
                 var eligible = item.optJSONArray("eligibleInstallationIds");
                 boolean canAccept = false;
@@ -272,7 +291,49 @@ public class RuntimeActivity extends Activity {
             if (attempt != null && attempt.optJSONObject("review") != null) {
                 label(attempt.optJSONObject("review").optString("reason"));
             }
+            JSONObject entitlement = item.optJSONObject("compensation");
+            if (entitlement != null && entitlement.has("amountAtoms")) {
+                JSONObject network = entitlement.optJSONObject("network");
+                JSONObject payout = entitlement.optJSONObject("payout");
+                String paymentState = payout == null ? "payout eligible" : payout.optString("state").replace('_', ' ');
+                label(amount(entitlement.optString("amountAtoms"), network) + " " + asset(network) + " · " + paymentState);
+                if (payout != null && payout.has("signature")) label(payout.optString("signature"));
+                if (payout == null || !"finalized".equals(payout.optString("state"))) {
+                    button("Reconcile payout", () -> run(() -> {
+                        PilotApi.request("POST", "/assignments/" + item.getString("id") + "/payment", person, new JSONObject());
+                        runOnUiThread(this::assignments);
+                        return "Payout status checked.";
+                    }));
+                }
+            }
+            JSONObject dispute = item.optJSONObject("dispute");
+            if (dispute != null) label("Dispute " + dispute.optString("state") + " · " + dispute.optString("resolution", dispute.optString("reason")));
+            if (item.optBoolean("disputeEligible")) button("Open compensation dispute", () -> dispute(item));
         }
+    }
+
+    private static String asset(JSONObject network) {
+        return "devnet".equals(network.optString("cluster")) ? "Devnet test USDC" : "Localnet test SPL";
+    }
+
+    private static String amount(String atoms, JSONObject network) {
+        return new java.math.BigDecimal(new java.math.BigInteger(atoms), network.optInt("decimals", 6)).toPlainString();
+    }
+
+    private void dispute(JSONObject item) {
+        EditText reason = new EditText(this);
+        reason.setHint("Reason for the dispute");
+        reason.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(400)});
+        new AlertDialog.Builder(this).setTitle("Open compensation dispute").setView(reason)
+            .setNegativeButton("Back", null).setPositiveButton("Submit", (dialog, which) -> {
+                String value = reason.getText().toString().trim();
+                if (value.isEmpty()) { status("Enter a dispute reason before submitting."); return; }
+                run(() -> {
+                    PilotApi.request("POST", "/assignments/" + item.getString("id") + "/dispute", person, new JSONObject().put("reason", value));
+                    runOnUiThread(this::assignments);
+                    return "Dispute sent for review.";
+                });
+            }).show();
     }
 
     private void accept(JSONObject offer) {

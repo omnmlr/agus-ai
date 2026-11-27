@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { paymentTerms, pinnedPayout, publicObligation, recordObligation, sumCampaignFunds } from './campaign-compensation.mjs';
+import { mayDispute, paymentTerms, pinnedPayout, publicObligation, recordObligation, sumCampaignFunds } from './campaign-compensation.mjs';
 import { evidenceExpiresAt, purgeExpiredCampaignEvidence } from './campaign-retention.mjs';
 import { createRun, getOwned, notice, publicRun, requestStop, terminal } from './domain.mjs';
 import { refreshLifecycles } from './person-routes.mjs';
 import { array, digest, requireCondition, stableJson, string } from './security.mjs';
-import { conflict, exact, integer, missing, nativeClasses, own } from './pilot-policy.mjs';
+import { conflict, exact, integer, missing, nativeClasses, own, reviewedWorkload } from './pilot-policy.mjs';
 import { expireNativeLease, publicInstallation, stopNativeLease } from './native-runtime.mjs';
 import { qualified } from './qualifications.mjs';
 import { expectedTransaction, SCENARIOS } from './verification.mjs';
@@ -197,8 +197,8 @@ export function changeCampaign(state, user, id, action, input, config, now) {
     for (const [taskIndex, task] of draft.tasks.entries()) {
       const dedicated = task.runtimeClass === 'dedicated_runner';
       if (!dedicated) {
-        const reviewed = config.pilot.reviewedBuilds.get(task.buildSha256);
-        conflict(reviewed?.packageName === task.packageName, 'Phone campaign requires an operator-reviewed build', 'build_not_reviewed');
+        const reviewed = reviewedWorkload(config.pilot, { sha256: task.buildSha256, packageName: task.packageName }, user.id);
+        conflict(reviewed, 'Phone campaign requires publisher authorization and an operator-reviewed build', 'build_not_reviewed');
       }
       for (let slot = 0; slot < task.count; slot++) {
         const id = randomUUID();
@@ -303,6 +303,7 @@ function assignmentView(state, assignment, user, now) {
     ...(assignment.runId && owned && { run: publicRun(state.runs[assignment.runId]) }),
     ...(attempt && state.compensation[assignment.id] && { compensation: publicObligation(state.compensation[assignment.id]) }),
     ...(attempt && assignment.dispute && { dispute: assignment.dispute }),
+    ...(mine && mayDispute(state, assignment, now) && { disputeEligible: true }),
   };
 }
 

@@ -1,7 +1,11 @@
 package app.agus.companion;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import java.net.URI;
 import org.junit.Test;
@@ -39,5 +43,16 @@ public final class CompanionBoundariesTest {
         bytes[31] = (byte) 57;
         assertEquals("1111111111111111111111111111111z", SolanaAddress.encode(bytes));
         assertThrows(IllegalArgumentException.class, () -> SolanaAddress.encode(new byte[31]));
+    }
+
+    @Test public void googleReturnRequiresTheExactOriginAndPendingAttempt() {
+        String verifier = GoogleSignIn.verifier();
+        String fragment = "#authCode=" + "a".repeat(43) + "&attempt=" + GoogleSignIn.challenge(verifier);
+        assertNotNull(GoogleSignIn.callback(GoogleSignIn.ORIGIN.resolve("/auth/android" + fragment), verifier));
+        assertNull(GoogleSignIn.callback(GoogleSignIn.ORIGIN.resolve("/auth/android" + fragment), GoogleSignIn.verifier()));
+        assertNull(GoogleSignIn.callback(URI.create("https://outside.example/auth/android" + fragment), verifier));
+        assertNull(GoogleSignIn.callback(GoogleSignIn.ORIGIN.resolve("/auth/android?code=unsafe" + fragment), verifier));
+        assertTrue(GoogleSignIn.browserUrl(URI.create("https://accounts.google.com/o/oauth2/v2/auth?client_id=test")));
+        assertFalse(GoogleSignIn.browserUrl(URI.create("https://accounts.google.com@outside.example/o/oauth2/v2/auth?client_id=test")));
     }
 }

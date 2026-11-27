@@ -419,6 +419,12 @@
                   },
                   "registrationToken": {
                     "type": "string"
+                  },
+                  "client": {
+                    "type": "string",
+                    "enum": [
+                      "android"
+                    ]
                   }
                 },
                 "required": [
@@ -3878,7 +3884,7 @@
     },
     "/api/v1/campaigns": {
       "get": {
-        "summary": "List owned campaigns in the local preview",
+        "summary": "List owned campaigns and the configured test funding network",
         "security": [
           {
             "SessionBearer": []
@@ -3898,10 +3904,21 @@
                       "items": {
                         "$ref": "#/components/schemas/Campaign"
                       }
+                    },
+                    "fundingNetwork": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/CampaignNetwork"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
-                    "campaigns"
+                    "campaigns",
+                    "fundingNetwork"
                   ]
                 }
               }
@@ -4470,6 +4487,275 @@
                   },
                   "required": [
                     "report"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{campaignId}/funding": {
+      "get": {
+        "summary": "Read authoritative campaign funding and refund state",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "escrow": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/CampaignEscrow"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "escrow"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{campaignId}/funding/quote": {
+      "post": {
+        "summary": "Lock the campaign revision and request a test funding quote",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedRevision": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "expectedRevision"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "escrow": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/CampaignEscrow"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "escrow"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{campaignId}/funding/verify": {
+      "post": {
+        "summary": "Verify finalized funding for the exact quote",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "signature": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "signature"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "escrow": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/CampaignEscrow"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "escrow"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{campaignId}/funding/refund": {
+      "post": {
+        "summary": "Request or reconcile the unused test balance",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "refund": {
+                      "$ref": "#/components/schemas/CampaignTransfer"
+                    }
+                  },
+                  "required": [
+                    "refund"
                   ]
                 }
               }
@@ -5330,6 +5616,214 @@
         }
       }
     },
+    "/api/v1/assignments/{assignmentId}/payment": {
+      "post": {
+        "summary": "Start or reconcile the accepted test-chain payout",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "payout": {
+                      "$ref": "#/components/schemas/CampaignTransfer"
+                    }
+                  },
+                  "required": [
+                    "payout"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assignments/{assignmentId}/dispute": {
+      "post": {
+        "summary": "Open a funded-assignment dispute",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dispute": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "dispute"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assignments/{assignmentId}/dispute/resolve": {
+      "post": {
+        "summary": "Resolve a dispute as an independent reviewer",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "uphold",
+                      "award"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "decision",
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dispute": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "dispute"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/assignments/{assignmentId}/receipt": {
       "get": {
         "summary": "Download the scoped native receipt and key",
@@ -5681,7 +6175,7 @@
     },
     "/api/v1/me/campaign-earnings": {
       "get": {
-        "summary": "Read nontransferable preview obligations",
+        "summary": "Read nontransferable credits and authoritative funded earnings",
         "security": [
           {
             "SessionBearer": []
@@ -5697,8 +6191,7 @@
                   "type": "object",
                   "properties": {
                     "earnings": {
-                      "type": "object",
-                      "additionalProperties": true
+                      "$ref": "#/components/schemas/CampaignEarnings"
                     }
                   },
                   "required": [
@@ -8139,6 +8632,22 @@
           "referenceRunId": {
             "type": "string",
             "format": "uuid"
+          },
+          "compensation": {
+            "type": "object",
+            "properties": {
+              "amountAtoms": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,19})$"
+              },
+              "partialAtoms": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,19})$"
+              }
+            },
+            "required": [
+              "amountAtoms"
+            ]
           }
         },
         "required": [
@@ -8247,6 +8756,10 @@
           "sha256": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "fundingAmountAtoms": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,19})$"
           }
         },
         "required": [
@@ -8300,6 +8813,9 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          "fundingState": {
+            "type": "string"
           }
         },
         "required": [
@@ -8310,6 +8826,280 @@
           "createdAt",
           "updatedAt",
           "assignmentIds"
+        ]
+      },
+      "CampaignNetwork": {
+        "type": "object",
+        "properties": {
+          "cluster": {
+            "type": "string",
+            "enum": [
+              "localnet",
+              "devnet"
+            ]
+          },
+          "genesis": {
+            "type": "string"
+          },
+          "mint": {
+            "type": "string"
+          },
+          "asset": {
+            "type": "string",
+            "enum": [
+              "TEST-SPL",
+              "USDC"
+            ]
+          },
+          "decimals": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cluster",
+          "genesis",
+          "mint",
+          "asset",
+          "decimals"
+        ]
+      },
+      "CampaignTransfer": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "empty",
+              "ready",
+              "submitted_or_unknown",
+              "needs_review",
+              "finalized"
+            ]
+          },
+          "amountAtoms": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,19})$"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "receipt": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "amountAtoms"
+        ]
+      },
+      "CampaignQuote": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "revisionSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "funder": {
+            "type": "string"
+          },
+          "deposit": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "network": {
+            "$ref": "#/components/schemas/CampaignNetwork"
+          },
+          "memo": {
+            "type": "string"
+          },
+          "amountAtoms": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,19})$"
+          },
+          "createdAt": {
+            "type": "integer"
+          },
+          "expiresAt": {
+            "type": "integer"
+          },
+          "afterSlot": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reference",
+          "revision",
+          "revisionSha256",
+          "funder",
+          "deposit",
+          "source",
+          "destination",
+          "network",
+          "memo",
+          "amountAtoms",
+          "createdAt",
+          "expiresAt",
+          "afterSlot"
+        ]
+      },
+      "CampaignEscrow": {
+        "type": "object",
+        "properties": {
+          "quote": {
+            "$ref": "#/components/schemas/CampaignQuote"
+          },
+          "funding": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "refund": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CampaignTransfer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "quote",
+          "funding",
+          "refund"
+        ]
+      },
+      "CampaignEntitlement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "assignmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "payout_eligible",
+              "test_obligation_recorded",
+              "unpaid_accepted"
+            ]
+          },
+          "testUnits": {
+            "type": "integer"
+          },
+          "acceptedAt": {
+            "type": "integer"
+          },
+          "amountAtoms": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,19})$"
+          },
+          "network": {
+            "$ref": "#/components/schemas/CampaignNetwork"
+          },
+          "payout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CampaignTransfer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "assignmentId",
+          "state",
+          "testUnits",
+          "acceptedAt"
+        ]
+      },
+      "CampaignEarnings": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "enum": [
+              "TEST_UNITS"
+            ]
+          },
+          "transferable": {
+            "const": false
+          },
+          "testUnits": {
+            "type": "integer"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampaignEntitlement"
+            }
+          },
+          "funded": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "network": {
+                  "$ref": "#/components/schemas/CampaignNetwork"
+                },
+                "pendingAtoms": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$"
+                },
+                "finalizedAtoms": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$"
+                },
+                "reviewAtoms": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$"
+                }
+              },
+              "required": [
+                "network",
+                "pendingAtoms",
+                "finalizedAtoms",
+                "reviewAtoms"
+              ]
+            }
+          }
+        },
+        "required": [
+          "asset",
+          "transferable",
+          "testUnits",
+          "records",
+          "funded"
         ]
       },
       "Assignment": {
@@ -8382,8 +9172,7 @@
             "$ref": "#/components/schemas/Run"
           },
           "compensation": {
-            "type": "object",
-            "additionalProperties": true
+            "$ref": "#/components/schemas/CampaignEntitlement"
           },
           "referenceActions": {
             "type": "array",
@@ -8391,6 +9180,13 @@
               "type": "object",
               "additionalProperties": true
             }
+          },
+          "dispute": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "disputeEligible": {
+            "type": "boolean"
           }
         },
         "required": [

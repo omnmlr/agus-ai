@@ -1,4 +1,5 @@
 import { purgeExpiredCampaignEvidence } from './campaign-retention.mjs';
+import { createCampaignSettlementWorker } from './campaign-escrow.mjs';
 import { createServer } from 'node:http';
 import { createApi } from './api.mjs';
 import { pilotConfig } from './pilot-policy.mjs';
@@ -68,12 +69,29 @@ export async function createControlPlane({ env = process.env, overrides = {} } =
     if (env.AGUS_CAMPAIGN_SETTLEMENT_CLUSTER) {
       const { campaignChainFromEnv } = await import('../../settlement/campaign-chain.mjs');
       config.campaignChain = await campaignChainFromEnv(env, { persistent: Boolean(store.pool), pilot: config.pilot });
+      if (settlement?.depositWallet === config.campaignChain.depositWallet) {
+        throw new Error('Configure distinct disposable deposit wallets for dedicated and campaign settlement.');
+      }
+    }
+    if (env.AGUS_CAMPAIGN_SETTLEMENT_AUTOMATIC === '1' && !config.campaignChain) {
+      throw new Error('AGUS_CAMPAIGN_SETTLEMENT_AUTOMATIC requires campaign settlement configuration');
     }
   } catch (error) {
     await store.close();
     throw error;
   }
   const server = createServer({ requestTimeout: 45_000, headersTimeout: 15_000 }, createApi({ store, config, settlement }));
+  if (env.AGUS_CAMPAIGN_SETTLEMENT_AUTOMATIC === '1') {
+    const worker = createCampaignSettlementWorker(store, config);
+    let timer;
+    server.once('listening', () => {
+      timer = setInterval(() => worker.tick().catch(error => {
+        console.error('Campaign settlement worker deferred', error.code ?? error.name);
+      }), 10_000);
+      timer.unref();
+    });
+    server.once('close', () => clearInterval(timer));
+  }
   if (config.pilot) {
     let sweep;
     server.once('listening', () => {

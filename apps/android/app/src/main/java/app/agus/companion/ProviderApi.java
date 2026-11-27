@@ -32,6 +32,7 @@ final class ProviderApi {
         String scope = string(device, "id");
         JSONArray jobs = null;
         JSONObject earnings = null;
+        JSONObject campaignEarnings = null;
         if (!scope.isEmpty() && marketplace) {
             jobs = optionalArray(MARKETPLACE + "?deviceId=" + Uri.encode(scope), "jobs");
         }
@@ -46,6 +47,15 @@ final class ProviderApi {
                 }
             }
         }
+        if (payouts) {
+            try {
+                campaignEarnings = client.get("/me/campaign-earnings").getJSONObject("earnings");
+            } catch (ApiClient.ApiError unavailable) {
+                if (unavailable.status != 404 && !unavailable.code.equals("pilot_unavailable") && !unavailable.code.equals("pilot_access_required")) {
+                    throw unavailable;
+                }
+            }
+        }
         JSONArray notifications = inbox ? optionalArray("/me/notifications", "notifications") : null;
         JSONObject run = null;
         JSONArray events = null;
@@ -54,7 +64,7 @@ final class ProviderApi {
             run = client.get(path).getJSONObject("run");
             events = client.get(path + "/events").getJSONArray("events");
         }
-        return new Snapshot(user, devices, runs, invitations, run, events, scope, jobs, earnings, notifications);
+        return new Snapshot(user, devices, runs, invitations, run, events, scope, jobs, earnings, campaignEarnings, notifications);
     }
 
     private JSONArray optionalArray(String route, String key) throws IOException, JSONException {
@@ -126,10 +136,11 @@ final class ProviderApi {
         final String deviceScope;
         final JSONArray jobs;
         final JSONObject earnings;
+        final JSONObject campaignEarnings;
         final JSONArray notifications;
 
         Snapshot(JSONObject user, JSONArray devices, JSONArray runs, JSONArray invitations, JSONObject run, JSONArray events,
-            String deviceScope, JSONArray jobs, JSONObject earnings, JSONArray notifications) {
+            String deviceScope, JSONArray jobs, JSONObject earnings, JSONObject campaignEarnings, JSONArray notifications) {
             this.user = user;
             this.devices = devices;
             this.runs = runs;
@@ -139,13 +150,15 @@ final class ProviderApi {
             this.deviceScope = deviceScope;
             this.jobs = jobs;
             this.earnings = earnings;
+            this.campaignEarnings = campaignEarnings;
             this.notifications = notifications;
         }
 
         boolean sameAs(Snapshot other) {
             return sameJson(user, other.user) && sameJson(devices, other.devices) && sameJson(runs, other.runs)
                 && sameJson(invitations, other.invitations) && sameJson(run, other.run) && sameJson(events, other.events)
-                && deviceScope.equals(other.deviceScope) && sameJson(jobs, other.jobs) && sameJson(earnings, other.earnings) && sameJson(notifications, other.notifications);
+                && deviceScope.equals(other.deviceScope) && sameJson(jobs, other.jobs) && sameJson(earnings, other.earnings)
+                && sameJson(campaignEarnings, other.campaignEarnings) && sameJson(notifications, other.notifications);
         }
 
         private static boolean sameJson(Object first, Object second) {

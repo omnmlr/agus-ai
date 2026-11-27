@@ -132,6 +132,7 @@ export function createSettlementService({ store, chain, depositWallet, amountAto
   }
 
   return {
+    depositWallet,
     async get({ runId }) {
       assertIdentifier(runId);
       const row = await store.get(runId);

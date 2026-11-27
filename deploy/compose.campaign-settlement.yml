@@ -1,0 +1,14 @@
+services:
+  api:
+    environment:
+      AGUS_CAMPAIGN_SETTLEMENT_CLUSTER: devnet
+      AGUS_ENABLE_CAMPAIGN_DEVNET: "1"
+      AGUS_CAMPAIGN_SETTLEMENT_AUTOMATIC: "1"
+      AGUS_CAMPAIGN_SETTLEMENT_KEYPAIR_FILE: /run/agus-ai/campaign-operator.json
+    volumes:
+      - type: bind
+        source: /etc/agus-ai/campaign-operator.json
+        target: /run/agus-ai/campaign-operator.json
+        read_only: true
+        bind:
+          create_host_path: false

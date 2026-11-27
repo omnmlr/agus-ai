@@ -2,14 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { digest, hex256, requireCondition, stableJson, string, token } from './security.mjs';
 import {
   conflict, exact, integer, manifestEnvelope, missing, nativeClasses, own,
-  p256PublicKey, qualifyingPolicy, sdkVersion, verifyNativeProof, workProfilePolicy,
+  p256PublicKey, qualifyingPolicy, reviewedWorkload, sdkVersion, verifyNativeProof, workProfilePolicy,
 } from './pilot-policy.mjs';
 
 const minute = 60_000;
 const authorityMs = 45_000;
 const qualificationMs = 7 * 24 * 60 * minute;
 
-export function startNativeEnrollment(state, user, input, now) {
+export function startNativeEnrollment(state, user, input, now, tier = 'development') {
   exact(input, ['runtimeClass', 'appVersion', 'policyVersion'], 'enrollment');
   requireCondition(nativeClasses.includes(input.runtimeClass) && input.policyVersion === workProfilePolicy,
     'Unsupported runtime or work-profile policy');
@@ -23,16 +23,18 @@ export function startNativeEnrollment(state, user, input, now) {
   const binding = {
     v: 1, kind: 'enrollment', id, challenge: token(), runtimeClass: input.runtimeClass,
     appVersion: string(input.appVersion, 'appVersion', 32), policyVersion: workProfilePolicy,
+    ...(tier !== 'development' && { tier }),
   };
   state.runtimeEnrollments[id] = { id, ownerId: user.id, binding, expiresAt: now + 5 * minute };
   return { enrollment: { id, binding, expiresAt: state.runtimeEnrollments[id].expiresAt } };
 }
 
-export function completeNativeEnrollment(state, user, id, input, now) {
+export function completeNativeEnrollment(state, user, id, input, now, tier = 'development') {
   exact(input, ['publicKey', 'proof'], 'enrollment proof');
   const enrollment = own(state.runtimeEnrollments, id);
   missing(enrollment?.ownerId === user.id, 'Enrollment');
   conflict(enrollment.expiresAt > now, 'Enrollment challenge expired', 'grant_expired');
+  conflict((enrollment.binding.tier ?? 'development') === tier, 'Enrollment deployment changed', 'grant_expired');
   p256PublicKey(input.publicKey);
   const proof = verifyNativeProof(input.publicKey, input.proof);
   requireCondition(stableJson(proof.value) === stableJson(enrollment.binding), 'Wrong enrollment challenge', 'invalid_proof', 403);
@@ -41,7 +43,7 @@ export function completeNativeEnrollment(state, user, id, input, now) {
   const credential = token();
   const installation = {
     id, ownerId: user.id, runtimeClass: enrollment.binding.runtimeClass, appVersion: enrollment.binding.appVersion,
-    policyVersion: workProfilePolicy, publicKey: input.publicKey,
+    policyVersion: workProfilePolicy, publicKey: input.publicKey, tier,
     credentialHash: digest(credential), credentialExpiresAt: now + qualificationMs,
     createdAt: now, sequence: 0, fence: 0, readiness: 'pending', activeLeaseId: null, revokedAt: null,
   };
@@ -116,8 +118,8 @@ export function revokeNativeInstallation(state, user, id, now) {
 }
 
 export function issueNativeLease(state, installation, assignment, task, build, pilot, now) {
-  const review = pilot.reviewedBuilds.get(build.sha256);
-  conflict(review?.packageName === build.packageName, 'Build lacks an operator-reviewed digest and signer', 'build_not_reviewed');
+  const review = reviewedWorkload(pilot, build, assignment.ownerId);
+  conflict(review, 'Build lacks publisher authorization and an operator-reviewed digest and signer', 'build_not_reviewed');
   conflict(publicInstallation(installation, now).readiness === 'ready' &&
     assignment.state === 'reserved' && assignment.installationId === installation.id &&
     assignment.attempt.contributorId === installation.ownerId && assignment.reservationExpiresAt > now,
@@ -139,6 +141,7 @@ export function issueNativeLease(state, installation, assignment, task, build, p
     observationSchema: 'fixture-result-v1', policyVersion: workProfilePolicy,
     issuedAt: now, deadline, ttlMs: authorityMs, challenge: token(),
     termsDigest: assignment.termsDigest, evidence: 'structured_only',
+    ...(installation.tier && installation.tier !== 'development' && { tier: installation.tier }),
   };
   const envelope = manifestEnvelope(pilot, manifest);
   const lease = {

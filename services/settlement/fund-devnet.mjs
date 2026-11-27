@@ -1,6 +1,6 @@
 import { open, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { assertDevnet, assertSignature, connectDevnet, createFundingTransaction, readKeypair, sendRpc, signTransfer } from './chain.mjs';
+import { assertDevnet, assertSignature, connectDevnet, createCampaignFundingTransaction, createFundingTransaction, readKeypair, sendRpc, signTransfer } from './chain.mjs';
 
 const [file, ...flags] = process.argv.slice(2);
 if (!file || flags.length !== 1 || flags[0] !== '--broadcast') {
@@ -10,7 +10,7 @@ if (!file || flags.length !== 1 || flags[0] !== '--broadcast') {
 
 async function fund() {
   const saved = JSON.parse(await readFile(file, 'utf8'));
-  const quote = saved.payment?.quote ?? saved.quote ?? saved;
+  const quote = saved.escrow?.quote ?? saved.payment?.quote ?? saved.quote ?? saved;
   if (!/^[0-9a-f-]{36}$/.test(quote.reference)) throw new Error('Invalid payment reference');
   const journalPath = join(dirname(resolve(file)), `.${quote.reference}.devnet-funding.json`);
   const recover = async () => {
@@ -28,13 +28,14 @@ async function fund() {
   if (await recover()) return;
 
   const developer = await readKeypair(process.env.AGUS_FUNDING_KEYPAIR_FILE);
-  if (developer.address !== quote.developerWallet) {
+  if (developer.address !== (quote.funder ?? quote.developerWallet)) {
     throw new Error('The keypair does not match the quoted developer wallet.');
   }
   const rpc = connectDevnet(process.env.AGUS_SETTLEMENT_RPC_URL);
   await assertDevnet(rpc);
   const { value: lifetime } = await sendRpc(rpc.getLatestBlockhash({ commitment: 'finalized' }));
-  const transaction = await createFundingTransaction(quote, lifetime, developer);
+  const transaction = quote.network ? await createCampaignFundingTransaction(quote, lifetime, developer)
+    : await createFundingTransaction(quote, lifetime, developer);
   const { signature, signedTransaction } = await signTransfer(transaction);
 
   const entry = { signature, lastValidBlockHeight: Number(lifetime.lastValidBlockHeight) };

@@ -9,7 +9,7 @@ import { digest, hex256, stableJson, validSignature } from '../control-plane/src
 export const name = 'agus-execution-v1';
 export const field = 'manifest_sha256';
 const fields = Buffer.concat([Buffer.from([field.length, 0, 0, 0]), Buffer.from(field)]);
-const genesis = 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG';
+export const devnetGenesis = 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG';
 
 export function receiptClaim(receipt) {
   const manifest = receipt?.manifest;
@@ -30,20 +30,27 @@ function decoded(account, discriminator, decoder) {
   return data;
 }
 
+export const decodeCredential = account => decoded(account, 1, getCredentialDecoder());
+
+export function decodeReceiptSchema(account, credential) {
+  const layout = decoded(account, 2, getSchemaDecoder());
+  if (layout.credential !== credential || Buffer.from(layout.name).toString() !== name ||
+      layout.version !== 1 || layout.isPaused || !Buffer.from(layout.layout).equals(Buffer.from([12])) ||
+      !Buffer.from(layout.fieldNames).equals(fields)) throw new Error('Unexpected or paused AGUS receipt schema');
+  return layout;
+}
+
 export async function verifyDevnetAttestation({ receipt, credential, signer, nonce, rpc = publicRpc, now = Date.now() }) {
   const claim = receiptClaim(receipt);
   const [schema] = await deriveSchemaPda({ credential, name, version: 1 });
   const [address] = await deriveAttestationPda({ credential, schema, nonce });
-  if (await rpc('getGenesisHash', []) !== genesis) throw new Error('Devnet genesis mismatch');
+  if (await rpc('getGenesisHash', []) !== devnetGenesis) throw new Error('Devnet genesis mismatch');
   const { context, value } = await rpc('getMultipleAccounts', [[credential, schema, address], {
     encoding: 'base64', commitment: 'finalized',
   }]);
-  const issuer = decoded(value[0], 1, getCredentialDecoder());
-  const layout = decoded(value[1], 2, getSchemaDecoder());
+  const issuer = decodeCredential(value[0]);
+  const layout = decodeReceiptSchema(value[1], credential);
   const attestation = decoded(value[2], 0, getAttestationDecoder());
-  if (layout.credential !== credential || Buffer.from(layout.name).toString() !== name ||
-      layout.version !== 1 || layout.isPaused || !Buffer.from(layout.layout).equals(Buffer.from([12])) ||
-      !Buffer.from(layout.fieldNames).equals(fields)) throw new Error('Unexpected or paused AGUS receipt schema');
   if (attestation.credential !== credential || attestation.schema !== schema || attestation.nonce !== nonce ||
       attestation.signer !== signer || !(issuer.authority === signer || issuer.authorizedSigners.includes(signer)) ||
       attestation.expiry <= BigInt(Math.floor(now / 1000)) ||
@@ -53,8 +60,10 @@ export async function verifyDevnetAttestation({ receipt, credential, signer, non
   return { address, schema, credential, signer, slot: context.slot, network: 'devnet', claim, scope: 'receipt-digest' };
 }
 
-async function publicRpc(method, params) {
-  const response = await fetch('https://api.devnet.solana.com', {
+export async function publicRpc(method, params, origin = 'https://api.devnet.solana.com') {
+  const endpoint = new URL(origin);
+  if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.hash) throw new Error('Use an approved HTTPS Devnet RPC');
+  const response = await fetch(endpoint, {
     method: 'POST', redirect: 'error', signal: AbortSignal.timeout(12_000),
     headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
   });

@@ -26,7 +26,7 @@ export function campaignRoute(state, user, route, method, input, config, now, re
   if (resource === 'campaigns') {
     if (!id && method === 'GET') {
       return { campaigns: Object.values(state.campaigns).filter(entry => entry.ownerId === user.id)
-        .slice(-50).reverse().map(campaignView) };
+        .slice(-50).reverse().map(campaignView), fundingNetwork: config.campaignChain?.network ?? null };
     }
     if (!id && method === 'POST') {
       const record = idempotencyRecord({ state, user, route: 'campaigns', rawKey: requestKey, body: input,

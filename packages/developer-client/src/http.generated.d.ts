@@ -1,4 +1,173 @@
 export interface paths {
+    "/api/v1/assignments/{assignmentId}/dispute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open a funded-assignment dispute */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    assignmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        reason: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            dispute: {
+                                [key: string]: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Stable error envelope */
+                default: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assignments/{assignmentId}/dispute/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve a dispute as an independent reviewer */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    assignmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        decision: "uphold" | "award";
+                        reason: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            dispute: {
+                                [key: string]: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Stable error envelope */
+                default: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assignments/{assignmentId}/payment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start or reconcile the accepted test-chain payout */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    assignmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            payout: components["schemas"]["CampaignTransfer"];
+                        };
+                    };
+                };
+                /** @description Stable error envelope */
+                default: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assignments/{assignmentId}/receipt": {
         parameters: {
             query?: never;
@@ -404,6 +573,8 @@ export interface paths {
                 content: {
                     "application/json": {
                         challenge: string;
+                        /** @enum {string} */
+                        client?: "android";
                         registrationToken?: string;
                     };
                 };
@@ -816,7 +987,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List owned campaigns in the local preview */
+        /** List owned campaigns and the configured test funding network */
         get: {
             parameters: {
                 query?: never;
@@ -834,6 +1005,7 @@ export interface paths {
                     content: {
                         "application/json": {
                             campaigns: components["schemas"]["Campaign"][];
+                            fundingNetwork: components["schemas"]["CampaignNetwork"] | null;
                         };
                     };
                 };
@@ -1197,6 +1369,218 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaigns/{campaignId}/funding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read authoritative campaign funding and refund state */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    campaignId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            escrow: components["schemas"]["CampaignEscrow"] | null;
+                        };
+                    };
+                };
+                /** @description Stable error envelope */
+                default: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaigns/{campaignId}/funding/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lock the campaign revision and request a test funding quote */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    campaignId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        expectedRevision: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            escrow: components["schemas"]["CampaignEscrow"] | null;
+                        };
+                    };
+                };
+                /** @description Stable error envelope */
+                default: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaigns/{campaignId}/funding/refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request or reconcile the unused test balance */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    campaignId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            refund: components["schemas"]["CampaignTransfer"];
+                        };
+                    };
+                };
+                /** @description Stable error envelope */
+                default: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaigns/{campaignId}/funding/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify finalized funding for the exact quote */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    campaignId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        signature: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            escrow: components["schemas"]["CampaignEscrow"] | null;
+                        };
+                    };
+                };
+                /** @description Stable error envelope */
+                default: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -2323,7 +2707,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read nontransferable preview obligations */
+        /** Read nontransferable credits and authoritative funded earnings */
         get: {
             parameters: {
                 query?: never;
@@ -2340,9 +2724,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            earnings: {
-                                [key: string]: unknown;
-                            };
+                            earnings: components["schemas"]["CampaignEarnings"];
                         };
                     };
                 };
@@ -5292,10 +5674,12 @@ export interface components {
             /** Format: uuid */
             campaignId: string;
             campaignRevision: number;
-            compensation?: {
+            compensation?: components["schemas"]["CampaignEntitlement"];
+            deadlineAt: number;
+            dispute?: {
                 [key: string]: unknown;
             };
-            deadlineAt: number;
+            disputeEligible?: boolean;
             eligibleInstallationIds?: string[];
             expiresAt: number;
             /** Format: uuid */
@@ -5330,6 +5714,7 @@ export interface components {
         Campaign: {
             assignmentIds: string[];
             createdAt: number;
+            fundingState?: string;
             /** Format: uuid */
             id: string;
             revision: number;
@@ -5351,6 +5736,65 @@ export interface components {
             /** @enum {string} */
             visibility?: "qualified_preview" | "invited";
         };
+        CampaignEarnings: {
+            /** @enum {string} */
+            asset: "TEST_UNITS";
+            funded: {
+                finalizedAtoms: string;
+                network: components["schemas"]["CampaignNetwork"];
+                pendingAtoms: string;
+                reviewAtoms: string;
+            }[];
+            records: components["schemas"]["CampaignEntitlement"][];
+            testUnits: number;
+            /** @constant */
+            transferable: false;
+        };
+        CampaignEntitlement: {
+            acceptedAt: number;
+            amountAtoms?: string;
+            /** Format: uuid */
+            assignmentId: string;
+            /** Format: uuid */
+            id: string;
+            network?: components["schemas"]["CampaignNetwork"];
+            payout?: components["schemas"]["CampaignTransfer"] | null;
+            /** @enum {string} */
+            state: "payout_eligible" | "test_obligation_recorded" | "unpaid_accepted";
+            testUnits: number;
+        };
+        CampaignEscrow: {
+            funding: {
+                [key: string]: unknown;
+            } | null;
+            quote: components["schemas"]["CampaignQuote"];
+            refund: components["schemas"]["CampaignTransfer"] | null;
+        };
+        CampaignNetwork: {
+            /** @enum {string} */
+            asset: "TEST-SPL" | "USDC";
+            /** @enum {string} */
+            cluster: "localnet" | "devnet";
+            decimals: number;
+            genesis: string;
+            mint: string;
+        };
+        CampaignQuote: {
+            afterSlot: number;
+            amountAtoms: string;
+            createdAt: number;
+            deposit: string;
+            destination: string;
+            expiresAt: number;
+            funder: string;
+            memo: string;
+            network: components["schemas"]["CampaignNetwork"];
+            /** Format: uuid */
+            reference: string;
+            revision: number;
+            revisionSha256: string;
+            source: string;
+        };
         CampaignReport: {
             acceptedTestUnits: number;
             assignments: components["schemas"]["Assignment"][];
@@ -5365,6 +5809,7 @@ export interface components {
             budgetTestUnits: number;
             contributorIds: string[];
             deadlineAt: number;
+            fundingAmountAtoms?: string;
             objective: string;
             /** Format: uuid */
             projectId: string;
@@ -5382,6 +5827,10 @@ export interface components {
             actions?: ("describe" | "advance")[];
             /** Format: uuid */
             buildId: string;
+            compensation?: {
+                amountAtoms: string;
+                partialAtoms?: string;
+            };
             count: number;
             expectedTransaction?: components["schemas"]["TransactionExpectation"];
             instructions: string;
@@ -5400,6 +5849,16 @@ export interface components {
             testUnits?: number;
             title: string;
             trainingEligible?: boolean;
+        };
+        CampaignTransfer: {
+            amountAtoms: string;
+            reason?: string;
+            receipt?: {
+                [key: string]: unknown;
+            };
+            signature?: string;
+            /** @enum {string} */
+            state: "empty" | "ready" | "submitted_or_unknown" | "needs_review" | "finalized";
         };
         Constraints: {
             chargingRequired: boolean;
