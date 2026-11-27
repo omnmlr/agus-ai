@@ -2,6 +2,12 @@
 
 Resumed from `79e63ec43c78e4c681a01efb6f13fbdd5ae68055` on the product feature branch. The Cloud environment reported its updated egress policy as enforced. The existing Gemini key returned HTTP 200 from the model API and generated valid planner responses with `gemini-3.5-flash-lite` in the synthetic adapter smoke test. The configured 3.1 Flash-Lite model returned HTTP 503 during the initial generation checks. Google OpenID discovery and GitHub API reads succeeded. The unauthenticated Resend API answered HTTP 401.
 
+## Gemini on Android
+
+The Cloud machine lacks KVM. The Android 15 AOSP x86-64 emulator booted with software CPU emulation and the dedicated runner enrolled. Gemini selected an action that started the pinned test APK through ADB. Android System UI and launcher error dialogs covered the activity, so the runner could not verify the foreground app and the private lease expired. The warm-boot retry also lost Android framework services after System UI failed to start. The session produced no passing Gemini Android receipt and no Gemini-driven wallet finality.
+
+The harness now waits for the declared lease and reconciliation and supports a bounded ADB command timeout for software-emulated acceptance. The next acceptance run needs a stable KVM-enabled AVD or an authorized dedicated Android device with the existing Gemini binding. The GitHub integration could push code but returned HTTP 403 when checking Actions secret metadata. Use the [Android runner procedure](../../services/provider-runner/README.md#model-driven-acceptance).
+
 ## Devnet
 
 Public Solana RPC returned the pinned Devnet genesis. Finalized reads found the Circle test USDC mint and the executable SAS program `22zoJMtdu4tQc2PzL74ZUT7FrwgB1Udec8DdW4yw4BdG`. No original role files were available in the accessible workspace. The restricted replacement signer set had zero finalized SOL balances and its three campaign associated token accounts were absent.
