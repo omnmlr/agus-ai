@@ -80,7 +80,7 @@ export function createNeonHandler({ assets, createService, reportError = () => {
   return {
     async fetch(request) {
       const url = new URL(request.url);
-      if (url.pathname === '/health' || url.pathname === '/api/v1' || url.pathname.startsWith('/api/v1/')) {
+      if (['/health', '/api/v1', '/.well-known/assetlinks.json', '/auth/android'].includes(url.pathname) || url.pathname.startsWith('/api/v1/')) {
         try {
           return await proxyToControlPlane(await getPort(), request, url);
         } catch (error) {

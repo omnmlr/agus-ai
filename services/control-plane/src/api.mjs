@@ -1,7 +1,7 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { developerSession, logout, refreshSession, updateProfile } from './accounts.mjs';
-import { finishGoogle, googleCallback, startEmailOtp, startGoogle, verifyEmailOtp } from './identity.mjs';
+import { androidAuthPath, finishGoogle, googleCallback, startEmailOtp, startGoogle, verifyEmailOtp } from './identity.mjs';
 import {
   authSession, createRun, getOwned, newAction, notice, publicBuild, publicDevice,
   publicProject, publicRun, publicUser, requestStop, timestamp, validPackage, visibleTo,
@@ -19,6 +19,16 @@ import {
 } from './security.mjs';
 
 const MiB = 1024 * 1024;
+const androidReturnScript = `
+  const fragment = location.hash;
+  if (/^#(?:authCode=[A-Za-z0-9_-]{43}|authError=(?:google_declined|google_unavailable|registration_required))&attempt=[a-f0-9]{64}$/.test(fragment)) {
+    const link = document.querySelector('a');
+    link.href = 'intent://agusai.grindcity.app/auth/android' + fragment + '#Intent;scheme=https;action=android.intent.action.VIEW;package=app.agus.companion;end';
+    link.hidden = false;
+    history.replaceState(null, '', location.pathname);
+  }
+`;
+const androidReturnHash = createHash('sha256').update(androidReturnScript).digest('base64');
 
 export function createApi({ store, config, settlement }) {
   const authLimits = new Map();
@@ -41,6 +51,20 @@ export function createApi({ store, config, settlement }) {
 
     try {
       const url = new URL(request.url, 'http://control-plane.invalid');
+      if (config.androidAppLinks && ['GET', 'HEAD'].includes(request.method)) {
+        if (url.pathname === '/.well-known/assetlinks.json') {
+          response.writeHead(200, { 'Content-Type': 'application/json' })
+            .end(request.method === 'HEAD' ? undefined : JSON.stringify(config.androidAppLinks));
+          return;
+        }
+        if (url.pathname === androidAuthPath) {
+          response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8',
+            'Content-Security-Policy': `default-src 'none'; script-src 'sha256-${androidReturnHash}'; base-uri 'none'; frame-ancestors 'none'`,
+            'Referrer-Policy': 'no-referrer' }).end(request.method === 'HEAD' ? undefined :
+            `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Return to AGUS AI</title><h1>Return to AGUS AI</h1><p><a hidden>Open AGUS AI Companion</a></p><p>If the app does not open, enable its supported links in Android settings and start sign-in again.</p><script>${androidReturnScript}</script></html>`);
+          return;
+        }
+      }
       if (url.pathname === '/health' && request.method === 'GET') {
         try {
           await store.health();

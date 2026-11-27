@@ -2,7 +2,7 @@ import { purgeExpiredCampaignEvidence } from './campaign-retention.mjs';
 import { createServer } from 'node:http';
 import { createApi } from './api.mjs';
 import { pilotConfig } from './pilot-policy.mjs';
-import { identityConfig } from './identity.mjs';
+import { androidAppLinks, identityConfig } from './identity.mjs';
 import { createFileStore, createPgStore } from './store.mjs';
 
 function number(raw, fallback, min, max) {
@@ -40,6 +40,7 @@ export function configFromEnv(env) {
     idempotencySecret: env.AGUS_IDEMPOTENCY_SECRET ?? providerBootstrapToken,
     registrationToken: env.AGUS_REGISTRATION_TOKEN,
     identity: identityConfig(env),
+    androidAppLinks: androidAppLinks(env),
     pilot: pilotConfig(env),
     corsOrigin: env.AGUS_CORS_ORIGIN,
     publicOrigin: env.AGUS_PUBLIC_ORIGIN,

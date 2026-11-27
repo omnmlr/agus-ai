@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { digest } from '../src/security.mjs';
 import { developerSession, logout, refreshSession, updateProfile } from '../src/accounts.mjs';
-import { finishGoogle, googleCallback, startEmailOtp, startGoogle, verifyEmailOtp } from '../src/identity.mjs';
+import { androidAppLinks, androidAuthOrigin, finishGoogle, googleCallback, startEmailOtp, startGoogle, verifyEmailOtp } from '../src/identity.mjs';
 
 function fixture() {
   const state = { users: {}, sessions: {} };
@@ -96,4 +96,26 @@ test('Google PKCE callback exchange binds the verified email to the originating 
   await assert.rejects(refreshSession({ store, credential: session.token, now: config.now() }), { code: 'unauthorized' });
   await logout({ store, credential: rotated.token, now: config.now() });
   await assert.rejects(refreshSession({ store, credential: rotated.token, now: config.now() }), { code: 'unauthorized' });
+});
+
+test('Android Google returns only to the approved App Link and binds cancellation to the attempt', async () => {
+  const { store, config } = fixture();
+  const challenge = digest('a'.repeat(64));
+  const start = () => startGoogle({ store, config, input: { client: 'android', challenge, returnUrl: 'https://different.invalid' } });
+  await assert.rejects(start(), { code: 'identity_unavailable' });
+  const fingerprint = '12:'.repeat(31) + 'AB';
+  assert.throws(() => androidAppLinks({ AGUS_ANDROID_CERT_SHA256: fingerprint, AGUS_PUBLIC_ORIGIN: 'https://different.invalid' }));
+  config.androidAppLinks = androidAppLinks({ AGUS_ANDROID_CERT_SHA256: fingerprint, AGUS_PUBLIC_ORIGIN: androidAuthOrigin });
+  assert.equal(config.androidAppLinks[0].target.package_name, 'app.agus.companion');
+  config.identity.google.callback = androidAuthOrigin + '/api/v1/auth/google/callback';
+  const { url } = await start();
+  const state = new URL(url).searchParams.get('state');
+  const query = new URLSearchParams({ state, error: 'access_denied' });
+  const returned = new URL(await googleCallback({ store, config, query }));
+  assert.equal(returned.origin + returned.pathname, androidAuthOrigin + '/auth/android');
+  assert.equal(returned.search, '');
+  assert.deepEqual(Object.fromEntries(new URLSearchParams(returned.hash.slice(1))), {
+    attempt: challenge, authError: 'google_declined',
+  });
+  await assert.rejects(googleCallback({ store, config, query }), { code: 'invalid_oauth_state' });
 });

@@ -2,6 +2,12 @@ plugins {
     id 'com.android.application'
 }
 
+def signing = ['AGUS_ANDROID_KEYSTORE_FILE', 'AGUS_ANDROID_KEYSTORE_PASSWORD', 'AGUS_ANDROID_KEY_ALIAS',
+               'AGUS_ANDROID_KEY_PASSWORD'].collect { System.getenv(it) }
+if (signing.any { it } && !signing.every { it }) {
+    throw new GradleException('Set all four AGUS Android release signing environment variables')
+}
+
 android {
     namespace 'app.agus.companion'
     compileSdk 35
@@ -16,6 +22,18 @@ android {
 
     buildFeatures {
         buildConfig true
+    }
+
+    if (signing.every { it }) {
+        signingConfigs {
+            release {
+                storeFile file(signing[0])
+                storePassword signing[1]
+                keyAlias signing[2]
+                keyPassword signing[3]
+            }
+        }
+        buildTypes.release.signingConfig signingConfigs.release
     }
 
     compileOptions {

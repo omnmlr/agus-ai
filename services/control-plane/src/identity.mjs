@@ -6,6 +6,20 @@ import { digest, equalSecret, HttpError, requireCondition, string, token } from 
 const ttl = 10 * 60_000;
 const cooldown = 60_000;
 const maxOtpAttempts = 5;
+export const androidAuthOrigin = 'https://agusai.grindcity.app';
+export const androidAuthPath = '/auth/android';
+
+export function androidAppLinks(env) {
+  if (!env.AGUS_ANDROID_CERT_SHA256) return null;
+  const fingerprints = [...new Set(env.AGUS_ANDROID_CERT_SHA256.split(',').map(value => value.trim().toUpperCase()))];
+  if (env.AGUS_PUBLIC_ORIGIN !== androidAuthOrigin || fingerprints.length > 4 ||
+    fingerprints.some(value => !/^(?:[A-F0-9]{2}:){31}[A-F0-9]{2}$/.test(value))) {
+    throw new Error('AGUS_ANDROID_CERT_SHA256 requires the AGUS HTTPS origin and Android signing certificate fingerprints');
+  }
+  return [{ relation: ['delegate_permission/common.handle_all_urls'], target: {
+    namespace: 'android_app', package_name: 'app.agus.companion', sha256_cert_fingerprints: fingerprints,
+  } }];
+}
 
 function navigationUrl(raw, name) {
   const url = new URL(raw);
@@ -113,6 +127,11 @@ function validClientProof(value, label) {
 export async function startGoogle({ store, input, config, now = config.now() }) {
   const channel = active(config, 'google');
   const challenge = validClientProof(input.challenge, 'client challenge');
+  requireCondition(input.client === undefined || input.client === 'android', 'Unsupported sign-in client');
+  if (input.client === 'android') {
+    requireCondition(config.androidAppLinks && new URL(channel.callback).origin === androidAuthOrigin,
+      'Android Google sign-in is unavailable', 'identity_unavailable', 503);
+  }
   const stateToken = token();
   const verifier = token();
   await store.transaction((state) => {
@@ -121,7 +140,7 @@ export async function startGoogle({ store, input, config, now = config.now() }) 
       if (value.expiresAt <= now) delete pending[key];
     }
     pending[digest(stateToken)] = {
-      verifier, clientChallenge: challenge, expiresAt: now + ttl,
+      verifier, clientChallenge: challenge, expiresAt: now + ttl, client: input.client,
       registrationAllowed: registrationAllowed(config, input.registrationToken),
     };
   });
@@ -144,10 +163,15 @@ export async function googleCallback({ store, config, query, fetchImpl = fetch }
     return value?.expiresAt > now ? value : null;
   });
   requireCondition(authorization, 'The sign-in request is invalid or expired', 'invalid_oauth_state', 401);
-  const target = new URL(channel.returnUrl);
-  if (query.has('error')) {
-    target.hash = new URLSearchParams({ authError: 'google_declined' });
+  const android = authorization.client === 'android';
+  const target = new URL(android ? androidAuthPath : channel.returnUrl, androidAuthOrigin);
+  function returned(result) {
+    if (android) result.attempt = authorization.clientChallenge;
+    target.hash = new URLSearchParams(result);
     return target.href;
+  }
+  if (query.has('error')) {
+    return returned({ authError: 'google_declined' });
   }
   let email;
   let googleSubject;
@@ -177,8 +201,7 @@ export async function googleCallback({ store, config, query, fetchImpl = fetch }
       throw new Error('email authority');
     }
   } catch {
-    target.hash = new URLSearchParams({ authError: 'google_unavailable' });
-    return target.href;
+    return returned({ authError: 'google_unavailable' });
   }
   const exchange = token();
   const accepted = await store.transaction((state) => {
@@ -188,11 +211,12 @@ export async function googleCallback({ store, config, query, fetchImpl = fetch }
     for (const [key, value] of Object.entries(pending)) {
       if (value.expiresAt <= now) delete pending[key];
     }
-    pending[digest(exchange)] = { email, googleSubject, challenge: authorization.clientChallenge, expiresAt: now + 120_000 };
+    pending[digest(exchange)] = {
+      email, googleSubject, challenge: authorization.clientChallenge, expiresAt: config.now() + 120_000,
+    };
     return true;
   });
-  target.hash = new URLSearchParams(accepted ? { authCode: exchange } : { authError: 'registration_required' });
-  return target.href;
+  return returned(accepted ? { authCode: exchange } : { authError: 'registration_required' });
 }
 
 export async function finishGoogle({ store, input, config }) {

@@ -28,6 +28,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import java.io.IOException;
 import java.net.URI;
+import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Objects;
@@ -38,6 +39,7 @@ import org.json.JSONObject;
 
 public final class MainActivity extends Activity {
     private static final long REFRESH_INTERVAL_MS = 10_000;
+    private static final long GOOGLE_ATTEMPT_MS = 10 * 60_000;
 
     enum Screen {
         WELCOME, AUTH, ENROLLMENT, HOME, MY_DEVICE, ACTIVITY, JOB_DETAILS,
@@ -93,6 +95,7 @@ public final class MainActivity extends Activity {
     private ScrollView scroll;
     private TextView statusView;
     private Session session;
+    private AuthStorage authStorage;
     private boolean loading;
     private boolean mutating;
     private int mutationVersion;
@@ -106,6 +109,7 @@ public final class MainActivity extends Activity {
         }
         ui = new CompanionViews(this);
         screens = new ProviderScreens(this);
+        authStorage = new AuthStorage(this);
         Retained retained = (Retained) getLastNonConfigurationInstance();
         if (retained != null) {
             session = retained.session;
@@ -118,9 +122,29 @@ public final class MainActivity extends Activity {
             selectedOffer = retained.selectedOffer;
             selectedOfferDeviceId = retained.selectedOfferDeviceId;
             snapshot = retained.snapshot;
+        } else {
+            JSONObject saved = authStorage.read("session");
+            if (saved != null) {
+                try {
+                    Session restored = new Session(ApiOrigin.parse(saved.getString("origin"), BuildConfig.DEBUG),
+                        saved.getJSONObject("response"));
+                    if (restored.expiresAt <= System.currentTimeMillis()) throw new JSONException("Expired session");
+                    session = restored;
+                    screen = Screen.HOME;
+                } catch (IllegalArgumentException | JSONException invalid) {
+                    authStorage.clear("session");
+                }
+            }
+            if (session == null && googlePending() != null) screen = Screen.AUTH;
         }
         render(false);
+        handleGoogleReturn(getIntent());
         refresh(false);
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        handleGoogleReturn(intent);
     }
 
     @Override public Object onRetainNonConfigurationInstance() {
@@ -147,6 +171,7 @@ public final class MainActivity extends Activity {
 
     @Override public void onBackPressed() {
         if (screen == Screen.AUTH) {
+            authStorage.clear("google");
             navigate(Screen.WELCOME, null);
         } else if (screen == Screen.ENROLLMENT || screen == Screen.MY_DEVICE || screen == Screen.PROFILE) {
             navigate(mainTab, null);
@@ -266,6 +291,128 @@ public final class MainActivity extends Activity {
             verify ? "Checking sign-in code…" : "Requesting email code…", verify);
     }
 
+    private JSONObject googlePending() {
+        JSONObject pending = authStorage.read("google");
+        if (pending != null && pending.optLong("expiresAt") > System.currentTimeMillis()) return pending;
+        if (pending != null) authStorage.clear("google");
+        return null;
+    }
+
+    void cancelGoogle() {
+        authStorage.clear("google");
+        status("Google sign-in cancelled. You can try again.", false);
+    }
+
+    void startGoogle(EditText originField, EditText registrationField) {
+        if (mutating) return;
+        try {
+            if (!GoogleSignIn.ORIGIN.equals(ApiOrigin.parse(originField.getText().toString(), false))) {
+                statusError("Continue with Google is available at agusai.grindcity.app.");
+                return;
+            }
+        } catch (IllegalArgumentException invalid) {
+            statusError(invalid.getMessage());
+            return;
+        }
+        String verifier = GoogleSignIn.verifier();
+        String registration = registrationField.getText().toString().trim();
+        mutating = true;
+        status("Opening Google sign-in…", false);
+        network.execute(() -> {
+            try {
+                JSONObject body = new JSONObject().put("client", "android").put("challenge", GoogleSignIn.challenge(verifier));
+                if (!registration.isEmpty()) body.put("registrationToken", registration);
+                JSONObject reply = new ApiClient(GoogleSignIn.ORIGIN, null).post("/auth/google/start", body);
+                URI browser = URI.create(reply.getString("url"));
+                if (!GoogleSignIn.browserUrl(browser)) throw new IOException("Unexpected Google sign-in URL");
+                runOnUiThread(() -> {
+                    mutating = false;
+                    if (isDestroyed() || screen != Screen.AUTH) return;
+                    try {
+                        authStorage.write("google", new JSONObject().put("verifier", verifier)
+                            .put("expiresAt", System.currentTimeMillis() + GOOGLE_ATTEMPT_MS));
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(browser.toString())).addCategory(Intent.CATEGORY_BROWSABLE));
+                        status("Finish in your browser or cancel here and try again.", false);
+                    } catch (ActivityNotFoundException | GeneralSecurityException | JSONException unavailable) {
+                        authStorage.clear("google");
+                        statusError("Could not open secure Google sign-in. Check that a browser is available and try again.");
+                    }
+                });
+            } catch (IOException | JSONException | IllegalArgumentException failure) {
+                runOnUiThread(() -> authFailed(failure));
+            }
+        });
+    }
+
+    private void handleGoogleReturn(Intent intent) {
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction()) || intent.getData() == null) return;
+        if (mutating || session != null) return;
+        JSONObject pending = googlePending();
+        if (pending == null) return;
+        String verifier = pending.optString("verifier");
+        java.util.regex.Matcher callback;
+        try {
+            callback = GoogleSignIn.callback(URI.create(intent.getDataString()), verifier);
+        } catch (IllegalArgumentException invalid) {
+            return;
+        }
+        if (callback == null || !authStorage.clear("google")) return;
+        intent.setData(null);
+        navigate(Screen.AUTH, null);
+        if (callback.group(2) != null) {
+            String message = switch (callback.group(2)) {
+                case "google_declined" -> "Google sign-in was cancelled. You can try again.";
+                case "registration_required" -> "An approved registration invite is required.";
+                default -> "Google sign-in is unavailable. Try again or use another method.";
+            };
+            statusError(message);
+            return;
+        }
+        String code = callback.group(1).substring("authCode=".length());
+        mutating = true;
+        status("Finishing Google sign-in…", false);
+        network.execute(() -> {
+            try {
+                JSONObject reply = new ApiClient(GoogleSignIn.ORIGIN, null).post("/auth/google/exchange",
+                    new JSONObject().put("code", code).put("verifier", verifier));
+                Session next = new Session(GoogleSignIn.ORIGIN, reply);
+                runOnUiThread(() -> acceptSession(next));
+            } catch (IOException | JSONException failure) {
+                runOnUiThread(() -> authFailed(failure));
+            }
+        });
+    }
+
+    private void authFailed(Exception failure) {
+        mutating = false;
+        if (!isDestroyed() && screen == Screen.AUTH) statusError(errorMessage(failure));
+    }
+
+    private void acceptSession(Session next) {
+        mutating = false;
+        if (isDestroyed()) return;
+        if (screen != Screen.AUTH || !saveSession(next)) {
+            revoke(next);
+            return;
+        }
+        authStorage.clear("google");
+        session = next;
+        remember("control_plane_origin", next.origin.toString());
+        navigate(Screen.HOME, null);
+        if (pendingInvitationCode != null) reviewCode(pendingInvitationCode);
+    }
+
+    private boolean saveSession(Session next) {
+        try {
+            authStorage.write("session", new JSONObject().put("origin", next.origin.toString()).put("response", next.response));
+            return true;
+        } catch (GeneralSecurityException | JSONException unavailable) {
+            authStorage.clear("session");
+            statusError("Secure session storage is unavailable. Unlock Android and sign in again.");
+            return false;
+        }
+    }
+
     private void authRequest(String path, EditText originField, EditText emailField, String key, String value,
         String registrationToken, String progress, boolean createsSession) {
         if (mutating) {
@@ -311,12 +458,7 @@ public final class MainActivity extends Activity {
                         status("If email sign-in is enabled for this address, check your inbox for a code.", false);
                         return;
                     }
-                    session = newSession;
-                    remember("control_plane_origin", origin.toString());
-                    navigate(Screen.HOME, null);
-                    if (pendingInvitationCode != null) {
-                        reviewCode(pendingInvitationCode);
-                    }
+                    acceptSession(newSession);
                 });
             } catch (IOException | JSONException failure) {
                 runOnUiThread(() -> {
@@ -397,7 +539,14 @@ public final class MainActivity extends Activity {
         current.lastRefreshAttempt = System.currentTimeMillis();
         perform("Refreshing session…", api -> api.post("/auth/refresh", new JSONObject()), result -> {
             try {
-                session = new Session(current.origin, result);
+                Session rotated = new Session(current.origin, result);
+                if (!saveSession(rotated)) {
+                    signOut(false);
+                    revoke(rotated);
+                    statusError("Secure session storage is unavailable. Sign in again.");
+                    return;
+                }
+                session = rotated;
                 refresh(false);
             } catch (JSONException invalid) {
                 signOut(false);
@@ -475,6 +624,8 @@ public final class MainActivity extends Activity {
     void signOut(boolean revoke) {
         Session old = session;
         session = null;
+        authStorage.clear("session");
+        authStorage.clear("google");
         snapshot = null;
         loading = false;
         mutating = false;
@@ -676,6 +827,7 @@ public final class MainActivity extends Activity {
 
     private static final class Session {
         final URI origin;
+        final JSONObject response;
         final ProviderApi api;
         final String email;
         final long expiresAt;
@@ -683,13 +835,14 @@ public final class MainActivity extends Activity {
 
         Session(URI origin, JSONObject response) throws JSONException {
             this.origin = origin;
+            this.response = response;
             this.api = new ProviderApi(new ApiClient(origin, response.getString("token")));
             this.email = response.getJSONObject("user").getString("email");
             long expiry;
             try {
                 expiry = Instant.parse(response.optString("expiresAt")).toEpochMilli();
             } catch (DateTimeParseException invalid) {
-                expiry = Long.MAX_VALUE;
+                throw new JSONException("Invalid session expiration");
             }
             this.expiresAt = expiry;
         }

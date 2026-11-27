@@ -9,7 +9,7 @@
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 	}
-	@backend path /health /api/v1 /api/v1/*
+	@backend path /health /api/v1 /api/v1/* /.well-known/assetlinks.json /auth/android
 	@invite path /invite
 	handle @invite {
 		header Cache-Control no-store

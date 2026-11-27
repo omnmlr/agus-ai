@@ -65,13 +65,16 @@ final class ProviderScreens {
         LinearLayout card = ui.card(content);
         EditText origin = input(card, "Control-plane origin", "https://control-plane.example",
             InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI, R.id.auth_origin);
-        origin.setText(host.preference("control_plane_origin"));
+        String savedOrigin = host.preference("control_plane_origin");
+        origin.setText(savedOrigin.isEmpty() ? GoogleSignIn.ORIGIN.toString() : savedOrigin);
         EditText email = input(card, "Email", "you@example.com", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, R.id.auth_email);
         EditText password = input(card, "Password", "Password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD, R.id.auth_password);
         EditText registration = input(card, "Registration invite (if required)", "Pilot access code",
             InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD, R.id.auth_registration_token);
         button(card, "Sign in", R.id.auth_sign_in, true, view -> host.authenticate(false, origin, email, password, registration));
         button(card, "Create account", R.id.auth_register, false, view -> host.authenticate(true, origin, email, password, registration));
+        button(card, "Continue with Google", 0, false, view -> host.startGoogle(origin, registration));
+        button(card, "Cancel Google sign-in", 0, false, view -> host.cancelGoogle());
         LinearLayout emailCode = ui.card(content);
         ui.add(emailCode, ui.heading("Email code", 18), 0);
         EditText code = input(emailCode, "Six-digit code", "000000", InputType.TYPE_CLASS_NUMBER, R.id.auth_email_code);
