@@ -1,0 +1,8 @@
+[
+  "Android-managed profile created with visible system approval",
+  "human profile enrollment, signed evidence, cleanup and submission passed",
+  "owner-stop independently suspended the fixture and confirmed cleanup",
+  "offline independently suspended the fixture and confirmed cleanup",
+  "cooperative profile enrollment, signed evidence, cleanup and submission passed",
+  "Personal launcher restored after removing the test profile"
+]

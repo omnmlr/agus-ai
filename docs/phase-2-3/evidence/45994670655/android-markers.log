@@ -1,0 +1,17 @@
+--------- beginning of main
+I/AgusPreview( 3049): PROFILE_PERSON_AUTHENTICATED
+I/AgusPreview( 3049): PROFILE_RUNTIME_ENROLLED
+I/AgusPreview( 3049): PROFILE_WINDOW_OPEN
+I/AgusPreview( 3049): PROFILE_LEASE_CLAIMED
+I/AgusPreview( 3049): PROFILE_INSTALL_POLICY_RESTORED
+I/AgusPreview( 3049): install_status_0
+I/AgusPreview( 3049): WATCHDOG_OWNER_STOP
+I/AgusPreview( 3049): WATCHDOG_SERVER_FENCED
+I/AgusPreview( 3049): remove_status_0
+I/AgusPreview( 3049): PROFILE_CLEANED
+I/AgusPreview( 3049): PROFILE_WINDOW_OPEN
+I/AgusPreview( 3049): PROFILE_LEASE_CLAIMED
+I/AgusPreview( 3049): install_status_0
+I/AgusPreview( 3049): WATCHDOG_AUTHORITY_LOST
+I/AgusPreview( 3049): remove_status_0
+I/AgusPreview( 3049): PROFILE_CLEANED

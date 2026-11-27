@@ -1,0 +1,48 @@
+{
+  "receipt": {
+    "manifest": {
+      "encoding": "base64",
+      "alg": "ECDSA-P256-SHA256-DER",
+      "keyId": "e726c6a32137dd6ec0f21599189d45ac6f4758e769ec53600e7522d7961345d0",
+      "payload": "eyJhY3Rpb25Db250cmFjdCI6ImNvb3BlcmF0aXZlLXYxIiwiYWN0aW9ucyI6WyJkZXNjcmliZSIsImFkdmFuY2UiLCJkZXNjcmliZSJdLCJhc3NpZ25tZW50SWQiOiJhZTE2MjcyNC01YWIzLTQ4MTUtYTBkYy1kY2E3MjdhNjE2YjEiLCJhdHRlbXB0SWQiOiIyYTUwNDdmYS0xM2RjLTQ1ZjEtYTZmYi04NmVmZTMwMDE3M2EiLCJhdWRpZW5jZSI6ImRmOWRlZjQ3LTJhMGYtNDQ3Yi04MzI3LTliZjgwZjIwMjgyMCIsImJ1aWxkIjp7ImNvbXBvbmVudCI6ImFwcC5hZ3VzLnByZXZpZXcuZml4dHVyZS5UZXN0QWN0aXZpdHkiLCJpZCI6ImE4OGM1OTIxLTRkZmQtNGJjYy04MTM5LTIyNGEzZmQ5MDhhMiIsInBhY2thZ2VOYW1lIjoiYXBwLmFndXMucHJldmlldy5maXh0dXJlIiwic2hhMjU2IjoiYmM1MWNmMmFhNzliYWM0M2QyYWUxMmM5YTUzMjlmNTI0NGZiNzg4MjZiNGZlNjMxYjUwNzY1YTQzMTc4NGZjMCIsInNpZ25lclNoYTI1NiI6ImI1NmI1NmY2ZGUxNmE3YzA3NTQ4N2MwNDBmMWUxNzZiNDY3ZjZmMTRkN2FlOWQ3MTE5MjE1Yzc3MGEyZjAyNGUifSwiY2FtcGFpZ25SZXZpc2lvbiI6MSwiY2hhbGxlbmdlIjoiZEoteEc1cFBOd2JKclZvMjNWNF9OM21yaWFfUTAyejlEZXV3TXlMRTZzcyIsImRlYWRsaW5lIjoxNzk1NzgxMjEyMTMxLCJldmlkZW5jZSI6InN0cnVjdHVyZWRfb25seSIsImZlbmNlIjoxLCJpbnN0YWxsYXRpb25LZXlTaGEyNTYiOiJlOGEyNmE1NTM3NTczMTVkMTY0NDk4ZWZkMWY2NmQ2ODdjYTVlNmVlNGY1ZmMxMWJiMDk1MWMyODI3NzU1ZTRiIiwiaXNzdWVkQXQiOjE3OTU3ODEwMzIxMzEsImxlYXNlSWQiOiI0NDZiYjg1My01YTA1LTRkMWUtOTliYi1jMTU2Y2FhZmZlMTAiLCJvYnNlcnZhdGlvblNjaGVtYSI6ImZpeHR1cmUtcmVzdWx0LXYxIiwicG9saWN5VmVyc2lvbiI6Im1hbmFnZWQtcHJvZmlsZS12MSIsInJ1bnRpbWVDbGFzcyI6InBob25lX2Nvb3BlcmF0aXZlIiwidGFza0tpbmQiOiJhdXRvbWF0ZWRfdGVzdCIsInRlcm1zRGlnZXN0IjoiOGExODE2NmUzNjkxMmFmMGRhZGI1NjUxY2JkNTQwZjk0YjdmMjc5MzNhM2M0MDQ0YWZkN2E3NGZiODE0MmJjOCIsInR0bE1zIjo0NTAwMCwidHlwZSI6ImFndXMubmF0aXZlLndvcmtsb2FkIiwidiI6MX0=",
+      "sha256": "69f6f82461aea894df6c511800dad9d8c83eca4821aa8c92f697a28fbc1c871c",
+      "signature": "MEYCIQDxQ5Cb7H2DIqBOrEQ4DZ90BpBCKKKZAcYAifTzuViQHAIhAK9Nf/bWcQ/lNHIJZkTzE5juwaXhMyZDJ6w0iWr7i7wm"
+    },
+    "report": {
+      "sha256": "c9e2f4df529ba9377b09c25a90db510c134157483ec21740dd1565dff91db6ff",
+      "receivedAt": 1795781044312,
+      "proof": {
+        "payload": "eyJ2IjoxLCJraW5kIjoicmVwb3J0IiwiaW5zdGFsbGF0aW9uSWQiOiJkZjlkZWY0Ny0yYTBmLTQ0N2ItODMyNy05YmY4MGYyMDI4MjAiLCJsZWFzZUlkIjoiNDQ2YmI4NTMtNWEwNS00ZDFlLTk5YmItYzE1NmNhYWZmZTEwIiwiY2hhbGxlbmdlIjoiZEoteEc1cFBOd2JKclZvMjNWNF9OM21yaWFfUTAyejlEZXV3TXlMRTZzcyIsImZlbmNlIjoxLCJtYW5pZmVzdFNoYTI1NiI6IjY5ZjZmODI0NjFhZWE4OTRkZjZjNTExODAwZGFkOWQ4YzgzZWNhNDgyMWFhOGM5MmY2OTdhMjhmYmMxYzg3MWMiLCJvdXRjb21lIjoiY29tcGxldGVkIiwib2JzZXJ2YXRpb25zIjpbeyJhY3Rpb24iOiJkZXNjcmliZSIsInJlc3VsdCI6InJlYWR5In0seyJhY3Rpb24iOiJhZHZhbmNlIiwicmVzdWx0IjoiYWR2YW5jZWQifSx7ImFjdGlvbiI6ImRlc2NyaWJlIiwicmVzdWx0IjoicmVhZHkifV19",
+        "signature": "MEUCIECw+j0PVsUzYCX1jrJj3tXj5uZc0Hc8TBpzKId6CSBvAiEA/R4Dnrc048QqMhRkWOTxeewGE8ZZLlcmu4PhruJXmPo="
+      },
+      "outcome": "completed",
+      "observations": [
+        {
+          "action": "describe",
+          "result": "ready"
+        },
+        {
+          "action": "advance",
+          "result": "advanced"
+        },
+        {
+          "action": "describe",
+          "result": "ready"
+        }
+      ],
+      "evaluation": "passed",
+      "provenance": "installation_signed_preview_claim"
+    },
+    "cleanup": {
+      "sha256": "894ba0359b003e277ea4b3b0b17c420e3a3e2257e47fadd964adb082fe2cff10",
+      "confirmedAt": 1795781054550,
+      "proof": {
+        "payload": "eyJ2IjoxLCJraW5kIjoiY2xlYW51cCIsImluc3RhbGxhdGlvbklkIjoiZGY5ZGVmNDctMmEwZi00NDdiLTgzMjctOWJmODBmMjAyODIwIiwibGVhc2VJZCI6IjQ0NmJiODUzLTVhMDUtNGQxZS05OWJiLWMxNTZjYWFmZmUxMCIsImNoYWxsZW5nZSI6ImRKLXhHNXBQTndiSnJWbzIzVjRfTjNtcmlhX1EwMno5RGV1d015TEU2c3MiLCJmZW5jZSI6MSwibWFuaWZlc3RTaGEyNTYiOiI2OWY2ZjgyNDYxYWVhODk0ZGY2YzUxMTgwMGRhZDlkOGM4M2VjYTQ4MjFhYThjOTJmNjk3YTI4ZmJjMWM4NzFjIiwicGFja2FnZUFic2VudCI6dHJ1ZSwiaW5zdGFsbFJlc3RyaWN0ZWQiOnRydWV9",
+        "signature": "MEUCIQCKCFUriXnqkZt722XzHYVOd/KBBao9aSll9O0Ggj0dGgIgTriwAkHvGm4vYZ0YNg4oPMVPNT37r58MNmXth/tHNV8="
+      },
+      "provenance": "installation_signed_preview_claim"
+    },
+    "algorithm": "ECDSA-P256-SHA256-DER",
+    "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEiFNpPOC5XYLHX4Jlz8WV/Vuu9IOuYz3r4Rb48RSQdjhv67MkRhkh7mP4BYtVC+FEf9LZZbXbrdOe/qTQ1PR7uA=="
+  }
+}

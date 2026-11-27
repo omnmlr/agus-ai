@@ -2,7 +2,7 @@
 
 Use the [preview release matrix](functionality-matrix.md), [audit](audit.md) and [commercial dossier](../research/README.md). The public product and payments remain unavailable pending a separate decision.
 
-Start from branch `feature/phase-2-3-product`. The full AOSP campaign and offline receipt verification passed at `f408304949f48e80efd29ffcb49eccd2ce681094`. Compare the code and artifacts you test with the revision file in the run. [AOSP run](https://github.com/omnmlr/agus-ai/actions/runs/45993813578) · [Signed evidence](evidence/45993813578) · [Sanitized campaign report](evidence/45991796479/campaign-evidence.json)
+Start from branch `feature/phase-2-3-product`. The full AOSP campaign, staging-failure safety exercise and offline receipt verification passed at `b3f239f6e885a3f212e090d89909ef4281282671`. Compare the code and artifacts you test with the revision file in each run. [Full AOSP](https://github.com/omnmlr/agus-ai/actions/runs/45994668676) · [Safety](https://github.com/omnmlr/agus-ai/actions/runs/45994670655) · [Signed evidence](evidence/45994668676) · [Sanitized campaign report](evidence/45994668676/campaign-evidence.json)
 
 ## Antigravity assignment
 
