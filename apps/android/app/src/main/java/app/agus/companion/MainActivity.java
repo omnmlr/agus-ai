@@ -309,7 +309,7 @@ public final class MainActivity extends Activity {
     void startGoogle(EditText originField, EditText registrationField) {
         if (mutating) return;
         try {
-            if (!GoogleSignIn.ORIGIN.equals(ApiOrigin.parse(originField.getText().toString(), false))) {
+            if (!GoogleSignIn.ORIGIN.equals(authOrigin(originField, false))) {
                 statusError("Continue with Google is available at agusai.grindcity.app.");
                 return;
             }
@@ -405,6 +405,11 @@ public final class MainActivity extends Activity {
         if (!isDestroyed() && screen == Screen.AUTH) statusError(errorMessage(failure));
     }
 
+    private URI authOrigin(EditText field, boolean debug) {
+        String entered = field.getText().toString().trim();
+        return entered.isEmpty() ? GoogleSignIn.ORIGIN : ApiOrigin.parse(entered, debug);
+    }
+
     private void acceptSession(Session next) {
         mutating = false;
         if (isDestroyed()) return;
@@ -437,7 +442,7 @@ public final class MainActivity extends Activity {
         }
         URI origin;
         try {
-            origin = ApiOrigin.parse(originField.getText().toString(), BuildConfig.DEBUG);
+            origin = authOrigin(originField, BuildConfig.DEBUG);
         } catch (IllegalArgumentException invalid) {
             status(invalid.getMessage(), true);
             return;

@@ -63,10 +63,9 @@ final class ProviderScreens {
         heading(content, "Auth", host.pendingInvitationCode == null
             ? "Sign in to your provider workspace." : "Sign in to review the private invitation.");
         LinearLayout card = ui.card(content);
-        EditText origin = input(card, "Control-plane origin", "https://control-plane.example",
+        EditText origin = input(card, "Control-plane origin", GoogleSignIn.ORIGIN.toString(),
             InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI, R.id.auth_origin);
-        String savedOrigin = host.preference("control_plane_origin");
-        origin.setText(savedOrigin.isEmpty() ? GoogleSignIn.ORIGIN.toString() : savedOrigin);
+        origin.setText(host.preference("control_plane_origin"));
         EditText email = input(card, "Email", "you@example.com", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, R.id.auth_email);
         EditText password = input(card, "Password", "Password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD, R.id.auth_password);
         EditText registration = input(card, "Registration invite (if required)", "Pilot access code",
