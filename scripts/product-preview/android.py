@@ -206,7 +206,7 @@ def run():
             fill("Reproduction steps, one per line", "Open%sonboarding%sand%sinspect%sthe%sreview")
             fill("Expected outcome", "One%sonboarding%ssubmission")
             fill("Actual outcome", "Duplicate%ssubmission%sobserved" if mode == "human" else "Automated%sstep%spassed")
-            tap("Review submission")
+            tap("Review submission", scroll=False)
             tap("Send report", scroll=False)
             expect("PERSON_SUBMISSION_SAVED", finished)
             record(mode + " profile enrollment, signed evidence, cleanup and submission passed")

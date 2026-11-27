@@ -34,6 +34,7 @@ public class RuntimeActivity extends Activity {
     private static final int FIXTURE = 11;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private LinearLayout layout;
+    private LinearLayout screenRoot;
     private TextView message;
     private String person;
     private String personId;
@@ -58,12 +59,15 @@ public class RuntimeActivity extends Activity {
     }
 
     private void render() {
+        screenRoot = new LinearLayout(this);
+        screenRoot.setOrientation(LinearLayout.VERTICAL);
         var scroll = new ScrollView(this);
         layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(24, 28, 24, 24);
         scroll.addView(layout);
-        setContentView(scroll);
+        screenRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        setContentView(screenRoot);
         label("AGUS Phone Preview");
         message = label("");
         if (Build.VERSION.SDK_INT != 35 || !"ranchu".equals(Build.HARDWARE)
@@ -418,7 +422,7 @@ public class RuntimeActivity extends Activity {
             label(index + " · " + action.optString("type") + " · " + action.optString("status"));
         }
         var attempt = assignment.optJSONObject("attempt");
-        button("Review submission", () -> {
+        var review = makeButton("Review submission", () -> {
             JSONObject body = new JSONObject().put("attemptId", attempt.optString("id"))
                 .put("expectedVersion", attempt.optJSONArray("submissions").length())
                 .put("steps", new JSONArray(java.util.Arrays.asList(steps.getText().toString().split("\\n"))))
@@ -438,6 +442,7 @@ public class RuntimeActivity extends Activity {
                     return "Submission ready for developer review.";
                 })).show();
         });
+        screenRoot.addView(review, 0);
     }
 
     private Spinner choices(String... values) {
@@ -462,7 +467,9 @@ public class RuntimeActivity extends Activity {
         return value;
     }
 
-    private void button(String label, Click action) {
+    private void button(String label, Click action) { layout.addView(makeButton(label, action)); }
+
+    private Button makeButton(String label, Click action) {
         var button = new Button(this);
         button.setAllCaps(false);
         button.setText(label);
@@ -471,7 +478,7 @@ public class RuntimeActivity extends Activity {
             try { action.run(); }
             catch (Exception failure) { status(failure.getMessage()); }
         });
-        layout.addView(button);
+        return button;
     }
 
     private void status(String detail) { message.setText(detail == null ? "Action unavailable." : detail); }
