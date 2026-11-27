@@ -26,12 +26,12 @@ function restricted(info, isDirectory) {
   }
 }
 
-async function disposableSigner(directory, role) {
+async function disposableSigner(directory, role, existingOnly) {
   const file = resolve(directory, role + '.json');
   try {
     restricted(await lstat(file), false);
   } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
+    if (error.code !== 'ENOENT' || existingOnly) throw error;
     const { privateKey, publicKey } = generateKeyPairSync('ed25519');
     const seed = privateKey.export({ type: 'pkcs8', format: 'der' }).subarray(-32);
     const publicBytes = publicKey.export({ type: 'spki', format: 'der' }).subarray(-32);
@@ -63,9 +63,12 @@ async function prepareAccount(rpc, payer, ata) {
 const remaining = (target, actual) => (target > actual ? target - actual : 0n).toString();
 
 async function prepare(directory, campaignAtoms, flags) {
-  await mkdir(directory, { mode: 0o700, recursive: true });
+  const existingOnly = flags.includes('--existing-only');
+  if (!existingOnly) await mkdir(directory, { mode: 0o700, recursive: true });
   restricted(await lstat(directory), true);
-  const signers = await Promise.all(Object.keys(roles).map(async role => [role, await disposableSigner(directory, role)]));
+  const signers = await Promise.all(Object.keys(roles).map(async role => [
+    role, await disposableSigner(directory, role, existingOnly),
+  ]));
   if (new Set(signers.map(([, signer]) => signer.address)).size !== signers.length) throw new Error('Identity roles must have distinct addresses.');
   const rpc = connectDevnet(process.env.AGUS_SETTLEMENT_RPC_URL);
   let online = false;
@@ -89,13 +92,21 @@ async function prepare(directory, campaignAtoms, flags) {
     row.balanceStatus = 'finalized';
     row.balanceLamports = sol.toString();
     row.requiredFaucetLamports = remaining(target, sol);
-    if (sol < target && flags.includes('--airdrop') && !faucetUnavailable) {
-      await sendRpc(rpc.requestAirdrop(payer.address, target - sol, finalized)).then(signature => {
-        row.airdrop = { status: 'submitted', signature };
-      }, () => {
-        row.airdrop = { status: 'interactive_faucet_required' };
-        faucetUnavailable = true;
-      });
+    if (sol < target && flags.includes('--airdrop')) {
+      if (faucetUnavailable) {
+        row.airdrop = { status: 'skipped_after_faucet_failure' };
+      } else {
+        await sendRpc(rpc.requestAirdrop(payer.address, target - sol, finalized)).then(signature => {
+          row.airdrop = { status: 'submitted', signature };
+        }, error => {
+          const status = error.context?.statusCode;
+          row.airdrop = {
+            status: status === 410 ? 'interactive_faucet_required' : 'unavailable_or_unconfirmed',
+            ...(typeof status === 'number' ? { httpStatus: status } : {}),
+          };
+          faucetUnavailable = true;
+        });
+      }
     }
     if (!row.tokenAccount) continue;
     const account = () => sendRpc(rpc.getAccountInfo(row.tokenAccount, finalized)).then(result => result.value);
@@ -120,10 +131,15 @@ async function prepare(directory, campaignAtoms, flags) {
 
 const [directory, atoms, ...flags] = process.argv.slice(2);
 try {
-  if (!directory || !atoms || flags.some(flag => !['--addresses-only', '--airdrop', '--prepare-accounts'].includes(flag)) ||
-      (flags.includes('--addresses-only') && flags.length > 1)) throw new Error('Usage: prepare-devnet.mjs PRIVATE_DIRECTORY CAMPAIGN_ATOMS [--addresses-only | --airdrop --prepare-accounts]');
+  const allowed = ['--addresses-only', '--airdrop', '--prepare-accounts', '--existing-only'];
+  if (!directory || !atoms || flags.some(flag => !allowed.includes(flag)) ||
+      (flags.includes('--addresses-only') && (flags.includes('--airdrop') || flags.includes('--prepare-accounts')))) {
+    throw new Error('Invalid arguments');
+  }
   console.log(JSON.stringify(await prepare(resolve(directory), assertAmount(atoms), flags), null, 2));
 } catch (error) {
-  console.error(error.code === 'WRONG_CLUSTER' ? 'Refused RPC with a non-Devnet genesis.' : 'Devnet preparation failed. Check the arguments and private identity directory permissions.');
+  console.error(error.code === 'WRONG_CLUSTER' ? 'Refused RPC with a non-Devnet genesis.'
+    : error.code === 'ENOENT' && flags.includes('--existing-only') ? 'The existing identity directory or a required role file is missing.'
+    : 'Usage: prepare-devnet.mjs PRIVATE_DIRECTORY CAMPAIGN_ATOMS [--existing-only] [--addresses-only | --airdrop --prepare-accounts]. Check directory permissions.');
   process.exitCode = 1;
 }

@@ -46,13 +46,15 @@ Total reserve for fresh accounts is **0.27 Devnet SOL and 1.7 Devnet test USDC**
 ```bash
 npm ci --prefix services/settlement
 node services/settlement/prepare-devnet.mjs /path/to/private-identities 1700000 --addresses-only
-node services/settlement/prepare-devnet.mjs /path/to/private-identities 1700000 --airdrop --prepare-accounts
-node services/settlement/prepare-devnet.mjs /path/to/private-identities 1700000 --prepare-accounts
+node services/settlement/prepare-devnet.mjs /path/to/private-identities 1700000 --existing-only --airdrop --prepare-accounts
+node services/settlement/prepare-devnet.mjs /path/to/private-identities 1700000 --existing-only --prepare-accounts
 ```
 
 Use the existing restricted identity directory if you want these addresses. A new directory creates new addresses. Use an interactive Solana faucet only for the remaining SOL figures and an authorized test USDC faucet for the funder's remaining exact amount. Run the last command again to confirm final balances and associated token accounts. Keep separate authority and issuer roles. Use the nominated account wallet in Companion for funder and contributor ownership proof. A device-level wallet applies to dedicated runs.
 
 ## Founder activation checklist
+
+Use the [founder-controlled signing setup](founder-signing.md) to retain the approved identities across workspace changes.
 
 1. Download the checksum-verified artifacts and review the underlying evidence. Choose the approved companion and runtime signing identities. Keep every private signing key in the authorized secret store or restricted local service directory.
 2. Build the signed companion with `./gradlew assembleRelease` from `apps/android`. Set `AGUS_ANDROID_KEYSTORE_FILE`, `AGUS_ANDROID_KEYSTORE_PASSWORD`, `AGUS_ANDROID_KEY_ALIAS`, and `AGUS_ANDROID_KEY_PASSWORD` from the approved signing store. Verify the result with SDK 35 `apksigner verify --print-certs`. Convert the actual SHA-256 certificate digest to colon-delimited octets and bind it as `AGUS_ANDROID_CERT_SHA256` with `AGUS_PUBLIC_ORIGIN=https://agusai.grindcity.app`.
