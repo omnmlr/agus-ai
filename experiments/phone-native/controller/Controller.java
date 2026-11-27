@@ -105,8 +105,8 @@ public class Controller extends Activity {
             say("PROVISIONING_UNAVAILABLE");
             return;
         }
-        startActivity(new Intent(action).putExtra(
-                DevicePolicyManager.EXTRA_PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME, Admin.component(this)));
+        startActivityForResult(new Intent(action).putExtra(
+                DevicePolicyManager.EXTRA_PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME, Admin.component(this)), 10);
         mark("PROVISIONING_REQUESTED");
     }
 
@@ -204,6 +204,10 @@ public class Controller extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 10) {
+            mark(resultCode == RESULT_OK ? "PROVISIONING_UI_OK" : "PROVISIONING_UI_CANCELED");
+            return;
+        }
         if (requestCode != 11) return;
         String current = nonce;
         nonce = null;
