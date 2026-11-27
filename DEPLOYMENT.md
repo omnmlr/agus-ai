@@ -20,6 +20,8 @@ Add deployment environment variables using the Neon console or the deployment AP
 | `DATABASE_URL`, `DATABASE_URL_UNPOOLED` | Override both platform defaults with the same restricted URL so an injected owner credential never reaches the isolate. The application reads only `AGUS_DATABASE_URL`. |
 | `AGUS_PROVIDER_BOOTSTRAP_TOKEN` | Random app-specific enrollment token with at least 32 characters. Give it only to approved runner operators. |
 | `AGUS_REGISTRATION_TOKEN` | Independent invitation token for the demo's registered accounts. Bind it while signup is limited to invited testers. |
+| `AGUS_IDEMPOTENCY_SECRET` | Stable random app-specific secret for deriving opaque invitation tokens on valid retries. |
+| `AGUS_PUBLIC_ORIGIN` | Verified HTTPS origin for domain-bound payout-wallet ownership challenge. |
 | `AGUS_DEVNET_RPC_URL` | Optional approved Devnet RPC. The API defaults to `https://api.devnet.solana.com`. |
 | `AGUS_SETTLEMENT_ENABLED` | `0` for the Function bundle. Use the EC2 packaging below with a separately mounted disposable signer for settlement. |
 
@@ -89,3 +91,9 @@ For API or web rollback, reapply an earlier verified AGUS AI release using its f
 - GitHub's secret metadata call returned `403` from this integration. The destination listed no GitHub deployment environment during the initial audit.
 - The Netlify sites API returned `401` with the configured credential. Railway has an existing empty project called `refreshing-playfulness`, with billing eligibility unverified. The Vercel account search returned only the existing financial identity project. The isolated Neon Function is the first deployment path with confirmed Free plan eligibility.
 - Windows runner prerequisites and physical-device enrollment are documented in the provider runner's setup. A phone and its authorized operator are required for physical acceptance. No raw ADB port is part of the hosted package.
+
+## Activation checklist
+
+1. Deploy the tested bundle using an approved Neon credential path. Automatic review rejected this session's direct deployment with the scoped Postgres URI and newly generated application secrets. The isolated database and runtime role exist. The Function origin and persistent hosted app still need verification.
+2. For Google and email sign-in, bind `AGUS_GOOGLE_CLIENT_ID`, `AGUS_GOOGLE_CLIENT_SECRET`, `AGUS_GOOGLE_CALLBACK_URL`, `AGUS_AUTH_RETURN_URL`, `AGUS_RESEND_API_KEY`, `AGUS_AUTH_FROM_EMAIL`, and a fresh `AGUS_EMAIL_OTP_SECRET` in the dedicated app environment. Register the exact callback with the existing Google OAuth configuration and use an authorized Resend sender. Keep app registration and credentials scoped to AGUS AI.
+3. For live payout, give the operator a disposable Devnet signer and verify separate disposable developer and provider wallets. The public SOL faucet returned HTTP 410. Use the official sign-in/interactive faucets or authorized pre-funded accounts and follow the [settlement runbook](services/settlement/README.md).
