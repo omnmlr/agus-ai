@@ -10,13 +10,14 @@ import { createControlPlane } from '../../services/control-plane/src/server.mjs'
 import { digest } from '../../services/control-plane/src/security.mjs';
 import { createWebServer } from '../../apps/web/scripts/serve.mjs';
 import { enroll, heartbeat, leaseProof } from '../../services/control-plane/test-support/pilot-fixtures.mjs';
+import { verifyNativeReceipt } from '../../packages/developer-client/src/native-receipt.mjs';
 
 const directory = await mkdtemp(join(tmpdir(), 'agus-browser-'));
 const artifact = Buffer.from([80, 75, 3, 4, 1, 0, 0, 0]);
-const key = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey;
+const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
 const config = {
   AGUS_LOCAL_DATA_DIR: join(directory, 'state'), AGUS_PROVIDER_BOOTSTRAP_TOKEN: 'disposable-preview-test-only',
-  AGUS_PRODUCT_PILOT: '1', AGUS_NATIVE_MANIFEST_PKCS8: key.export({ format: 'der', type: 'pkcs8' }).toString('base64'),
+  AGUS_PRODUCT_PILOT: '1', AGUS_NATIVE_MANIFEST_PKCS8: privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64'),
   AGUS_NATIVE_REVIEWED_BUILDS: JSON.stringify([{
     sha256: digest(artifact), packageName: 'app.agus.preview.fixture', signerSha256: 'f'.repeat(64),
   }]),
@@ -160,6 +161,16 @@ try {
   await wait("document.body.innerText.includes('1 accepted, 1 failed')");
   assert.equal(await run("document.body.innerText.includes('5 accepted and 0 reserved')"), true);
   evidence.push('Developer browser reviewed a separately submitted software-signed fixture finding and recorded test compensation');
+  await cdp('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: directory });
+  await click('[data-action=campaign-receipt]');
+  const receipt = await until(async () => JSON.parse(await readFile(join(directory, 'agus-native-receipt.json'), 'utf8')),
+    'Browser did not download the signed campaign receipt');
+  const trustedKey = publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
+  const verified = verifyNativeReceipt(receipt, trustedKey);
+  assert.equal(verified.assignmentId, offer.id);
+  assert.equal(verified.buildSha256, digest(artifact));
+  assert.equal(verified.cleanupConfirmed, true);
+  evidence.push('Downloaded receipt verified independently with the pinned manifest key');
   await click('[data-action=sign-out]');
   await wait("document.querySelector('#auth-form')");
   evidence.push('Sign-out returned to authentication');

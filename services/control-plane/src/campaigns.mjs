@@ -348,11 +348,13 @@ function structuredSubmission(state, task, input) {
   exact(input, ['attemptId', 'expectedVersion', 'steps', 'expected', 'actual', 'result', 'category', 'correction'], 'submission');
   requireCondition(outcomes.includes(input.result), 'Choose a structured result');
   requireCondition(['bug', 'usability', 'validation', 'agent_correction'].includes(input.category), 'Choose a finding category');
+  const correctionTask = task.kind === 'agent_correction';
+  requireCondition((input.category === 'agent_correction') === correctionTask, 'Finding category must match the reviewed task');
   const steps = array(input.steps, 'reproduction steps', 12).map(step => text(step, 'step', 250));
   requireCondition(steps.length > 0, 'Include at least one reproducible step');
   const evidence = { steps, expected: text(input.expected, 'expected outcome', 600),
     actual: text(input.actual, 'observed outcome', 600), result: input.result, category: input.category };
-  if (task.kind === 'agent_correction') {
+  if (correctionTask) {
     exact(input.correction, ['actionIndex', 'actualAction', 'suggestedAction'], 'correction');
     const { actionIndex, actualAction, suggestedAction } = input.correction;
     const steps = state.actions[task.referenceRunId] ?? [];

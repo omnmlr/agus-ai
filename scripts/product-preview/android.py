@@ -182,6 +182,17 @@ def run():
         if number == 1:
             tap("Allow from this source", scroll=False)
             adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        if JOURNEY == "safety" and mode == "owner-stop":
+            backend = int(os.environ["AGUS_PREVIEW_BACKEND_PID"])
+            os.kill(backend, signal.SIGSTOP)
+            try:
+                tap("Stage reviewed APK")
+                expect("PROFILE_INSTALL_POLICY_RESTORED")
+                assert not package_present(profile)
+            finally:
+                os.kill(backend, signal.SIGCONT)
+            record("Failed APK download restored the Android install restriction")
+            tap("Allow Android installation source")
         tap("Stage reviewed APK")
         confirm_action("install_status_0", number, {"review android confirmation", "install", "ok"})
         assert package_present(profile) and not package_present("0")

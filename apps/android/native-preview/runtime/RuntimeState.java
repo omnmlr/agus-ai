@@ -13,6 +13,7 @@ import android.os.BatteryManager;
 import android.os.Build;
 import android.os.PowerManager;
 import android.os.SystemClock;
+import android.util.Log;
 import app.agus.cooperative.Workload;
 import java.io.File;
 import java.nio.file.Files;
@@ -109,6 +110,18 @@ final class RuntimeState {
     }
 
     static void install(Context context, Session work) throws Exception {
+        try {
+            stagePackage(context, work);
+        } finally {
+            if (!prefs(context).getBoolean("packagePending", false)) {
+                ProfileAdmin.restrictInstalls(context, true);
+                if (!ProfileAdmin.installRestricted(context)) throw new SecurityException("Could not restore profile install policy");
+                Log.i("AgusPreview", "PROFILE_INSTALL_POLICY_RESTORED");
+            }
+        }
+    }
+
+    private static void stagePackage(Context context, Session work) throws Exception {
         work.requireLive();
         if (!absent(context) || prefs(context).getBoolean("packagePending", false)) throw new SecurityException("Package collision");
         if (!context.getPackageManager().canRequestPackageInstalls()) throw new SecurityException("Approve the Android installation source");

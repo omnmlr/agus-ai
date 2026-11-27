@@ -51,19 +51,25 @@ async function qualify(pilot, as, person) {
   return runtime;
 }
 
-async function executeHuman({ pilot, as, person, runtime, offer, accepted }) {
+async function executeHuman({ pilot, as, person, runtime, offer, accepted, correction }) {
   const { lease } = await pilot.request('POST', '/runtime/installations/' + runtime.id + '/claim',
     { credential: runtime.credential, body: { assignmentId: offer.id } });
   const manifest = JSON.parse(Buffer.from(lease.manifest.payload, 'base64'));
   assert.deepEqual(manifest.actions, []);
   const body = { attemptId: accepted.attempt.id, expectedVersion: 0, steps: ['Tap Continue', 'Return to review', 'Tap Continue'],
-    expected: 'One submission per session', actual: 'Two submissions were observed', result: 'failed', category: 'bug' };
+    expected: 'One submission per session', actual: 'Two submissions were observed', result: 'failed',
+    category: correction ? 'agent_correction' : 'bug', ...(correction && { correction }) };
   await as(person, 'POST', '/assignments/' + offer.id + '/submissions', body, 409);
   const prefix = '/runtime/leases/' + lease.id;
   await pilot.request('POST', prefix + '/report', { credential: lease.credential,
     body: leaseProof(runtime, lease, 'report', { outcome: 'completed', observations: [] }) });
   await pilot.request('POST', prefix + '/cleanup', { credential: lease.credential,
     body: leaseProof(runtime, lease, 'cleanup', { packageAbsent: true, installRestricted: true }) });
+  if (correction) {
+    const path = '/assignments/' + offer.id + '/submissions';
+    await as(person, 'POST', path, { ...body, category: 'bug' }, 400);
+    await as(person, 'POST', path, { ...body, correction: { ...correction, actionIndex: 1 } }, 400);
+  }
   return { body, submitted: await as(person, 'POST', '/assignments/' + offer.id + '/submissions', body) };
 }
 
@@ -114,6 +120,47 @@ test('campaign reservation, native human submission, revision, review and earnin
   assert.equal(report.acceptedTestUnits, 10);
   assert.equal(report.reservedTestUnits, 0);
   await as(first, 'GET', path + '/report', undefined, 404);
+});
+
+test('correction accepts only a completed recorded action and exports bounded authorized fields', async t => {
+  const { pilot, developer, first, as, path } = await setup(t);
+  const original = (await as(developer, 'GET', path)).campaign.revisions[1];
+  const { projectId } = original;
+  const buildId = original.tasks[0].buildId;
+  const { run } = await as(developer, 'POST', '/runs', {
+    projectId, buildId, scenario: 'app-launch', mode: 'agent', allocation: 'marketplace',
+  }, 201);
+  // Seed the completed agent reference. Dedicated Android execution has its own acceptance workflow.
+  await pilot.store.transaction(state => {
+    Object.assign(state.runs[run.id], { state: 'completed', receipt: { id: 'synthetic-reference' } });
+    state.actions[run.id] = [{ type: 'tap', state: 'completed' }, { type: 'tap', state: 'queued' }];
+  });
+  const { campaign } = await as(developer, 'POST', '/campaigns', {
+    projectId, title: 'Review an agent choice', objective: 'Identify a better bounded action',
+    deadlineAt: original.deadlineAt, tasks: [{ title: 'Correct the recorded tap', instructions: 'Choose a reviewed alternative.',
+      buildId, kind: 'agent_correction', runtimeClass: 'phone_human', referenceRunId: run.id, count: 1, trainingEligible: true }],
+  });
+  const campaignPath = '/campaigns/' + campaign.id;
+  await as(developer, 'POST', campaignPath + '/launch', { expectedRevision: 1 });
+  const runtime = await qualify(pilot, as, first);
+  const { assignments } = await as(first, 'GET', '/me/assignments');
+  const offer = assignments.find(assignment => assignment.campaignId === campaign.id);
+  assert.equal(Object.hasOwn(offer.task, 'referenceRunId'), false);
+  const { assignment } = await as(first, 'POST', '/me/assignments/' + offer.id + '/accept',
+    { termsDigest: offer.termsDigest, installationId: runtime.id, consent: true });
+  const correction = { actionIndex: 0, actualAction: 'tap', suggestedAction: 'describe' };
+  const { body } = await executeHuman({ pilot, as, person: first, runtime, offer, accepted: assignment, correction });
+  await as(developer, 'POST', '/assignments/' + offer.id + '/reviews',
+    { attemptId: body.attemptId, version: 1, decision: 'accept', reason: 'Verified scoped correction.' });
+  for (const participant of [first, developer]) {
+    await as(participant, 'PUT', '/me/assignments/' + offer.id + '/training-consent', { termsDigest: offer.termsDigest, grant: true });
+  }
+  const exportPath = campaignPath + '/exports';
+  const prepared = await as(developer, 'POST', exportPath, { purpose: 'training', assignmentIds: [offer.id] });
+  const { export: delivery } = await as(developer, 'GET', exportPath + '/' + prepared.export.id);
+  assert.deepEqual(delivery.data.rows[0].correction, correction);
+  assert.equal(JSON.stringify(delivery.data).includes(run.id), false);
+  assert.equal(JSON.stringify(delivery.data).includes(body.actual), false);
 });
 
 const databaseUrl = process.env.AGUS_TEST_PRODUCT_DATABASE_URL;
