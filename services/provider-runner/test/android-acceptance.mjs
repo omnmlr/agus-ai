@@ -25,6 +25,7 @@ const [serial, fixturePath, walletPath, outputDirectory] = process.argv.slice(2)
 if (!serial || !fixturePath || !outputDirectory) {
   throw new Error("Usage: node --import tsx services/provider-runner/test/android-acceptance.mjs SERIAL FIXTURE_APK WALLET_APK_OR_DASH OUTPUT_DIR");
 }
+const planner = process.env.AGUS_ANDROID_ACCEPTANCE_GEMINI === "1" ? "gemini" : "remote";
 const wallet = walletPath && walletPath !== "-";
 const scenario = wallet ? (process.env.AGUS_ANDROID_ACCEPTANCE_TRANSFER === "1" ? "wallet-transfer" : "wallet-connect") : "app-launch";
 const expectedTransaction = scenario === "wallet-transfer" ? {
@@ -57,7 +58,7 @@ try {
     stateDirectory: "runner",
     device: { id: "acceptance-android", kind: serial.startsWith("emulator-") ? "emulator" : "android-device", serial, dedicated: true },
     approvedBuilds: [{ packageName: FIXTURE, sha256: digest, scenarios: [...new Set(["app-launch", scenario])] }],
-    planner: "remote",
+    planner,
     ...(wallet ? {
       wallet: { apkPath: resolve(walletPath), sha256: FAKE_WALLET_SHA },
       localnet: { genesis: process.env.AGUS_TEST_LOCAL_GENESIS },
@@ -148,33 +149,35 @@ try {
       return null;
     }, 15_000);
   }
-  await waitForRunning(privateRun.id);
-  let finished = false;
-  let photographed = false;
-  let previousPhase;
-  for (let step = 0; step < 25 && !finished; step++) {
-    const described = await agentAction(privateRun.id, "describe");
-    const phase = described.observation?.phase ?? described.observation?.code ?? described.state;
-    if (phase !== previousPhase) {
-      console.log("Approved agent phase: " + phase);
-      previousPhase = phase;
+  if (planner === "remote") {
+    await waitForRunning(privateRun.id);
+    let finished = false;
+    let photographed = false;
+    let previousPhase;
+    for (let step = 0; step < 25 && !finished; step++) {
+      const described = await agentAction(privateRun.id, "describe");
+      const phase = described.observation?.phase ?? described.observation?.code ?? described.state;
+      if (phase !== previousPhase) {
+        console.log("Approved agent phase: " + phase);
+        previousPhase = phase;
+      }
+      if (described.state === "failed") {
+        await delay(600);
+        continue;
+      }
+      if (wallet && !photographed && described.observation.phase === "approve-connection") {
+        const captured = await agentAction(privateRun.id, "screenshot");
+        photographed = captured.state === "completed";
+      }
+      const [allowed] = described.observation.actions;
+      const result = await agentAction(privateRun.id, allowed.type, allowed.args);
+      if (result.state === "failed" && ["launch", "tap"].includes(allowed.type)) {
+        throw new Error("Android rejected described action " + JSON.stringify(result.observation));
+      }
+      finished = result.state === "completed" && allowed.type === "finish";
     }
-    if (described.state === "failed") {
-      await delay(600);
-      continue;
-    }
-    if (wallet && !photographed && described.observation.phase === "approve-connection") {
-      const captured = await agentAction(privateRun.id, "screenshot");
-      photographed = captured.state === "completed";
-    }
-    const [allowed] = described.observation.actions;
-    const result = await agentAction(privateRun.id, allowed.type, allowed.args);
-    if (result.state === "failed" && ["launch", "tap"].includes(allowed.type)) {
-      throw new Error("Android rejected described action " + JSON.stringify(result.observation));
-    }
-    finished = result.state === "completed" && allowed.type === "finish";
+    assert.equal(finished, true, "Agent did not complete the allowed Android work");
   }
-  assert.equal(finished, true, "Agent did not complete the allowed Android work");
 
   const output = resolve(outputDirectory);
   await mkdir(output, { recursive: true, mode: 0o700 });
@@ -213,7 +216,8 @@ try {
   }
 
   const completed = await verifyCompleted(privateRun.id, "private");
-  assert.equal(completed.receipt.manifest.execution.planner, "remote");
+  assert.equal(completed.receipt.manifest.execution.planner, planner);
+  if (planner === "gemini") assert.ok(completed.receipt.manifest.execution.modelActionCount >= 2);
   assert.ok(completed.receipt.manifest.execution.deviceActionCount >= (wallet ? 3 : 1));
   if (wallet) assert.equal(completed.receipt.manifest.checks.find(({ id }) => id === "wallet-authorized")?.passed, true);
   if (expectedTransaction) assert.equal(completed.verification.transaction.status, "verified");

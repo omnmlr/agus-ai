@@ -100,7 +100,14 @@ export function validateManifest(report, run, lease, build, now) {
     requireCondition(['scripted', 'remote', 'local', 'gemini'].includes(execution.planner)
       && Number.isSafeInteger(execution.deviceActionCount) && execution.deviceActionCount >= 0
       && execution.deviceActionCount <= 10_000 && hex256(execution.testSpecSha256)
-      && Object.keys(execution).every((key) => ['planner', 'deviceActionCount', 'testSpecSha256'].includes(key)),
+      && (execution.planner === 'gemini'
+        ? (execution.modelId === undefined && execution.modelActionCount === undefined)
+          || (typeof execution.modelId === 'string' && /^gemini-[a-z0-9.-]{2,60}$/.test(execution.modelId)
+            && Number.isSafeInteger(execution.modelActionCount) && execution.modelActionCount >= 0
+            && execution.modelActionCount === manifest.metrics?.actionCount)
+        : execution.modelId === undefined && execution.modelActionCount === undefined)
+      && Object.keys(execution).every((key) =>
+        ['planner', 'deviceActionCount', 'testSpecSha256', 'modelId', 'modelActionCount'].includes(key)),
     'Invalid execution metadata');
   }
   return manifest;
@@ -119,7 +126,9 @@ export async function verifyOutcome({ run, report, lease, actions, config, fetch
     scope: 'runner-signed-claims',
     transaction: { status: 'not_applicable' },
     durationMs: Date.parse(report.finishedAt) - Date.parse(report.startedAt),
-    ...(run.mode === 'agent' ? { actionMetrics } : {}),
+    ...(run.mode === 'agent' ? {
+      actionMetrics: report.execution?.planner === 'gemini' ? { ...report.metrics, provenance: 'runner-signed' } : actionMetrics,
+    } : {}),
   };
   if (run.scenario === 'wallet-transfer' || run.scenario === 'wallet-false-success') {
     result.transaction = await independentlyVerify({
@@ -131,7 +140,10 @@ export async function verifyOutcome({ run, report, lease, actions, config, fetch
   if (report.outcome === 'failed' || !passedChecks || run.scenario === 'wallet-false-success') {
     return { ...result, state: 'failed' };
   }
-  if (run.mode === 'agent' && !actions.some(({ type, state }) => type === 'finish' && state === 'completed')) {
+  const modelEvaluation = report.execution?.planner === 'gemini' && report.execution.modelActionCount > 0
+    && report.execution.deviceActionCount > 0;
+  if (run.mode === 'agent' && !modelEvaluation
+    && !actions.some(({ type, state }) => type === 'finish' && state === 'completed')) {
     return { ...result, state: 'unverified', reason: 'No completed live agent evaluation was recorded' };
   }
   if (run.scenario !== 'wallet-transfer') return { ...result, state: 'passed' };

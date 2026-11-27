@@ -137,13 +137,20 @@ export class Evaluation {
 
   async runLocal(planner, signal) {
     let invalid = false;
+    const useModel = this.job.mode === "agent" && planner === "gemini";
+    if (useModel) {
+      this.report.execution.modelId = geminiModel();
+      this.report.execution.modelActionCount = 0;
+    }
     for (let index = 0; index < 55 && !this.state.has("finished"); index++) {
       signal.throwIfAborted();
       const { phase, actions } = await this.observe(signal);
-      const action = this.job.mode === "agent" && planner === "gemini"
-        ? await chooseWithGemini(phase, actions, signal)
-        : actions[0];
+      const action = useModel ? await chooseWithGemini(phase, actions, signal) : actions[0];
       const result = await this.action(action, signal);
+      if (useModel) {
+        this.report.execution.modelActionCount++;
+        this.trace.at(-1).selectedBy = "gemini";
+      }
       if (result.outcome === "failed") {
         if (this.report.metrics.policyViolations) throw new RunnerFailure("ACTION_SCOPE");
         invalid = true;
@@ -182,13 +189,20 @@ export class Evaluation {
   }
 }
 
-async function chooseWithGemini(phase, actions, signal) {
-  const key = process.env.AGUS_GEMINI_API_KEY;
+function geminiModel() {
   const model = process.env.AGUS_GEMINI_MODEL;
-  if (!key || !model || !/^gemini-[a-z0-9.-]{2,60}$/.test(model)) {
+  if (!model || !/^gemini-[a-z0-9.-]{2,60}$/.test(model)) {
     throw new RunnerFailure("GEMINI_CONFIG");
   }
-  const candidates = [{ type: "describe", args: {} }, ...actions, { type: "wait", args: {} }];
+  return model;
+}
+
+async function chooseWithGemini(phase, actions, signal) {
+  const key = process.env.AGUS_GEMINI_API_KEY;
+  const model = geminiModel();
+  if (!key) throw new RunnerFailure("GEMINI_CONFIG");
+  const candidates = [...actions];
+  if (phase !== "waiting-for-approved-ui") candidates.push({ type: "wait", args: {} });
   const response = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent",
     {
@@ -196,11 +210,13 @@ async function chooseWithGemini(phase, actions, signal) {
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
         contents: [{ parts: [{ text: JSON.stringify({
-          task: "Complete the fixture task using its synthetic state. Choose one candidate by index. Return only its integer index.",
+          task: "Complete the authorized synthetic Android task. Execute the ready next step; wait only if no progress action is ready. Choose a candidate by its zero-based index. Return only that integer.",
           phase,
           candidates,
         }) }] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 512 },
+        generationConfig: { temperature: 0, maxOutputTokens: 512,
+          ...(model.startsWith("gemini-2.5-flash") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+        },
       }),
       redirect: "error",
       signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
