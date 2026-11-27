@@ -4,10 +4,12 @@ import { account, authView, buildOptions, deviceOptions, devicesView, escape, in
 import { campaignDraft, campaignsView, campaignTask } from './campaigns.mjs';
 
 const sessionKey = 'agus-console-session';
+const googleKey = 'agus-google-pkce';
 const elements = Object.fromEntries(['account', 'navigation', 'notice', 'screen'].map((id) => [id, document.getElementById(id)]));
 const state = { session: loadSession(), register: false, data: {}, routeVersion: 0, selected: null, events: [], runFingerprint: null, paymentFingerprint: null, share: null };
 const api = createApi(() => state.session?.token);
 let polling = false;
+let sessionRefresh;
 
 function loadSession() {
   try {
@@ -75,6 +77,15 @@ async function loadData(page, selected) {
   return Object.assign({}, ...(await Promise.all(requests)));
 }
 
+async function refreshSessionIfDue() {
+  const current = state.session;
+  if (!current || !(Date.parse(current.expiresAt) - Date.now() <= 120_000)) return;
+  if (!sessionRefresh) sessionRefresh = api.post('/auth/refresh', {}).then(replacement => {
+    if (state.session === current) saveSession(replacement);
+  }).finally(() => { sessionRefresh = undefined; });
+  await sessionRefresh;
+}
+
 async function navigate() {
   const currentVersion = ++state.routeVersion;
   const { page, selected } = route();
@@ -99,6 +110,7 @@ async function navigate() {
   }
   elements.screen.innerHTML = '<p class="empty" aria-busy="true">Loading data from the control plane…</p>';
   try {
+    await refreshSessionIfDue();
     const data = await loadData(page, selected);
     if (currentVersion !== state.routeVersion) return;
     state.data = data;
@@ -252,7 +264,33 @@ async function reviewInvitation(path, body) {
   renderInvitation(invitation, true);
 }
 
+const optionalRegistration = data => {
+  const registrationToken = data.get('registrationToken')?.trim();
+  return registrationToken ? { registrationToken } : {};
+};
+
+const hex = bytes => [...bytes].map(value => value.toString(16).padStart(2, '0')).join('');
 const forms = {
+  'otp-start-form': async data => {
+    const email = data.get('email').trim();
+    await api.post('/auth/email/start', { email, ...optionalRegistration(data) });
+    document.getElementById('otp-verify-form').elements.email.value = email;
+    notice('If the account is eligible, a code will arrive shortly.');
+  },
+  'otp-verify-form': async data => {
+    saveSession(await api.post('/auth/email/verify', { email: data.get('email').trim(), code: data.get('code') }));
+    await navigate();
+  },
+  'google-start-form': async data => {
+    if (!crypto.subtle) throw new Error('Use HTTPS or localhost for Google sign-in.');
+    const verifier = hex(crypto.getRandomValues(new Uint8Array(32)));
+    const challenge = hex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+    const { url } = await api.post('/auth/google/start', { challenge, ...optionalRegistration(data) });
+    const destination = new URL(url);
+    if (destination.origin !== 'https://accounts.google.com') throw new Error('Invalid Google authorization URL.');
+    sessionStorage.setItem(googleKey, JSON.stringify({ verifier, returnHash: route().page === 'invite' ? location.hash : '' }));
+    location.assign(destination);
+  },
   'campaign-form': async (data, form) => {
     const draft = campaignDraft(form, data);
     const previous = state.data.report?.campaign;
@@ -515,7 +553,7 @@ document.addEventListener('submit', async (event) => {
   try {
     await handle(new FormData(form), form);
   } catch (error) {
-    displayError(error, { authenticationAttempt: form.id === 'auth-form' });
+    displayError(error, { authenticationAttempt: ['auth-form', 'otp-start-form', 'otp-verify-form', 'google-start-form'].includes(form.id) });
   } finally {
     button.disabled = false;
   }
@@ -554,4 +592,23 @@ setInterval(async () => {
     polling = false;
   }
 }, 3_000);
-void navigate();
+
+async function initialize() {
+  const response = new URLSearchParams(location.hash.slice(1));
+  const code = response.get('authCode');
+  if (!code && !response.has('authError')) return navigate();
+  let pending = null;
+  try { pending = JSON.parse(sessionStorage.getItem(googleKey)); sessionStorage.removeItem(googleKey); }
+  catch { /* Invalid or disabled browser storage aborts the exchange. */ }
+  const target = /^#invite\/[A-Za-z0-9_-]{20,160}$/.test(pending?.returnHash ?? '') ? pending.returnHash : '';
+  history.replaceState(null, '', location.pathname + location.search + target);
+  try {
+    if (!code || !/^[a-f0-9]{64}$/.test(pending?.verifier ?? '')) throw new Error('Google sign-in was not completed in this tab.');
+    saveSession(await api.post('/auth/google/exchange', { code, verifier: pending.verifier }));
+    await navigate();
+  } catch (error) {
+    await navigate();
+    displayError(error, { authenticationAttempt: true });
+  }
+}
+void initialize();

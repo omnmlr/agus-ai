@@ -61,7 +61,22 @@ export function authView(register, fromInvite = false) {
       ${register ? '<label class="field">Registration token<input name="registrationToken" maxlength="512" autocomplete="off"><small>Enter a token if your deployment requires one.</small></label>' : ''}
       <button type="submit" class="button button-primary">${heading}</button>
     </form>
-    <button type="button" class="button button-outline" data-action="toggle-auth">${register ? 'Use an existing account' : 'Create an account'}</button></section>`;
+    <button type="button" class="button button-outline" data-action="toggle-auth">${register ? 'Use an existing account' : 'Create an account'}</button></section>
+    <section class="panel auth-panel"><h2>Email code</h2>
+      <form id="otp-start-form" class="form-stack">
+        <label class="field">Email<input name="email" type="email" required autocomplete="email"></label>
+        <label class="field">Registration token if needed<input name="registrationToken" maxlength="512"></label>
+        <button type="submit" class="button button-outline">Send email code</button>
+      </form>
+      <form id="otp-verify-form" class="form-stack">
+        <label class="field">Email<input name="email" type="email" required autocomplete="email"></label>
+        <label class="field">Email code<input name="code" required inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code"></label>
+        <button type="submit" class="button button-outline">Verify email code</button>
+      </form></section>
+    <section class="panel auth-panel"><h2>Google sign-in</h2><form id="google-start-form" class="form-stack">
+      <label class="field">Registration token if needed<input name="registrationToken" maxlength="512"></label>
+      <button type="submit" class="button button-outline">Continue with Google</button>
+    </form></section>`;
 }
 
 export function workspaceView({ projects, builds }) {

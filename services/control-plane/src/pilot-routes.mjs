@@ -2,7 +2,7 @@ import { campaignRoute, isCampaignRoute } from './campaign-routes.mjs';
 import { qualified } from './qualifications.mjs';
 import { authSession } from './domain.mjs';
 import { digest, readJson, requireCondition } from './security.mjs';
-import { conflict, exact, missing, own } from './pilot-policy.mjs';
+import { boundJson, conflict, exact, missing, own } from './pilot-policy.mjs';
 import {
   authenticateNativeLease, authenticateRuntime, completeNativeEnrollment, issueNativeLease,
   nativeBuildForLease, nativeHeartbeat, publicInstallation, receiveNativeCleanup, receiveNativeReport,
@@ -62,6 +62,7 @@ export async function handlePilotRoutes({ services, route, request, response, se
   requireCondition(config.pilot, 'The local product pilot is disabled', 'pilot_unavailable', 503);
   missing(route.length <= 4, 'Route');
   const input = ['POST', 'PUT', 'PATCH'].includes(method) ? await readJson(request, 65_536) : null;
+  if (input) boundJson(input);
   const result = await store.transaction(state => {
     const now = config.now();
     if (runtime) return transport(state, config.pilot, credential, route, method, input, now);

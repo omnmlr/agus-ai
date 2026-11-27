@@ -381,3 +381,62 @@ test('run-bound signature, consent, and independent finalized transfer replay ch
   assert.equal(duplicate.run.verification.transaction.status, 'signature_reused');
   assert.equal(count, 2);
 });
+
+test('payout wallet proof binds the owner, origin and exact wallet through replacement and disconnection', async t => {
+  const f = await fixture(t, { publicOrigin: 'http://127.0.0.1:8080' });
+  const owner = await f.account('payout-owner');
+  const other = await f.account('other-payout-user');
+  const device = await f.pair(owner, 'payout-test', 'devnet');
+  const path = '/me/devices/' + encodeURIComponent(device.id) + '/payout-wallet';
+  const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  const wallet = key => {
+    const bytes = key.export({ type: 'spki', format: 'der' }).subarray(-32);
+    const leadingZeros = bytes.findIndex(byte => byte !== 0);
+    let value = BigInt('0x' + bytes.toString('hex'));
+    let address = '';
+    while (value) {
+      address = alphabet[Number(value % 58n)] + address;
+      value /= 58n;
+    }
+    return '1'.repeat(leadingZeros < 0 ? bytes.length : leadingZeros) + address;
+  };
+  const first = generateKeyPairSync('ed25519');
+  const replacement = generateKeyPairSync('ed25519');
+  const proofFor = (keys, challenge) => ({ challengeId: challenge.id,
+    signature: sign(null, Buffer.from(challenge.message, 'utf8'), keys.privateKey).toString('base64') });
+  const { challenge } = await f.request(path + '/challenge', { token: owner.token, body: { wallet: wallet(first.publicKey) } });
+  await f.request(path + '/verify', { token: other.token, body: proofFor(first, challenge), status: 404 });
+  await f.request(path + '/verify', { token: owner.token, body: proofFor(replacement, challenge), status: 400 });
+  const { payoutWallet: verified } = await f.request(path + '/verify', { token: owner.token, body: proofFor(first, challenge) });
+  assert.equal(verified.address, wallet(first.publicKey));
+  await f.request(path + '/verify', { token: owner.token, body: proofFor(first, challenge), status: 404 });
+  const next = await f.request(path + '/challenge', { token: owner.token, body: { wallet: wallet(replacement.publicKey) } });
+  const updated = await f.request(path + '/verify', { token: owner.token, body: proofFor(replacement, next.challenge) });
+  assert.equal(updated.payoutWallet.address, wallet(replacement.publicKey));
+  await f.request(path, { token: other.token, method: 'DELETE', status: 404 });
+  await f.request(path, { token: owner.token, method: 'DELETE' });
+  assert.equal((await f.request(path, { token: owner.token })).payoutWallet, null);
+});
+
+test('public decline suppresses matching on its owned device and inbox preferences are scoped', async t => {
+  const f = await fixture(t);
+  const developer = await f.account('decline-buyer');
+  const provider = await f.account('decline-provider');
+  const stranger = await f.account('decline-other');
+  const runner = await f.pair(provider, 'decline-test');
+  const deviceId = runner.id;
+  await f.request('/me/devices/' + encodeURIComponent(deviceId), { token: provider.token, method: 'PATCH',
+    body: { publicListing: true, autoMatch: true } });
+  const { run } = await f.request('/runs', { token: developer.token, status: 201,
+    body: { ...await f.workload(developer), scenario: 'app-launch', mode: 'scripted', allocation: 'marketplace' } });
+  const decline = '/marketplace/jobs/' + run.id + '/decline';
+  await f.request(decline, { token: stranger.token, body: { deviceId }, status: 404 });
+  assert.deepEqual(await f.request(decline, { token: provider.token, body: { deviceId } }), { declined: true });
+  assert.deepEqual((await f.request('/marketplace/jobs?deviceId=' + encodeURIComponent(deviceId),
+    { token: provider.token })).jobs, []);
+  assert.equal((await f.claim(runner, undefined)).job, null);
+  const preferences = '/me/notifications/preferences';
+  await f.request(preferences, { token: provider.token, method: 'PATCH', body: { completedRuns: false } });
+  assert.equal((await f.request(preferences, { token: provider.token })).preferences.completedRuns, false);
+  assert.equal((await f.request(preferences, { token: developer.token })).preferences.completedRuns, true);
+});

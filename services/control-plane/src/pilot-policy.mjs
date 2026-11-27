@@ -111,3 +111,10 @@ export function qualifyingPolicy(policy) {
     && policy.batteryPercent >= 25 && policy.availableStorageMiB >= 200
     && policy.thermalStatus <= 2 && policy.abi !== 'other';
 }
+
+export function boundJson(value, depth = 0) {
+  requireCondition(depth <= 12, 'Pilot input is nested too deeply');
+  if (value && typeof value === 'object') {
+    for (const child of Object.values(value)) boundJson(child, depth + 1);
+  }
+}

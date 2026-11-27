@@ -8,6 +8,7 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.os.UserManager;
@@ -21,6 +22,7 @@ import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.ArrayAdapter;
 import android.widget.TextView;
+import android.view.WindowManager;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,6 +45,7 @@ public class RuntimeActivity extends Activity {
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         render();
         if (ProfileAdmin.ownsProfile(this) && RuntimeState.live == null
             && RuntimeState.prefs(this).getString("pendingLease", null) != null) {
@@ -63,6 +66,11 @@ public class RuntimeActivity extends Activity {
         setContentView(scroll);
         label("AGUS Phone Preview");
         message = label("");
+        if (Build.VERSION.SDK_INT != 35 || !"ranchu".equals(Build.HARDWARE)
+            || !Build.FINGERPRINT.startsWith("Android/sdk_phone64_x86_64/")) {
+            label("This build is restricted to the disposable AOSP Android 15 preview image.");
+            return;
+        }
         if (!ProfileAdmin.ownsProfile(this)) {
             label("Local test environment. Use a disposable device and credentials.");
             button("Set up test work profile", this::provision);
@@ -398,7 +406,8 @@ public class RuntimeActivity extends Activity {
         EditText steps = input("Reproduction steps, one per line", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         EditText expected = input("Expected outcome", InputType.TYPE_CLASS_TEXT);
         EditText actual = input("Actual outcome", InputType.TYPE_CLASS_TEXT);
-        Spinner result = choices("failed", "passed", "blocked");
+        boolean autonomous = "phone_cooperative".equals(assignment.optJSONObject("task").optString("runtimeClass"));
+        Spinner result = autonomous ? choices("passed", "failed", "blocked") : choices("failed", "passed", "blocked");
         boolean correction = "agent_correction".equals(assignment.optJSONObject("task").optString("kind"));
         Spinner category = correction ? choices("agent_correction") : choices("bug", "usability", "validation");
         EditText actionIndex = correction ? input("Recorded action index starting at zero", InputType.TYPE_CLASS_NUMBER) : null;

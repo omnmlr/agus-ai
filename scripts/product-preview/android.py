@@ -66,8 +66,7 @@ def tap(label, scroll=True):
 def fill(hint, value):
     tap(hint, scroll=False)
     adb("shell", "input", "text", value)
-    if any(item in adb("shell", "dumpsys", "input_method") for item in ("mInputShown=true", "mIsInputViewShown=true")):
-        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+
 
 
 def log():
@@ -155,6 +154,8 @@ def run():
             tap("Continue")
             tap("Return to review")
             tap("Continue")
+            until(lambda: any(node.get("text") == "Onboarding submissions: 2" for node in tree().iter("node")),
+                  "Did not reproduce the second onboarding submission")
             tap("Finish attended test")
         expect("PROFILE_REPORT_VERIFIED", number)
         tap("Remove fixture")
