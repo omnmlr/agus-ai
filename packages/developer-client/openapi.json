@@ -5381,6 +5381,129 @@
         }
       }
     },
+    "/api/v1/qualification-appeals": {
+      "get": {
+        "summary": "List pending appeals for a configured local reviewer",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appeals": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  },
+                  "required": [
+                    "appeals"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/qualification-appeals/{qualificationId}/review": {
+      "post": {
+        "summary": "Adjudicate a current test qualification appeal",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "qualificationId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "uphold",
+                      "retest",
+                      "accept_reproduction"
+                    ]
+                  },
+                  "decisionReason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "decision",
+                  "decisionReason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appeal": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "appeal"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Stable error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/qualifications": {
       "get": {
         "summary": "Read exercises, current qualification and review history",

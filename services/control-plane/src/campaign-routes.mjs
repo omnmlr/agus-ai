@@ -5,18 +5,23 @@ import {
   campaignReport, campaignView, changeCampaign, contributorTransition, listAssignments, ownCampaign,
   refreshCampaigns, reviewSubmission, saveCampaign, sendSubmission, signedAssignmentReceipt,
 } from './campaigns.mjs';
-import { appealQualification, qualificationView, submitQualification } from './qualifications.mjs';
+import { appealQualification, qualificationAppeals, qualificationView, submitQualification } from './qualifications.mjs';
 
 const personResources = ['qualifications', 'assignments', 'campaign-earnings'];
 
 export function isCampaignRoute(route) {
-  return ['campaigns', 'assignments'].includes(route[0]) ||
+  return ['campaigns', 'assignments', 'qualification-appeals'].includes(route[0]) ||
     (route[0] === 'me' && personResources.includes(route[1]));
 }
 
 export function campaignRoute(state, user, route, method, input, config, now, requestKey) {
   refreshCampaigns(state, now);
   const [resource, id, operation, suffix] = route;
+  if (resource === 'qualification-appeals') {
+    missing(config.pilot.reviewerIds.has(user.id), 'Qualification appeal');
+    if (method === 'GET' && !id) return qualificationAppeals(state, user, null, null, now);
+    if (method === 'POST' && id && operation === 'review' && !suffix) return qualificationAppeals(state, user, id, input, now);
+  }
   if (resource === 'campaigns') {
     if (!id && method === 'GET') {
       return { campaigns: Object.values(state.campaigns).filter(entry => entry.ownerId === user.id)

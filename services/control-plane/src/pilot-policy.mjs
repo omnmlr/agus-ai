@@ -55,7 +55,12 @@ export function pilotConfig(env) {
   } catch {
     throw new Error('AGUS_NATIVE_REVIEWED_BUILDS must list exact local preview APK, package, and signer digests');
   }
+  const reviewerIds = (env.AGUS_PILOT_REVIEWER_IDS ?? '').split(',').map(value => value.trim()).filter(Boolean);
+  if (reviewerIds.length > 30 || reviewerIds.some(id => !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(id))) {
+    throw new Error('AGUS_PILOT_REVIEWER_IDS must contain local person IDs');
+  }
   return {
+    reviewerIds: new Set(reviewerIds),
     manifestSigningKey: key,
     manifestKeyId: digest(createPublicKey(key).export({ format: 'der', type: 'spki' })),
     reviewedBuilds: new Map(entries.map(entry => [entry.sha256, entry])),

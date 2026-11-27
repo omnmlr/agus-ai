@@ -22,7 +22,9 @@ import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.ArrayAdapter;
 import android.widget.TextView;
+import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -46,6 +48,7 @@ public class RuntimeActivity extends Activity {
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
+        getWindow().setDecorFitsSystemWindows(false);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         render();
         if (ProfileAdmin.ownsProfile(this) && RuntimeState.live == null
@@ -61,6 +64,11 @@ public class RuntimeActivity extends Activity {
     private void render() {
         screenRoot = new LinearLayout(this);
         screenRoot.setOrientation(LinearLayout.VERTICAL);
+        screenRoot.setOnApplyWindowInsetsListener((view, insets) -> {
+            var bounds = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.ime());
+            view.setPadding(bounds.left, bounds.top, bounds.right, bounds.bottom);
+            return insets;
+        });
         var scroll = new ScrollView(this);
         layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -68,6 +76,7 @@ public class RuntimeActivity extends Activity {
         scroll.addView(layout);
         screenRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(screenRoot);
+        screenRoot.requestApplyInsets();
         label("AGUS Phone Preview");
         message = label("");
         if (Build.VERSION.SDK_INT != 35 || !"ranchu".equals(Build.HARDWARE)
@@ -367,6 +376,22 @@ public class RuntimeActivity extends Activity {
             runOnUiThread(() -> {
                 render();
                 var exercise = current.optJSONObject("exercise");
+                var previous = current.optJSONObject("current");
+                if (previous != null) {
+                    label(previous.optString("status") + " · " + previous.optString("feedback"));
+                    var appeal = previous.optJSONObject("appeal");
+                    if (appeal != null) label("Appeal " + appeal.optString("state") + " " + appeal.optString("decisionReason"));
+                    else if ("remediation".equals(previous.optString("status"))) button("Appeal qualification result", () -> {
+                        var reason = new EditText(this);
+                        reason.setHint("Explain why the rubric result should be reviewed");
+                        new AlertDialog.Builder(this).setTitle("Qualification appeal").setView(reason).setNegativeButton("Back", null)
+                            .setPositiveButton("Submit appeal", (dialog, which) -> run(() -> {
+                                PilotApi.request("POST", "/me/qualifications/" + previous.getString("id") + "/appeal",
+                                    person, new JSONObject().put("reason", reason.getText().toString()));
+                                return "Appeal submitted for preview operator review.";
+                            })).show();
+                    });
+                }
                 label(exercise.optString("reproduction"));
                 EditText order = input("Action sequence, comma separated", InputType.TYPE_CLASS_TEXT);
                 Spinner expected = choices("single_continue", "no_action", "multiple_continue");
@@ -423,6 +448,7 @@ public class RuntimeActivity extends Activity {
         }
         var attempt = assignment.optJSONObject("attempt");
         var review = makeButton("Review submission", () -> {
+            getSystemService(InputMethodManager.class).hideSoftInputFromWindow(screenRoot.getWindowToken(), 0);
             JSONObject body = new JSONObject().put("attemptId", attempt.optString("id"))
                 .put("expectedVersion", attempt.optJSONArray("submissions").length())
                 .put("steps", new JSONArray(java.util.Arrays.asList(steps.getText().toString().split("\\n"))))

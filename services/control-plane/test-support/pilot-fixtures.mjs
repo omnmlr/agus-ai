@@ -73,7 +73,7 @@ export async function startTestPilot(t, { env = {}, databaseUrl } = {}) {
       body: { email: label + '-' + crypto.randomUUID() + '@example.invalid', password: 'disposable test only' },
     });
   }
-  return { request, register, get store() { return app.store; }, clock, manifestKeys, async restart() {
+  return { request, register, get store() { return app.store; }, get config() { return app.config; }, clock, manifestKeys, async restart() {
     await close();
     await start();
   } };

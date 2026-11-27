@@ -71,9 +71,14 @@ function assignmentCard(assignment) {
   const latest = assignment.attempt?.submissions.at(-1);
   const evidence = latest?.evidence;
   const review = assignment.attempt?.review;
-  const reviewForm = assignment.state === 'submitted' && latest ? `<form data-form="campaign-review" class="form-stack"
-      data-assignment="${e(assignment.id)}" data-attempt="${e(assignment.attempt.id)}" data-version="${latest.version}">
-      <label class="field">Decision<select name="decision">${options([['accept', 'Accept work'], ['revise', 'Request revision'], ['reject', 'Reject work']])}</select></label>
+  const completeReview = assignment.state === 'submitted' && latest;
+  const partialReview = assignment.state === 'interrupted' && assignment.attempt?.cleanup === 'confirmed'
+    && assignment.terms.stopTestUnits > 0;
+  const reviewForm = completeReview || partialReview ? `<form data-form="campaign-review" class="form-stack"
+      data-assignment="${e(assignment.id)}" data-attempt="${e(assignment.attempt.id)}" data-version="${latest?.version ?? 0}">
+      <label class="field">Decision<select name="decision">${options(partialReview
+        ? [['partial', 'Record disclosed partial test credit']]
+        : [['accept', 'Accept work'], ['revise', 'Request revision'], ['reject', 'Reject work']])}</select></label>
       <label class="field">Review reason<input name="reason" required maxlength="400"></label>
       <button type="submit" class="button button-primary">Save review</button></form>` : '';
   return `<section class="panel"><h3>${e(assignment.task.title)} · Slot ${assignment.slot + 1}</h3>

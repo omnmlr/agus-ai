@@ -83,3 +83,28 @@ test('preview flag refuses production and nonloopback configuration, and rejects
     { credential: person.token, key: 'depth', body: depth, status: 400 });
   assert.equal(result.error.code, 'invalid_request');
 });
+
+test('pilot qualification appeal cannot self-approve or grant the wallet skill', async t => {
+  const pilot = await startTestPilot(t);
+  const candidate = await pilot.register('candidate');
+  const reviewer = await pilot.register('reviewer');
+  const outsider = await pilot.register('outsider');
+  // Store-free role wiring is fixed at startup in deployed local previews.
+  pilot.config.pilot.reviewerIds.add(reviewer.user.id);
+  pilot.config.pilot.reviewerIds.add(candidate.user.id);
+  const result = await pilot.request('POST', '/me/qualifications/duplicate-onboarding-v1/submissions',
+    { credential: candidate.token, body: {
+      sequence: ['continue'], expectedCode: 'single_continue', actualCode: 'single_continue',
+      walletAnswer: 'finalized_effects', evidenceNote: 'The reproduction steps need to be reviewed.',
+    } });
+  assert.equal(result.current.status, 'remediation');
+  await pilot.request('POST', '/me/qualifications/' + result.current.id + '/appeal',
+    { credential: candidate.token, body: { reason: 'Please examine the reviewed exercise variant.' } });
+  await pilot.request('GET', '/qualification-appeals', { credential: outsider.token, status: 404 });
+  const path = '/qualification-appeals/' + result.current.id + '/review';
+  const body = { decision: 'accept_reproduction', decisionReason: 'Human reviewer accepted the known bug order.' };
+  await pilot.request('POST', path, { credential: candidate.token, body, status: 404 });
+  await pilot.request('POST', path, { credential: reviewer.token, body });
+  const current = await pilot.request('GET', '/me/qualifications', { credential: candidate.token });
+  assert.deepEqual(current.skills, ['human_reproduction']);
+});

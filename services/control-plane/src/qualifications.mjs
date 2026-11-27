@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { requireCondition, string } from './security.mjs';
-import { conflict, exact } from './pilot-policy.mjs';
+import { conflict, exact, missing } from './pilot-policy.mjs';
 
 const validityMs = 30 * 86_400_000;
 const rubric = 'duplicate-onboarding-v1';
@@ -42,7 +42,8 @@ export function submitQualification(state, user, version, input, now) {
   const note = string(input.evidenceNote, 'evidence note', 280, 12).trim();
   requireCondition(note.length >= 12, 'Describe a redacted and reproducible finding');
   const records = state.qualifications[user.id] ??= [];
-  conflict(!records.at(-1) || now - records.at(-1).submittedAt >= 10_000, 'Wait before retrying the exercise');
+  const previous = records.at(-1);
+  conflict(!previous || previous.appeal?.state === 'retest_authorized' || now - previous.submittedAt >= 10_000, 'Wait before retrying the exercise');
   const reproduced = input.sequence.join(',') === 'continue,review,continue'
     && input.expectedCode === 'single_continue' && input.actualCode === 'multiple_continue';
   const skills = reproduced ? ['human_reproduction'] : [];
@@ -65,4 +66,29 @@ export function appealQualification(state, user, id, input, now) {
   conflict(record?.status === 'remediation' && !record.appeal, 'This exercise is ineligible for appeal');
   record.appeal = { reason: string(input.reason, 'appeal reason', 400), submittedAt: now, state: 'pending_review' };
   return qualificationView(state, user, now);
+}
+
+export function qualificationAppeals(state, reviewer, id, input, now) {
+  const records = Object.entries(state.qualifications).flatMap(([candidateId, items]) =>
+    items.filter(item => item.appeal).map(item => ({ candidateId, item })));
+  if (!id) return { appeals: records.filter(({ candidateId, item }) =>
+    candidateId !== reviewer.id && item.appeal.state === 'pending_review').slice(-50)
+    .map(({ item }) => ({ id: item.id, version: item.version, submittedAt: item.appeal.submittedAt, reason: item.appeal.reason })) };
+
+  const candidate = records.find(({ candidateId, item }) => candidateId !== reviewer.id && item.id === id);
+  missing(candidate, 'Qualification appeal');
+  const { item, candidateId } = candidate;
+  conflict(item.appeal.state === 'pending_review', 'Appeal already reviewed');
+  exact(input, ['decision', 'decisionReason'], 'appeal review');
+  requireCondition(['uphold', 'retest', 'accept_reproduction'].includes(input.decision), 'Unknown appeal decision');
+  if (input.decision === 'accept_reproduction') {
+    conflict(state.qualifications[candidateId].at(-1) === item && item.validUntil > now,
+      'Only the current valid exercise can be amended');
+    item.skills = ['human_reproduction'];
+    item.status = 'passed';
+  }
+  item.appeal.state = { uphold: 'upheld', retest: 'retest_authorized', accept_reproduction: 'amended' }[input.decision];
+  item.appeal.reviewedAt = now;
+  item.appeal.decisionReason = string(input.decisionReason, 'decision reason', 400);
+  return { appeal: { id: item.id, state: item.appeal.state, reviewedAt: now } };
 }

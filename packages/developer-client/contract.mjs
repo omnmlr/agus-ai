@@ -336,6 +336,9 @@ post('/assignments/{assignmentId}/submissions', 'Submit redacted structured evid
 post('/assignments/{assignmentId}/reviews', 'Review an exact submission or record disclosed partial credit', assignment,
   obj({ attemptId: id, version: integer, decision: values('accept', 'revise', 'reject', 'partial'), reason: string }));
 get('/assignments/{assignmentId}/receipt', 'Download the scoped native receipt and key', envelope('receipt', record));
+get('/qualification-appeals', 'List pending appeals for a configured local reviewer', envelopeList('appeals', record));
+post('/qualification-appeals/{qualificationId}/review', 'Adjudicate a current test qualification appeal', envelope('appeal', record),
+  obj({ decision: values('uphold', 'retest', 'accept_reproduction'), decisionReason: string }));
 get('/me/qualifications', 'Read exercises, current qualification and review history', record);
 post('/me/qualifications/{version}/submissions', 'Score the reviewed qualification exercise', record,
   obj({ sequence: array(string), expectedCode: string, actualCode: string, walletAnswer: string, evidenceNote: string }));
