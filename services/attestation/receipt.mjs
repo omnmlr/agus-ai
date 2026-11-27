@@ -1,3 +1,4 @@
+import { createPublicKey } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import {
@@ -19,6 +20,14 @@ export function receiptClaim(receipt) {
     throw new Error('Invalid execution receipt');
   }
   return { [field]: hash };
+}
+
+export function authorizedReceiptClaim(receipt, trustedReceiptKey) {
+  const claim = receiptClaim(receipt);
+  const pinned = createPublicKey(trustedReceiptKey).export({ type: 'spki', format: 'der' });
+  const embedded = createPublicKey(receipt.publicKeyPem).export({ type: 'spki', format: 'der' });
+  if (!pinned.equals(embedded)) throw new Error('Execution receipt was signed by an unapproved runner');
+  return claim;
 }
 
 function decoded(account, discriminator, decoder) {
@@ -74,11 +83,15 @@ export async function publicRpc(method, params, origin = 'https://api.devnet.sol
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
-  const [command, file, credential, signer, nonce] = process.argv.slice(2);
-  if (!file || !['payload', 'verify'].includes(command) || (command === 'verify' && (!credential || !signer || !nonce))) {
-    throw new Error('Usage: receipt.mjs payload RECEIPT.json | verify RECEIPT.json CREDENTIAL SIGNER NONCE');
+  const [command, file, credential, signer, nonce, flag, key, ...extra] = process.argv.slice(2);
+  if (!file || !['payload', 'verify'].includes(command) ||
+      (command === 'verify' && (!credential || !signer || !nonce)) ||
+      (command === 'payload' && credential !== undefined) ||
+      (flag !== undefined && (flag !== '--trusted-runner' || !key || extra.length))) {
+    throw new Error('Usage: receipt.mjs payload RECEIPT.json | verify RECEIPT.json CREDENTIAL SIGNER NONCE [--trusted-runner RUNNER_PUBLIC.pem]');
   }
   const receipt = JSON.parse(await readFile(file, 'utf8'));
+  if (key) authorizedReceiptClaim(receipt, await readFile(key, 'utf8'));
   console.log(JSON.stringify(command === 'payload'
     ? { schema: name, version: 1, data: receiptClaim(receipt) }
     : await verifyDevnetAttestation({ receipt, credential, signer, nonce,

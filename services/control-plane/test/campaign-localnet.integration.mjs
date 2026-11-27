@@ -1,20 +1,24 @@
 import assert from 'node:assert/strict';
 import { createPrivateKey, sign } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
-import { Connection, Keypair } from '@solana/web3.js';
-import { createMint, getOrCreateAssociatedTokenAccount, mintTo } from '@solana/spl-token';
-import { buildTransfer, readKeypair, signTransfer } from '../../settlement/chain.mjs';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { ACCOUNT_SIZE, createMint, getAssociatedTokenAddressSync, getOrCreateAssociatedTokenAccount, mintTo } from '@solana/spl-token';
+import {
+  assertFinalizedTransfer, buildTransfer, createCampaignFundingTransaction, DEVNET, readKeypair, signTransfer,
+} from '../../settlement/chain.mjs';
 import { createCampaignSettlementWorker } from '../src/campaign-escrow.mjs';
 import { apk, enroll, heartbeat, leaseProof, review, startTestPilot } from '../test-support/pilot-fixtures.mjs';
 
-const rpc = 'http://127.0.0.1:8899';
+const localRpc = 'http://127.0.0.1:8899';
 const origin = 'http://127.0.0.1:18765';
 const final = { commitment: 'finalized', preflightCommitment: 'confirmed' };
 const genesisPin = process.env.AGUS_TEST_LOCAL_GENESIS;
+const devnetDirectory = process.env.AGUS_TEST_CAMPAIGN_DEVNET_IDENTITIES;
+const amountAtoms = '1700000';
 
 async function fundSol(connection, wallet) {
   const lifetime = await connection.getLatestBlockhash('confirmed');
@@ -22,26 +26,94 @@ async function fundSol(connection, wallet) {
   assert.equal((await connection.confirmTransaction({ signature, ...lifetime }, 'finalized')).value.err, null);
 }
 
-test('real Localnet and Postgres reserve, settle full and partial entitlements, and refund the remainder', {
-  timeout: 180_000, skip: !genesisPin && 'set AGUS_TEST_LOCAL_GENESIS and AGUS_TEST_PRODUCT_DATABASE_URL for the funded chain test',
+async function existingWallet(directory, role) {
+  const file = join(directory, role + '.json');
+  const info = await lstat(file);
+  assert(info.isFile() && (process.platform === 'win32' || !(info.mode & 0o077)), 'Use an owner-only wallet file');
+  const signer = await readKeypair(file);
+  const wallet = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(await readFile(file, 'utf8'))));
+  assert.equal(signer.address, wallet.publicKey.toBase58());
+  return wallet;
+}
+
+async function verifyFinalized(connection, signature, expected, network) {
+  const { value: [status] } = await connection.getSignatureStatuses([signature], { searchTransactionHistory: true });
+  assert.equal(status?.confirmationStatus, 'finalized');
+  assert.equal(status.err, null);
+  const response = await fetch(connection.rpcEndpoint, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(10_000),
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getTransaction',
+      params: [signature, { encoding: 'jsonParsed', commitment: 'finalized', maxSupportedTransactionVersion: 0 }] }),
+  });
+  assert(response.ok, 'Independent finalized RPC read failed');
+  const { result: transaction } = await response.json();
+  assert.equal(transaction?.slot, status.slot);
+  return assertFinalizedTransfer(transaction, signature, expected, network);
+}
+
+async function waitForFinalizedFunding(connection, signature) {
+  for (let retry = 0; retry < 60; retry++) {
+    const { value: [status] } = await connection.getSignatureStatuses([signature], { searchTransactionHistory: true });
+    if (status) assert.equal(status.err, null, 'Funding transaction failed');
+    if (status?.confirmationStatus === 'finalized') return;
+    await delay(1_000);
+  }
+  assert.fail('Funding finality unresolved. Reconcile the recorded signature before proceeding.');
+}
+
+test('funded campaign with Postgres settles full and partial entitlements and refunds the remainder', {
+  timeout: devnetDirectory ? 300_000 : 180_000,
+  skip: !genesisPin && !devnetDirectory && 'set a pinned Localnet genesis or opt into the disposable Devnet acceptance',
 }, async t => {
   const databaseUrl = process.env.AGUS_TEST_PRODUCT_DATABASE_URL;
-  assert(databaseUrl?.includes('@127.0.0.1:'), 'Use disposable loopback Postgres');
+  assert(databaseUrl && new URL(databaseUrl).hostname === '127.0.0.1', 'Use disposable loopback Postgres');
+  const devnet = Boolean(devnetDirectory);
+  assert(!(devnet && genesisPin), 'Select a single chain');
+  const journal = devnet ? join(devnetDirectory, 'campaign-acceptance.json') : null;
+  if (devnet) {
+    assert.equal(process.env.AGUS_TEST_CAMPAIGN_DEVNET_BROADCAST, '1', 'Explicitly authorize disposable Devnet funding');
+    const info = await lstat(devnetDirectory);
+    assert(info.isDirectory() && (process.platform === 'win32' || !(info.mode & 0o077)), 'Use an owner-only identity directory');
+    await assert.rejects(lstat(journal), { code: 'ENOENT' }, 'Reconcile the existing campaign acceptance journal before creating a new campaign');
+  }
+  const rpc = devnet ? DEVNET.rpc : localRpc;
   const connection = new Connection(rpc, 'finalized');
   const genesis = await connection.getGenesisHash();
-  assert.equal(genesis, genesisPin, 'Explicitly pin the disposable validator');
+  assert.equal(genesis, devnet ? DEVNET.genesis : genesisPin, 'Unexpected Solana genesis');
   const directory = await mkdtemp(join(tmpdir(), 'agus-campaign-escrow-'));
   t.after(() => rm(directory, { force: true, recursive: true }));
-  const [cashier, funder, humanWallet, automatedWallet, replacement] = Array.from({ length: 5 }, () => Keypair.generate());
-  await Promise.all([fundSol(connection, cashier), fundSol(connection, funder)]);
-  const mint = await createMint(connection, cashier, cashier.publicKey, null, 6, undefined, final);
-  const deposit = await getOrCreateAssociatedTokenAccount(connection, cashier, mint, cashier.publicKey, false, 'finalized', final);
-  const source = await getOrCreateAssociatedTokenAccount(connection, funder, mint, funder.publicKey, false, 'finalized', final);
-  await mintTo(connection, cashier, mint, source.address, cashier, 4_000_000n, [], final);
-  const keyFile = join(directory, 'operator.json');
-  await writeFile(keyFile, JSON.stringify([...cashier.secretKey]), { mode: 0o600, flag: 'wx' });
+  const [cashier, funder, humanWallet] = devnet ? await Promise.all(
+    ['settlement-operator', 'campaign-funder', 'contributor-payout'].map(role => existingWallet(devnetDirectory, role)),
+  ) : Array.from({ length: 3 }, () => Keypair.generate());
+  const automatedWallet = devnet ? humanWallet : Keypair.generate();
+  const replacement = Keypair.generate();
+  assert.equal(new Set([cashier, funder, humanWallet].map(wallet => wallet.publicKey.toBase58())).size, 3);
+  let mint, deposit;
+  const keyFile = join(devnet ? devnetDirectory : directory, devnet ? 'settlement-operator.json' : 'operator.json');
+  const funderFile = join(devnet ? devnetDirectory : directory, devnet ? 'campaign-funder.json' : 'funder.json');
+  if (devnet) {
+    const tokenAccountRent = await connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE, 'finalized');
+    const feeReserve = 50_000;
+    assert((await connection.getBalance(funder.publicKey, 'finalized')) >= feeReserve, 'Fund the campaign funder with Devnet SOL');
+    assert((await connection.getBalance(cashier.publicKey, 'finalized')) >= tokenAccountRent + feeReserve,
+      'Fund the campaign operator with Devnet SOL for fees and a recipient token account');
+    mint = new PublicKey(DEVNET.mint);
+    deposit = getAssociatedTokenAddressSync(mint, cashier.publicKey);
+    const source = getAssociatedTokenAddressSync(mint, funder.publicKey);
+    assert(BigInt((await connection.getTokenAccountBalance(source, 'finalized')).value.amount) >= BigInt(amountAtoms), 'Fund the source with Devnet test USDC');
+    assert.equal((await connection.getTokenAccountBalance(deposit, 'finalized')).value.amount, '0', 'Use an empty disposable operator token account');
+  } else {
+    await Promise.all([fundSol(connection, cashier), fundSol(connection, funder)]);
+    mint = await createMint(connection, cashier, cashier.publicKey, null, 6, undefined, final);
+    deposit = (await getOrCreateAssociatedTokenAccount(connection, cashier, mint, cashier.publicKey, false, 'finalized', final)).address;
+    const source = await getOrCreateAssociatedTokenAccount(connection, funder, mint, funder.publicKey, false, 'finalized', final);
+    await mintTo(connection, cashier, mint, source.address, cashier, 4_000_000n, [], final);
+    await writeFile(keyFile, JSON.stringify([...cashier.secretKey]), { mode: 0o600, flag: 'wx' });
+    await writeFile(funderFile, JSON.stringify([...funder.secretKey]), { mode: 0o600, flag: 'wx' });
+  }
   const pilot = await startTestPilot(t, { databaseUrl, env: {
-    AGUS_PUBLIC_ORIGIN: origin, AGUS_CAMPAIGN_SETTLEMENT_CLUSTER: 'localnet', AGUS_CAMPAIGN_SETTLEMENT_GENESIS: String(genesis),
+    AGUS_PUBLIC_ORIGIN: origin, AGUS_CAMPAIGN_SETTLEMENT_CLUSTER: devnet ? 'devnet' : 'localnet',
+    AGUS_ENABLE_CAMPAIGN_DEVNET: devnet ? '1' : '0', AGUS_CAMPAIGN_SETTLEMENT_GENESIS: String(genesis),
     AGUS_CAMPAIGN_SETTLEMENT_MINT: String(mint), AGUS_CAMPAIGN_SETTLEMENT_RPC_URL: rpc,
     AGUS_CAMPAIGN_SETTLEMENT_KEYPAIR_FILE: keyFile,
   } });
@@ -81,15 +153,25 @@ test('real Localnet and Postgres reserve, settle full and partial entitlements, 
   await as(buyer, 'POST', path + '/launch', after, 409);
   await as(outsider, 'POST', path + '/funding/quote', after, 404);
   const { escrow: { quote } } = await as(buyer, 'POST', path + '/funding/quote', after);
-  assert.equal(quote.amountAtoms, '1700000');
-  const funderFile = join(directory, 'funder.json');
-  await writeFile(funderFile, JSON.stringify([...funder.secretKey]), { mode: 0o600, flag: 'wx' });
+  assert.equal(quote.amountAtoms, amountAtoms);
   const fundingSigner = await readKeypair(funderFile);
   const lifetime = await connection.getLatestBlockhash('confirmed');
-  const funding = await signTransfer(await buildTransfer({ payer: fundingSigner, recipient: quote.deposit, amountAtoms: quote.amountAtoms,
-    memo: quote.memo, network: quote.network, lifetime: { ...lifetime, lastValidBlockHeight: BigInt(lifetime.lastValidBlockHeight) } }));
+  const blockhash = { ...lifetime, lastValidBlockHeight: BigInt(lifetime.lastValidBlockHeight) };
+  const funding = await signTransfer(devnet ? await createCampaignFundingTransaction(quote, blockhash, fundingSigner)
+    : await buildTransfer({ payer: fundingSigner, recipient: quote.deposit, amountAtoms: quote.amountAtoms,
+      memo: quote.memo, network: quote.network, lifetime: blockhash }));
+  if (devnet) {
+    await writeFile(journal, JSON.stringify({
+      campaignId: campaign.id, quote, fundingSignature: funding.signature, lastValidBlockHeight: lifetime.lastValidBlockHeight,
+    }, null, 2) + '\n', { mode: 0o600, flag: 'wx', flush: true });
+  }
   await connection.sendRawTransaction(Buffer.from(funding.signedTransaction, 'base64'), { maxRetries: 0, preflightCommitment: 'confirmed' });
-  assert.equal((await connection.confirmTransaction({ ...lifetime, signature: funding.signature }, 'finalized')).value.err, null);
+  if (devnet) await waitForFinalizedFunding(connection, funding.signature);
+  else assert.equal((await connection.confirmTransaction({ ...lifetime, signature: funding.signature }, 'finalized')).value.err, null);
+  const fundingProof = await verifyFinalized(connection, funding.signature, {
+    payer: String(funder.publicKey), recipient: String(cashier.publicKey), amountAtoms, memo: quote.memo, afterSlot: quote.afterSlot,
+    timeWindow: { from: Math.floor(quote.createdAt / 1000), until: Math.floor(quote.expiresAt / 1000) },
+  }, quote.network);
   await Promise.all([1, 2].map(() => as(buyer, 'POST', path + '/funding/verify', { signature: funding.signature })));
   await as(buyer, 'POST', path + '/launch', after);
 
@@ -165,10 +247,24 @@ test('real Localnet and Postgres reserve, settle full and partial entitlements, 
   const refund = await finalized(buyer, path + '/funding/refund', 'refund');
   assert.equal(refund.amountAtoms, '800000');
   assert.equal(refund.recipient, String(funder.publicKey));
-  assert.equal((await connection.getTokenAccountBalance(deposit.address)).value.amount, '0');
+  assert.equal((await connection.getTokenAccountBalance(deposit, 'finalized')).value.amount, '0');
   const { earnings } = await as(human, 'GET', '/me/campaign-earnings');
   assert.equal(earnings.funded.find(entry => entry.network.mint === String(mint)).finalizedAtoms, '200000');
   assert.equal((await as(buyer, 'POST', path + '/funding/refund', {})).refund.signature, refund.signature);
-  console.log(JSON.stringify({ network: 'disposable Localnet', genesis, mint: String(mint), funding: funding.signature,
-    automatic, partial, refund }));
+  for (const [kind, id, receipt] of [
+    ['payout', auto.assignment.id, automatic], ['payout', humanWork.assignment.id, partial], ['refund', campaign.id, refund],
+  ]) {
+    const independent = await verifyFinalized(connection, receipt.signature, {
+      payer: String(cashier.publicKey), recipient: receipt.recipient, amountAtoms: receipt.amountAtoms,
+      memo: `agus:campaign:${kind}:v1:${quote.reference}:${id}`, afterSlot: fundingProof.slot, createRecipientAccount: true,
+    }, quote.network);
+    assert.deepEqual(independent, receipt);
+  }
+  const evidence = { network: devnet ? 'disposable Devnet' : 'disposable Localnet', genesis, mint: String(mint),
+    funding: fundingProof, automatic, partial, refund, finalDepositAtoms: '0' };
+  if (devnet) {
+    await writeFile(join(devnetDirectory, 'campaign-finalized.json'), JSON.stringify(evidence, null, 2) + '\n',
+      { mode: 0o600, flag: 'wx', flush: true });
+  }
+  console.log(JSON.stringify(evidence));
 });

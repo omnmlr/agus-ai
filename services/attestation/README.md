@@ -23,7 +23,8 @@ export AGUS_SAS_AUTHORITY_KEYPAIR_FILE=/path/to/private-identities/sas-authority
 export AGUS_SAS_ISSUER_KEYPAIR_FILE=/path/to/private-identities/sas-issuer.json
 node services/attestation/issue.mjs initialize agus-rc-demo ISSUER_PUBLIC_ADDRESS --broadcast
 node services/attestation/issue.mjs issue receipt.json trusted-runner.pem CREDENTIAL_PUBLIC_ADDRESS --broadcast
-node services/attestation/receipt.mjs verify receipt.json CREDENTIAL_PUBLIC_ADDRESS ISSUER_PUBLIC_ADDRESS NONCE
+node services/attestation/receipt.mjs verify receipt.json CREDENTIAL_PUBLIC_ADDRESS ISSUER_PUBLIC_ADDRESS NONCE \
+  --trusted-runner trusted-runner.pem
 ```
 
 `AGUS_SAS_DEVNET_RPC_URL` can select an authorized HTTPS Devnet RPC. Issuance calculates the nonce from the trusted receipt digest, checks authorization before signing, and reconciles account creation by reading finalized state. Rerunning issuance checks the same attestation PDA. If confirmation remains unresolved, reconcile the returned public PDA and transaction signature before retrying. Use the separate authority only for credential and schema preparation. Finalized test-network issuance requires actual funded Devnet signers and network access.

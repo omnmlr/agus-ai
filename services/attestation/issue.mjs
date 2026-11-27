@@ -1,4 +1,3 @@
-import { createPublicKey } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
@@ -13,8 +12,10 @@ import {
 } from 'sas-lib';
 import { digest } from '../control-plane/src/security.mjs';
 import {
-  decodeCredential, decodeReceiptSchema, devnetGenesis, field, name, publicRpc, receiptClaim, verifyDevnetAttestation,
+  authorizedReceiptClaim, decodeCredential, decodeReceiptSchema, devnetGenesis, field, name, publicRpc, verifyDevnetAttestation,
 } from './receipt.mjs';
+
+export { authorizedReceiptClaim } from './receipt.mjs';
 
 async function assertDevnet(rpc) {
   if (await rpc('getGenesisHash', []) !== devnetGenesis) throw new Error('Devnet genesis mismatch');
@@ -64,14 +65,6 @@ export async function initializeSas({ authority, issuer, label, rpc = publicRpc 
   });
   decodeReceiptSchema(schemaAccount, credential);
   return { network: 'devnet', credential, schema, authority: authority.address, issuer };
-}
-
-export function authorizedReceiptClaim(receipt, trustedReceiptKey) {
-  const claim = receiptClaim(receipt);
-  const pinned = createPublicKey(trustedReceiptKey).export({ type: 'spki', format: 'der' });
-  const embedded = createPublicKey(receipt.publicKeyPem).export({ type: 'spki', format: 'der' });
-  if (!pinned.equals(embedded)) throw new Error('Execution receipt was signed by an unapproved runner');
-  return claim;
 }
 
 export async function issueSas({ receipt, trustedReceiptKey, credential, issuer, rpc = publicRpc }) {

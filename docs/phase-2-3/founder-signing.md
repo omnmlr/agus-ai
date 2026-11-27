@@ -25,6 +25,22 @@ Match the reported public addresses to the founder's roster before requesting fu
 
 Use the campaign funder file only on the workstation that authorizes the campaign funding transfer. Mount only the campaign operator file into the isolated settlement container. Bind the funder and contributor wallet ownership with account-specific proofs. The SAS authority prepares the credential and delegates the SAS issuer. Keep the authority offline between administrative operations. Keep the public runner key from enrollment in the release evidence so it can be checked independently against the signed receipt.
 
+### Funded campaign acceptance
+
+After checking finalized balances and token accounts, use an empty disposable operator token account and a dedicated disposable Postgres database on `127.0.0.1`. Set `AGUS_TEST_PRODUCT_DATABASE_URL` through the local test database's secret store. Run from the repository root.
+
+```bash
+npm ci
+npm ci --prefix services/control-plane
+AGUS_TEST_CAMPAIGN_DEVNET_IDENTITIES="$signing_root/devnet" \
+  AGUS_TEST_CAMPAIGN_DEVNET_BROADCAST=1 \
+  node --test services/control-plane/test/campaign-localnet.integration.mjs
+```
+
+The fixture submits signed software workload evidence to an isolated control plane. With the Devnet flag it quotes and broadcasts exactly 1.7 test USDC, then verifies the 0.7 payout, 0.2 partial award and 0.8 refund using separate finalized RPC reads. The contributor key receives both awards in this fixture. A readiness check stops before signing if the funder and operator lack the required reserves. Add `NODE_USE_ENV_PROXY=1` when the workstation uses a configured outbound proxy.
+
+Preserve the acceptance database and `campaign-acceptance.json` if execution stops after signing. The journal is written before submission and blocks a fresh attempt in that identity directory. Reconcile its public signature and the existing campaign state before approving any further transfer. On success, `campaign-finalized.json` contains public finalized receipts and the empty deposit balance.
+
 ## Android release keys and private-preview manifest
 
 Keep using any approved existing release key for the corresponding installed app. Only initialize the following files for new signing identities. Run the two keytool commands in an interactive terminal, with independent password-manager entries for the two keystores.
