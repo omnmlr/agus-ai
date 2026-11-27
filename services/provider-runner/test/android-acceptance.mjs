@@ -28,7 +28,7 @@ if (!serial || !fixturePath || !outputDirectory) {
 const wallet = walletPath && walletPath !== "-";
 const scenario = wallet ? (process.env.AGUS_ANDROID_ACCEPTANCE_TRANSFER === "1" ? "wallet-transfer" : "wallet-connect") : "app-launch";
 const expectedTransaction = scenario === "wallet-transfer" ? {
-  network: "localnet", recipient: FIXTURE_RECIPIENT, lamports: FIXTURE_AMOUNT,
+  network: "localnet", recipient: FIXTURE_RECIPIENT, lamports: Number(FIXTURE_AMOUNT),
 } : undefined;
 const fixture = await readFile(fixturePath);
 const digest = sha256(fixture);

@@ -34,12 +34,13 @@ async function fixture(t, overrides = {}) {
     await store.close();
     await rm(directory, { recursive: true, force: true });
   });
-  async function request(path, { method, token, body, status = 200, binary } = {}) {
+  async function request(path, { method, token, body, status = 200, binary, idempotencyKey } = {}) {
     const response = await fetch(origin + '/api/v1' + path, {
       method: method ?? (body === undefined ? 'GET' : 'POST'),
       headers: {
         ...(token ? { Authorization: 'Bearer ' + token } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -97,6 +98,31 @@ const privateRequest = (workload, deviceId) => ({
   maximumDurationSeconds: 20, evidence: { screenshots: false, logs: true, trajectory: false },
 });
 
+test('concurrent run and invitation retries retain one resource and invitation token', async (t) => {
+  const f = await fixture(t);
+  const developer = await f.account('idempotent-developer');
+  const provider = await f.account('idempotent-provider');
+  const device = await f.pair(provider, 'idempotent-device');
+  const app = await f.workload(developer);
+  const options = { token: developer.token, idempotencyKey: 'same-key', status: 201 };
+  const run = { ...app, scenario: 'app-launch', mode: 'scripted' };
+  const [first, retry] = await Promise.all([
+    f.request('/runs', { ...options, body: run }),
+    f.request('/runs', { ...options, body: { mode: 'scripted', ...run } }),
+  ]);
+  assert.equal(first.run.id, retry.run.id);
+  const conflict = await f.request('/runs', { ...options, body: { ...run, mode: 'agent' }, status: 409 });
+  assert.equal(conflict.error.code, 'idempotency_conflict');
+  const invitation = privateRequest(app, device.id);
+  const [created, replayed] = await Promise.all([
+    f.request('/invitations', { ...options, body: invitation }),
+    f.request('/invitations', { ...options, body: invitation }),
+  ]);
+  assert.equal(created.invitation.id, replayed.invitation.id);
+  assert.equal(created.token, replayed.token);
+  assert.equal((await f.request('/invitations', { token: provider.token })).invitations.length, 1);
+});
+
 test('owner device, targeted invite, offline grant, exclusive claim, and stop ACK', async (t) => {
   const f = await fixture(t);
   const owner = await f.account('owner');
@@ -108,6 +134,8 @@ test('owner device, targeted invite, offline grant, exclusive claim, and stop AC
   const { devices: owned } = await f.request('/me/devices', { token: owner.token });
   assert.equal(owned[0].id, worker.id);
   assert.equal(owned[0].profile.imei, undefined);
+  assert.equal(owned[0].profile.batteryHealth, null);
+  assert.equal(owned[0].profile.networkLatencyMs, null);
   assert.equal(owned[0].profile.hardwareAttested, false);
   assert.equal(owned[0].publicListing, false);
   assert.equal(owned[0].autoMatch, false);

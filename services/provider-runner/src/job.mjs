@@ -48,7 +48,7 @@ function walletSpec(config, job) {
   const expected = job.expectedTransaction;
   if (!config.localnet || (job.scenario === "wallet-transfer" && !expected) ||
       (expected && (expected.network !== configured.network || expected.recipient !== configured.recipient ||
-        expected.lamports !== configured.lamports))) {
+        expected.lamports !== Number(configured.lamports)))) {
     throw new RunnerFailure("FIXTURE_WALLET_POLICY");
   }
   return configured;

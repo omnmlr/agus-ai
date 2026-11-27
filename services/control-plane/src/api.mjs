@@ -30,7 +30,7 @@ export function createApi({ store, config, settlement }) {
       response.setHeader('Access-Control-Allow-Origin', origin);
       response.setHeader('Vary', 'Origin');
       response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
-      response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Idempotency-Key');
+      response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Idempotency-Key, Last-Event-ID');
     }
     if (request.method === 'OPTIONS') {
       response.writeHead(!origin || origin === config.corsOrigin ? 204 : 403).end();
