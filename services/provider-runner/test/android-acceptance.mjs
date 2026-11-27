@@ -28,6 +28,10 @@ if (!serial || !fixturePath || !outputDirectory) {
 const planner = process.env.AGUS_ANDROID_ACCEPTANCE_GEMINI === "1" ? "gemini" : "remote";
 if (planner === "gemini" && !process.env.AGUS_GEMINI_API_KEY) throw new Error("Configure AGUS_GEMINI_API_KEY for model-driven acceptance");
 const wallet = walletPath && walletPath !== "-";
+const correctionFixture = process.env.AGUS_PRODUCT_CORRECTION_FIXTURE;
+if (correctionFixture && (wallet || planner !== "remote" || serial !== "emulator-5554")) {
+  throw new Error("Correction seeding requires the disposable relay-controlled AVD");
+}
 const scenario = wallet ? (process.env.AGUS_ANDROID_ACCEPTANCE_TRANSFER === "1" ? "wallet-transfer" : "wallet-connect") : "app-launch";
 const expectedTransaction = scenario === "wallet-transfer" ? {
   network: "localnet", recipient: FIXTURE_RECIPIENT, lamports: FIXTURE_AMOUNT,
@@ -72,17 +76,20 @@ try {
     assert.equal(sha256(await readFile(walletPath)), FAKE_WALLET_SHA);
     assert.equal(await android.present(FAKE_WALLET, control.signal), false, "Start with an uninstalled Fake Wallet on this dedicated device");
   }
-  ({ server, store } = await createControlPlane({
-    env: {
-      AGUS_LOCAL_DATA_DIR: join(temporary, "control"),
-      AGUS_PROVIDER_BOOTSTRAP_TOKEN: secret(),
-      AGUS_ALLOW_LEGACY_POOL: "0",
-      ...(expectedTransaction ? { AGUS_LOCALNET_RPC_URL: "http://127.0.0.1:8899" } : {}),
-    },
-  }));
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const base = "http://127.0.0.1:" + server.address().port;
+  let base = "http://127.0.0.1:18765";
+  if (!correctionFixture) {
+    ({ server, store } = await createControlPlane({
+      env: {
+        AGUS_LOCAL_DATA_DIR: join(temporary, "control"),
+        AGUS_PROVIDER_BOOTSTRAP_TOKEN: secret(),
+        AGUS_ALLOW_LEGACY_POOL: "0",
+        ...(expectedTransaction ? { AGUS_LOCALNET_RPC_URL: "http://127.0.0.1:8899" } : {}),
+      },
+    }));
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    base = "http://127.0.0.1:" + server.address().port;
+  }
   async function request(path, token, body, { method = body === undefined ? "GET" : "POST", status = [200, 201] } = {}) {
     const response = await fetch(base + "/api/v1" + path, {
       method,
@@ -223,6 +230,15 @@ try {
   if (wallet) assert.equal(completed.receipt.manifest.checks.find(({ id }) => id === "wallet-authorized")?.passed, true);
   if (expectedTransaction) assert.equal(completed.verification.transaction.status, "verified");
 
+  if (correctionFixture) {
+    const { actions } = await request("/runs/" + completed.id + "/actions", developer);
+    const actionIndex = actions.findIndex(action => action.type === "describe" && action.state === "completed");
+    assert(actionIndex >= 0, "A completed relay action is required for correction");
+    const reference = { runId: completed.id, actionIndex, actual: "describe", suggested: "launch",
+      manifestSha256: completed.receipt.manifestSha256, deviceSource: device.profile.source };
+    await writeFile(join(correctionFixture, "agent.private.json"), JSON.stringify({ developer, projectId: project.id, ...reference }), { mode: 0o600 });
+    await writeFile(join(correctionFixture, "correction-reference.json"), JSON.stringify(reference, null, 2) + "\n");
+  } else {
   await request("/me/devices/" + encodeURIComponent(device.id), owner, { publicListing: true, autoMatch: false }, { method: "PATCH" });
   const { run: marketplaceRun } = await request("/runs", developer, {
     projectId: project.id, buildId: build.id, deviceId: device.id, allocation: "marketplace",
@@ -243,6 +259,7 @@ try {
     private: { runId: privateRun.id, scenario, outcome: completed.evaluationOutcome, actions: completed.receipt.manifest.execution.deviceActionCount },
     marketplace: { runId: marketplaceRun.id, outcome: marketplace.evaluationOutcome, payout: "unpaid" },
   }));
+  }
 } finally {
   control.abort(new RunnerFailure("ACCEPTANCE_COMPLETE"));
   await provider;

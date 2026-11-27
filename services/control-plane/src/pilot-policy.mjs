@@ -3,7 +3,6 @@ import { badInput, decodeBase64, digest, hex256, object, requireCondition, stabl
 
 export const nativeClasses = ['phone_human', 'phone_cooperative'];
 export const workProfilePolicy = 'managed-profile-v1';
-export const fixtureComponent = '.TestActivity';
 export const sdkVersion = 'cooperative-v1';
 
 export function exact(value, fields, label) {
@@ -47,9 +46,15 @@ export function pilotConfig(env) {
     entries = JSON.parse(env.AGUS_NATIVE_REVIEWED_BUILDS ?? '[]');
     if (!Array.isArray(entries) || entries.length > 16) throw new Error();
     for (const entry of entries) {
-      exact(entry, ['sha256', 'packageName', 'signerSha256'], 'reviewed fixture');
+      exact(entry, ['sha256', 'packageName', 'signerSha256', 'component'], 'reviewed workload');
       if (!hex256(entry.sha256) || !hex256(entry.signerSha256)
-        || !/^app\.agus\.preview\.[a-z][a-z0-9_]*$/.test(entry.packageName)) throw new Error();
+        || typeof entry.packageName !== 'string' || entry.packageName.length > 120
+        || !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$/.test(entry.packageName)
+        || entry.packageName.startsWith('com.android.') || entry.packageName.startsWith('com.google.android.')
+        || ['app.agus.runtime.preview', 'app.agus.companion'].includes(entry.packageName)) throw new Error();
+      const component = entry.component ?? '.TestActivity';
+      if (typeof component !== 'string' || component.length > 120 || !/^(\.[A-Za-z][A-Za-z0-9_]*)+$/.test(component)) throw new Error();
+      entry.component = entry.packageName + component;
     }
     if (new Set(entries.map(entry => entry.sha256)).size !== entries.length) throw new Error();
   } catch {

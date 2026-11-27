@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { digest, hex256, requireCondition, stableJson, string, token } from './security.mjs';
 import {
-  conflict, exact, fixtureComponent, integer, manifestEnvelope, missing, nativeClasses, own,
+  conflict, exact, integer, manifestEnvelope, missing, nativeClasses, own,
   p256PublicKey, qualifyingPolicy, sdkVersion, verifyNativeProof, workProfilePolicy,
 } from './pilot-policy.mjs';
 
@@ -134,7 +134,7 @@ export function issueNativeLease(state, installation, assignment, task, build, p
     attemptId: assignment.attempt.id, leaseId: id, fence, runtimeClass: installation.runtimeClass,
     campaignRevision: assignment.campaignRevision, actionContract: sdkVersion,
     taskKind: task.kind ?? 'automated_test',
-    build: { id: build.id, ...review, component: review.packageName + fixtureComponent },
+    build: { id: build.id, ...review },
     actions: installation.runtimeClass === 'phone_cooperative' ? task.actions : [],
     observationSchema: 'fixture-result-v1', policyVersion: workProfilePolicy,
     issuedAt: now, deadline, ttlMs: authorityMs, challenge: token(),

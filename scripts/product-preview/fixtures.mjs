@@ -7,11 +7,11 @@ import { verifyNativeReceipt } from '../../packages/developer-client/src/native-
 const directory = resolve(process.argv[2]);
 const action = process.argv[3];
 const journey = process.env.AGUS_PREVIEW_JOURNEY ?? 'full';
-if (!['full', 'safety', 'cooperative'].includes(journey)) throw Error('Unknown Android preview journey');
+if (!['full', 'safety', 'cooperative', 'partner', 'signer', 'correction'].includes(journey)) throw Error('Unknown Android preview journey');
 const endpoint = 'http://127.0.0.1:18765/api/v1';
 const testUser = { email: 'reviewer@example.invalid', password: 'DisposablePilotPassword123' };
 
-async function request(method, path, token, body) {
+async function request(method, path, token, body, expected) {
   const response = await fetch(endpoint + path, {
     method, redirect: 'error',
     headers: { ...(token ? { Authorization: 'Bearer ' + token } : {}),
@@ -19,13 +19,15 @@ async function request(method, path, token, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const value = await response.json();
-  if (!response.ok) throw Error(path + ' returned ' + response.status + ' ' + value.error?.code);
+  if (expected ? response.status !== expected : !response.ok) throw Error(path + ' returned ' + response.status + ' ' + value.error?.code);
   return value;
 }
 
-const apk = await readFile(resolve(directory, 'fixture.apk'));
-const reviewed = { sha256: digest(apk), packageName: 'app.agus.preview.fixture',
-  signerSha256: (await readFile(resolve(directory, 'fixture-signer.txt'), 'utf8')).trim() };
+const partner = ['partner', 'signer'].includes(journey);
+const artifact = partner ? 'partner' : 'fixture';
+const apk = await readFile(resolve(directory, artifact + '.apk'));
+const reviewed = { sha256: digest(apk), packageName: partner ? 'org.example.agus.checklist' : 'app.agus.preview.fixture',
+  signerSha256: (await readFile(resolve(directory, (journey === 'signer' ? 'fixture' : artifact) + '-signer.txt'), 'utf8')).trim() };
 
 if (action === 'serve') {
   const data = resolve(directory, 'database');
@@ -38,7 +40,8 @@ if (action === 'serve') {
   app.server.listen(18765, '127.0.0.1');
   process.once('SIGTERM', () => app.server.close(() => app.store.close()));
 } else if (action === 'seed') {
-  const { token } = await request('POST', '/auth/register', null, {
+  const correction = journey === 'correction' ? JSON.parse(await readFile(resolve(directory, 'agent.private.json'), 'utf8')) : null;
+  const { token } = correction ? { token: correction.developer } : await request('POST', '/auth/register', null, {
     email: 'developer@example.invalid', password: 'DisposableBuilderPassword123',
   });
   const contributor = await request('POST', '/auth/register', null, testUser);
@@ -46,7 +49,8 @@ if (action === 'serve') {
     sequence: ['continue', 'review', 'continue'], expectedCode: 'single_continue', actualCode: 'multiple_continue',
     walletAnswer: 'finalized_effects', evidenceNote: 'Compare the reviewed onboarding action counter twice.',
   });
-  const { project } = await request('POST', '/projects', token, { name: 'Onboarding preview' });
+  const { project } = correction ? { project: { id: correction.projectId } }
+    : await request('POST', '/projects', token, { name: 'Onboarding preview' });
   const { build } = await request('POST', '/builds', token, {
     name: 'Pinned test build', sha256: reviewed.sha256, packageName: reviewed.packageName,
     projectId: project.id, apkBase64: apk.toString('base64'),
@@ -62,7 +66,14 @@ if (action === 'serve') {
     { ...task, kind: 'human_test', runtimeClass: 'phone_human', title: 'Offline authority expiry', stopTestUnits: 2,
       instructions: 'Confirm the watchdog suspends the app when authority expires offline.' },
   ];
-  const tasks = journey === 'safety' ? cases.slice(2) : journey === 'cooperative' ? [cases[1]] : cases;
+  const tasks = correction ? [{ ...task, kind: 'agent_correction', runtimeClass: 'phone_human', title: 'Correct the sealed relay action',
+    instructions: 'Compare the completed describe action with launching the reviewed app.', referenceRunId: correction.runId }]
+    : journey === 'safety' ? cases.slice(2) : ['cooperative', 'partner', 'signer'].includes(journey) ? [cases[1]] : cases;
+  if (journey === 'partner') {
+    await request('POST', '/campaigns', token, { projectId: project.id, title: 'Unauthorized action',
+      objective: 'Reject an action outside the SDK contract', deadlineAt: Date.now() + 3_600_000,
+      tasks: [{ ...cases[1], actions: ['advance', 'shell'] }] }, 400);
+  }
   const { campaign } = await request('POST', '/campaigns', token, { projectId: project.id, title: 'Onboarding regression',
     objective: 'Verify signed evidence and safe cleanup for authorized Android testing.',
     deadlineAt: Date.now() + 3_600_000, budgetTestUnits: tasks.length * task.testUnits, tasks });
@@ -74,7 +85,7 @@ if (action === 'serve') {
   const { report } = await request('GET', path, token);
   const trustedKey = (await readFile(resolve(directory, 'manifest.public.b64'), 'utf8')).trim();
   for (const assignment of report.assignments) {
-    const successful = ['human_demonstration', 'automated_test'].includes(assignment.task.kind);
+    const successful = journey !== 'signer' && ['human_demonstration', 'automated_test', 'agent_correction'].includes(assignment.task.kind);
     if (assignment.state !== (successful ? 'submitted' : 'interrupted')) {
       throw Error(assignment.task.title + ' is ' + assignment.state);
     }
@@ -87,6 +98,10 @@ if (action === 'serve') {
       }
       await writeFile(resolve(directory, assignment.task.runtimeClass + '-receipt.json'), JSON.stringify(evidence, null, 2) + '\n');
     }
+    if (journey === 'signer') {
+      if (assignment.attempt.evidence) throw Error('Wrong signer obtained a report');
+      continue;
+    }
     await request('POST', '/assignments/' + assignment.id + '/reviews', token, {
       attemptId: assignment.attempt.id, version: successful ? 1 : 0, decision: successful ? 'accept' : 'partial',
       reason: 'Completed the authorized preview workflow.',
@@ -94,13 +109,22 @@ if (action === 'serve') {
   }
   await request('POST', '/campaigns/' + campaignId + '/complete', token, { expectedRevision: 1 });
   const updated = (await request('GET', path, token)).report;
-  const expected = { full: 14, safety: 4, cooperative: 5 }[journey];
+  const expected = { full: 14, safety: 4, cooperative: 5, partner: 5, signer: 0, correction: 5 }[journey];
   if (updated.acceptedTestUnits !== expected || (journey === 'full' && updated.cells[0].failed !== 1)
-    || (journey !== 'safety' && updated.cells.find(cell => cell.runtimeClass === 'phone_cooperative')?.passed !== 1)) {
+    || (['full', 'cooperative', 'partner'].includes(journey) && updated.cells.find(cell => cell.runtimeClass === 'phone_cooperative')?.passed !== 1)) {
     throw Error('Unexpected campaign report');
   }
   const demo = updated.assignments.find(assignment => assignment.task.kind === 'human_demonstration');
   const rehearsal = { interrupted: updated.assignments.filter(item => item.state === 'partially_accepted').length };
+  if (journey === 'correction') {
+    const reference = JSON.parse(await readFile(resolve(directory, 'correction-reference.json'), 'utf8'));
+    const evidence = updated.assignments[0].attempt.submissions[0]?.evidence;
+    if (evidence?.correction?.actionIndex !== reference.actionIndex || evidence.correction.actualAction !== reference.actual
+      || evidence.correction.suggestedAction !== reference.suggested || updated.assignments[0].state !== 'accepted') {
+      throw Error('The Android correction differs from the sealed reference');
+    }
+    rehearsal.correction = { ...evidence.correction, referenceManifestSha256: reference.manifestSha256, source: reference.deviceSource };
+  }
   if (demo) {
     const consentPath = '/me/assignments/' + demo.id + '/training-consent';
     await request('PUT', consentPath, token, { termsDigest: demo.termsDigest, grant: true });

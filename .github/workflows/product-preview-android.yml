@@ -6,7 +6,7 @@ on:
       journey:
         description: Android preview journey
         type: choice
-        options: [full, safety, cooperative]
+        options: [full, safety, cooperative, partner, signer, correction]
         default: full
   push:
     branches: [feature/phase-2-3-product]
@@ -59,8 +59,17 @@ jobs:
           backend=$!
           trap 'kill "$backend" || true; adb -s emulator-5554 emu kill >/dev/null 2>&1 || true' EXIT
           curl -sf --retry 5 --retry-delay 1 --retry-connrefused http://127.0.0.1:18765/health
-          node scripts/product-preview/fixtures.mjs "$out" seed
           timeout 240 bash -c 'adb -s emulator-5554 wait-for-device; until [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
+          if [[ "$AGUS_PREVIEW_JOURNEY" == correction ]]; then
+            npm ci --no-audit --no-fund
+            mkdir -p "$out/dedicated-build"
+            bash packages/mobile-test/lab/build-android.sh "$out/dedicated-build"
+            adb -s emulator-5554 shell input keyevent 82
+            AGUS_PRODUCT_CORRECTION_FIXTURE="$out" AGUS_AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt" \
+              node --import tsx services/provider-runner/test/android-acceptance.mjs emulator-5554 \
+              "$out/dedicated-build/agus-mwa-lab.apk" - "$out/dedicated-reference"
+          fi
+          node scripts/product-preview/fixtures.mjs "$out" seed
           AGUS_PREVIEW_BACKEND_PID="$backend" python3 scripts/product-preview/android.py "$out"
           node scripts/product-preview/fixtures.mjs "$out" review
       - name: Retain sanitized preview observations
@@ -71,6 +80,8 @@ jobs:
           path: |
             ${{ runner.temp }}/agus-product-preview/android-checks.json
             ${{ runner.temp }}/agus-product-preview/android-markers.log
+            ${{ runner.temp }}/agus-product-preview/correction-reference.json
+            ${{ runner.temp }}/agus-product-preview/dedicated-reference/private.json
             ${{ runner.temp }}/agus-product-preview/campaign-evidence.json
             ${{ runner.temp }}/agus-product-preview/emulator.log
             ${{ runner.temp }}/agus-product-preview/manifest.public.b64

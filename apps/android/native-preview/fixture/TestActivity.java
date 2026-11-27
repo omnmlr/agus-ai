@@ -27,11 +27,9 @@ public class TestActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         try {
-            if (!"app.agus.runtime.preview".equals(getCallingPackage())
-                || !getSystemService(UserManager.class).isManagedProfile() || state != null) throw new SecurityException();
-            Workload workload = Workload.verify(new JSONObject(getIntent().getStringExtra("manifest")), PreviewConfig.MANIFEST_KEY);
+            if (state != null) throw new SecurityException();
+            Workload workload = Workload.authorize(this, PreviewConfig.MANIFEST_KEY);
             var task = workload.document;
-            if (!task.getJSONObject("build").getString("packageName").equals(getPackageName())) throw new SecurityException();
             deadline = getIntent().getLongExtra("deadline", 0);
             long remaining = deadline - SystemClock.elapsedRealtime();
             if (remaining <= 0 || remaining > task.getLong("ttlMs")) throw new SecurityException();

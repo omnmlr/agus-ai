@@ -12,8 +12,8 @@ import xml.etree.ElementTree as ET
 ADB = str(Path(os.environ["ANDROID_HOME"]) / "platform-tools" / "adb")
 OUT = Path(sys.argv[1])
 APP = "app.agus.runtime.preview"
-FIXTURE = "app.agus.preview.fixture"
 JOURNEY = os.environ.get("AGUS_PREVIEW_JOURNEY", "full")
+FIXTURE = "org.example.agus.checklist" if JOURNEY in ("partner", "signer") else "app.agus.preview.fixture"
 marks = []
 
 
@@ -162,7 +162,8 @@ def run():
     enrollments = 0
     finished = 0
     modes = {"full": ("human", "owner-stop", "offline", "cooperative"),
-             "safety": ("owner-stop", "offline"), "cooperative": ("cooperative",)}[JOURNEY]
+             "safety": ("owner-stop", "offline"), "cooperative": ("cooperative",),
+             "partner": ("cooperative",), "signer": ("cooperative",), "correction": ("human",)}[JOURNEY]
     for number, mode in enumerate(modes, start=1):
         if number == 1 or mode == "cooperative":
             kind = "cooperative" if mode == "cooperative" else "human"
@@ -175,6 +176,16 @@ def run():
         tap("Open foreground window")
         expect("PROFILE_WINDOW_OPEN", number)
         tap("Show my assignments")
+        if JOURNEY == "partner":
+            adb("install", "--user", profile, str(OUT / "partner.apk"))
+            assert package_present(profile)
+            tap("Accept reviewed assignment")
+            tap("Authorize", scroll=False)
+            expect("PROFILE_PACKAGE_COLLISION_REJECTED")
+            assert "PROFILE_LEASE_CLAIMED" not in log() and package_present(profile)
+            adb("uninstall", "--user", profile, FIXTURE)
+            assert not package_present(profile)
+            record("A pre-existing independent publisher package prevented lease admission and was left intact")
         tap("Accept reviewed assignment")
         tap("Authorize", scroll=False)
         expect("PROFILE_LEASE_CLAIMED", number)
@@ -194,6 +205,15 @@ def run():
             record("Failed APK download restored the Android install restriction")
             tap("Allow Android installation source")
         tap("Stage reviewed APK")
+        if JOURNEY == "signer":
+            expect("PROFILE_INSTALL_POLICY_RESTORED")
+            expect("PROFILE_SIGNER_REJECTED")
+            assert not package_present(profile) and "install_status_0" not in log()
+            tap("Stop test now")
+            tap("Confirm clean profile")
+            expect("PROFILE_CLEANED")
+            record("A reviewed digest with a mismatched publisher certificate never reached Android installation")
+            break
         confirm_action("install_status_0", number, {"review android confirmation", "install", "ok"})
         assert package_present(profile) and not package_present("0")
         if mode != "offline":
@@ -239,11 +259,14 @@ def run():
             fill("Reproduction steps, one per line", "Open%sonboarding%sand%sinspect%sthe%sreview")
             fill("Expected outcome", "One%sonboarding%ssubmission")
             fill("Actual outcome", "Duplicate%ssubmission%sobserved" if mode == "human" else "Automated%sstep%spassed")
+            if JOURNEY == "correction":
+                reference = json.loads((OUT / "correction-reference.json").read_text())
+                fill("Recorded action index starting at zero", str(reference["actionIndex"]))
             tap("Review submission", scroll=False)
             tap("Send report", scroll=False)
             expect("PERSON_SUBMISSION_SAVED", finished)
             record(mode + " profile enrollment, signed evidence, cleanup and submission passed")
-            if mode == "human":
+            if mode == "human" and JOURNEY != "correction":
                 tap("Show my assignments")
                 tap("Training consent")
                 tap("Grant", scroll=False)

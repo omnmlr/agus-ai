@@ -1,6 +1,9 @@
 package app.agus.cooperative;
 
 import android.util.Base64;
+import android.app.Activity;
+import android.os.SystemClock;
+import android.os.UserManager;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.MessageDigest;
@@ -24,6 +27,19 @@ public final class Workload {
     public static String encode(byte[] bytes) { return Base64.encodeToString(bytes, Base64.NO_WRAP); }
     public static String sha256(byte[] bytes) throws Exception {
         return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+    }
+
+    /** Call before accessing the app's reviewed test surface. */
+    public static Workload authorize(Activity activity, String trustedKey) throws Exception {
+        if (!"app.agus.runtime.preview".equals(activity.getCallingPackage())
+            || !activity.getSystemService(UserManager.class).isManagedProfile()) throw new SecurityException("Expected the work-profile controller");
+        Workload workload = verify(new JSONObject(activity.getIntent().getStringExtra("manifest")), trustedKey);
+        JSONObject build = workload.document.getJSONObject("build");
+        long remaining = activity.getIntent().getLongExtra("deadline", 0) - SystemClock.elapsedRealtime();
+        if (!activity.getPackageName().equals(build.getString("packageName"))
+            || !activity.getComponentName().getClassName().equals(build.getString("component"))
+            || remaining <= 0 || remaining > workload.document.getLong("ttlMs")) throw new SecurityException("Workload target or deadline differs");
+        return workload;
     }
 
     public static Workload verify(JSONObject envelope, String trustedKey) throws Exception {

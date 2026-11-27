@@ -108,7 +108,7 @@ public class RuntimeActivity extends Activity {
             button("Review Android confirmation", this::confirmPackageOperation);
             button("Remove fixture", () -> {
                 work.stop();
-                RuntimeState.requestRemoval(this);
+                RuntimeState.requestRemoval(this, work);
                 render();
             });
             button("Confirm clean profile", () -> run(() -> {
@@ -281,7 +281,12 @@ public class RuntimeActivity extends Activity {
             return;
         }
         run(() -> {
-            if (!RuntimeState.absent(this)) throw new SecurityException("An existing fixture requires operator cleanup.");
+            String packageName = offer.getJSONObject("task").getString("packageName");
+            if (!PreviewConfig.REVIEWED_PACKAGES.contains(packageName)) throw new SecurityException("This workload package is outside the controller admission list.");
+            if (!RuntimeState.absent(this, packageName)) {
+                mark("PROFILE_PACKAGE_COLLISION_REJECTED");
+                throw new SecurityException("An existing workload package requires operator cleanup.");
+            }
             RuntimeState.heartbeat(this, windowId, windowEnd);
             String installation = RuntimeState.prefs(this).getString("installation", null);
             String offerId = offer.getString("id");
@@ -333,14 +338,11 @@ public class RuntimeActivity extends Activity {
 
     private void launchFixture(RuntimeState.Session work) throws Exception {
         work.requireLive();
-        if (RuntimeState.absent(this) || !ProfileAdmin.installRestricted(this)
+        if (RuntimeState.absent(this, work.packageName) || !ProfileAdmin.installRestricted(this)
             || RuntimeState.prefs(this).getBoolean("packagePending", false)) throw new SecurityException("Finish Android installation first");
-        var info = getPackageManager().getPackageInfo(RuntimeState.FIXTURE, PackageManager.GET_SIGNING_CERTIFICATES);
-        var signer = info.signingInfo.getApkContentsSigners();
-        if (signer.length != 1 || !work.manifest.document.getJSONObject("build").getString("signerSha256")
-            .equals(app.agus.cooperative.Workload.sha256(signer[0].toByteArray()))) throw new SecurityException("Installed signer changed");
+        if (!RuntimeState.installedSignerMatches(this, work)) throw new SecurityException("Installed signer changed");
         fixtureUi = true;
-        startActivityForResult(new Intent().setComponent(new ComponentName(RuntimeState.FIXTURE, RuntimeState.COMPONENT))
+        startActivityForResult(new Intent().setComponent(new ComponentName(work.packageName, work.component))
             .putExtra("manifest", work.grant.getJSONObject("manifest").toString()).putExtra("deadline", work.expiry), FIXTURE);
     }
 

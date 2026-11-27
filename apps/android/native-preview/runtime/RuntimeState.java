@@ -9,6 +9,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
+import android.content.pm.ApplicationInfo;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.PowerManager;
@@ -21,8 +22,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 final class RuntimeState {
-    static final String FIXTURE = "app.agus.preview.fixture";
-    static final String COMPONENT = FIXTURE + ".TestActivity";
     private static final Object STORAGE = new Object();
     private static final String KEY = "runtime";
     static volatile Session live;
@@ -87,26 +86,40 @@ final class RuntimeState {
         return work;
     }
 
-    static boolean absent(Context context) {
-        try { context.getPackageManager().getPackageInfo(FIXTURE, 0); return false; }
+    static boolean absent(Context context, String packageName) {
+        try { context.getPackageManager().getPackageInfo(packageName, 0); return false; }
         catch (PackageManager.NameNotFoundException absent) { return true; }
     }
 
-    static PackageInfo validateApk(Context context, File apk, Session work) throws Exception {
+    private static boolean signerMatches(PackageInfo info, Session work) {
+        try {
+            return info != null && info.signingInfo != null && !info.signingInfo.hasMultipleSigners()
+                && info.signingInfo.getApkContentsSigners().length == 1
+                && Workload.sha256(info.signingInfo.getApkContentsSigners()[0].toByteArray()).equals(work.signerSha256);
+        } catch (Exception unavailable) { return false; }
+    }
+
+    static boolean installedSignerMatches(Context context, Session work) {
+        try {
+            return signerMatches(context.getPackageManager().getPackageInfo(work.packageName, PackageManager.GET_SIGNING_CERTIFICATES), work);
+        } catch (PackageManager.NameNotFoundException absent) { return false; }
+    }
+
+    private static void validateApk(Context context, File apk, Session work) throws Exception {
         PackageInfo info = context.getPackageManager().getPackageArchiveInfo(apk.getPath(),
             PackageManager.GET_SIGNING_CERTIFICATES | PackageManager.GET_PERMISSIONS | PackageManager.GET_ACTIVITIES
-                | PackageManager.GET_SERVICES | PackageManager.GET_RECEIVERS | PackageManager.GET_PROVIDERS);
-        JSONObject build = work.manifest.document.getJSONObject("build");
-        if (info == null || !FIXTURE.equals(info.packageName) || !FIXTURE.equals(build.getString("packageName"))
-            || !COMPONENT.equals(build.getString("component")) || info.signingInfo == null
-            || info.signingInfo.hasMultipleSigners() || info.signingInfo.getApkContentsSigners().length != 1
-            || !Workload.sha256(info.signingInfo.getApkContentsSigners()[0].toByteArray()).equals(build.getString("signerSha256"))
+                | PackageManager.GET_SERVICES | PackageManager.GET_RECEIVERS | PackageManager.GET_PROVIDERS | PackageManager.GET_INSTRUMENTATION);
+        if (!signerMatches(info, work)) {
+            Log.i("AgusPreview", "PROFILE_SIGNER_REJECTED");
+            throw new SecurityException("APK does not match the reviewed signer");
+        }
+        if (!work.packageName.equals(info.packageName)
+            || info.applicationInfo == null || (info.applicationInfo.flags & (ApplicationInfo.FLAG_DEBUGGABLE | ApplicationInfo.FLAG_ALLOW_BACKUP)) != 0
             || (info.requestedPermissions != null && info.requestedPermissions.length != 0)
-            || info.activities == null || info.activities.length != 1 || !COMPONENT.equals(info.activities[0].name)
+            || info.activities == null || info.activities.length != 1 || !work.component.equals(info.activities[0].name) || !info.activities[0].exported
             || !"app.agus.runtime.preview.TEST".equals(info.activities[0].permission)
-            || info.services != null || info.receivers != null || info.providers != null)
-            throw new SecurityException("APK does not match the offline fixture policy");
-        return info;
+            || info.services != null || info.receivers != null || info.providers != null || info.instrumentation != null)
+            throw new SecurityException("APK does not match the reviewed signer and offline workload policy");
     }
 
     static void install(Context context, Session work) throws Exception {
@@ -123,7 +136,7 @@ final class RuntimeState {
 
     private static void stagePackage(Context context, Session work) throws Exception {
         work.requireLive();
-        if (!absent(context) || prefs(context).getBoolean("packagePending", false)) throw new SecurityException("Package collision");
+        if (!absent(context, work.packageName) || prefs(context).getBoolean("packagePending", false)) throw new SecurityException("Package collision");
         if (!context.getPackageManager().canRequestPackageInstalls()) throw new SecurityException("Approve the Android installation source");
         byte[] bytes = PilotApi.apk(work.id, work.credential);
         if (!work.manifest.document.getJSONObject("build").getString("sha256").equals(Workload.sha256(bytes))) {
@@ -136,7 +149,7 @@ final class RuntimeState {
             work.requireLive();
             var installer = context.getPackageManager().getPackageInstaller();
             var params = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
-            params.setAppPackageName(FIXTURE);
+            params.setAppPackageName(work.packageName);
             params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED);
             int id = installer.createSession(params);
             try (var session = installer.openSession(id)) {
@@ -155,9 +168,10 @@ final class RuntimeState {
         } finally { Files.deleteIfExists(apk.toPath()); }
     }
 
-    static void requestRemoval(Context context) {
-        if (!absent(context)) context.getPackageManager().getPackageInstaller()
-            .uninstall(FIXTURE, callback(context, "remove", 2));
+    static void requestRemoval(Context context, Session work) {
+        if (absent(context, work.packageName)) return;
+        if (!installedSignerMatches(context, work)) throw new SecurityException("Package ownership changed. Keep the profile quarantined.");
+        context.getPackageManager().getPackageInstaller().uninstall(work.packageName, callback(context, "remove", 2));
     }
 
     private static android.content.IntentSender callback(Context context, String action, int code) {
@@ -168,6 +182,9 @@ final class RuntimeState {
     static final class Session {
         final Context context;
         final Workload manifest;
+        final String packageName;
+        final String component;
+        final String signerSha256;
         final JSONObject grant;
         final String id;
         final String credential;
@@ -186,7 +203,11 @@ final class RuntimeState {
             this.credential = grant.getString("credential");
             this.manifest = Workload.verify(grant.getJSONObject("manifest"), PreviewConfig.MANIFEST_KEY);
             JSONObject value = manifest.document;
-            if (!id.equals(value.getString("leaseId")) ||
+            JSONObject build = value.getJSONObject("build");
+            packageName = build.getString("packageName");
+            component = build.getString("component");
+            signerSha256 = build.getString("signerSha256");
+            if (!PreviewConfig.REVIEWED_PACKAGES.contains(packageName) || !id.equals(value.getString("leaseId")) ||
                 !prefs(context).getString("installation", "").equals(value.getString("audience")) ||
                 !prefs(context).getString("runtimeClass", "").equals(value.getString("runtimeClass"))) {
                 throw new SecurityException("Workload is bound to a different installation");
@@ -211,9 +232,9 @@ final class RuntimeState {
         void stop() {
             stopped = true;
             ProfileAdmin.restrictInstalls(context, true);
-            if (!absent(context)) {
+            if (installedSignerMatches(context, this)) {
                 var policy = context.getSystemService(DevicePolicyManager.class);
-                policy.setPackagesSuspended(ProfileAdmin.component(context), new String[]{FIXTURE}, true);
+                policy.setPackagesSuspended(ProfileAdmin.component(context), new String[]{packageName}, true);
             }
         }
 
@@ -237,7 +258,7 @@ final class RuntimeState {
         }
 
         void acknowledge() throws Exception {
-            if (!absent(context) || prefs(context).getBoolean("packagePending", false) || !ProfileAdmin.installRestricted(context))
+            if (!absent(context, packageName) || prefs(context).getBoolean("packagePending", false) || !ProfileAdmin.installRestricted(context))
                 throw new SecurityException("Package cleanup is unconfirmed");
             PilotApi.request("POST", path() + "/cleanup", credential,
                 PilotApi.sign(binding("cleanup").put("packageAbsent", true).put("installRestricted", true)));
