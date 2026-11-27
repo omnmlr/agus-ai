@@ -8,7 +8,7 @@ On a fresh test device, compare the `wallet-false-success` and `wallet-transfer`
 
 ## Recording evidence
 
-Use the provider acceptance recording for actual Android pairing, explicit private acceptance, agent launch, signed evidence and manual marketplace allocation. Use the wallet acceptance recording for MWA, the missing-broadcast control, independently finalized Localnet transfer and test-token payout reconciliation. The provider acceptance offers were explicitly unpaid. [Provider acceptance](https://github.com/omnmlr/agus-ai/actions/runs/45922423658) · [Wallet acceptance](https://github.com/omnmlr/agus-ai/actions/runs/45888580906)
+Use the provider acceptance workflow for actual Android pairing, explicit private acceptance, agent launch, signed evidence and manual marketplace allocation. Use the wallet acceptance workflow for MWA, the missing-broadcast control, independently finalized Localnet transfer and test-token payout reconciliation. The provider acceptance offers were explicitly unpaid. [Provider acceptance](https://github.com/omnmlr/agus-ai/actions/runs/45922423658) · [Wallet acceptance](https://github.com/omnmlr/agus-ai/actions/runs/45888580906)
 
 ## Hosted demo acceptance
 

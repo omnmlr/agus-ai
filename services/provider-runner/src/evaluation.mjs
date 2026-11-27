@@ -41,17 +41,16 @@ export class Evaluation {
     if (focused === FIXTURE && !this.state.has("wallet-requested")) {
       target = "request-wallet";
       node = button("android:id/button1");
+    } else if (focused === FAKE_WALLET && this.state.has("approve-transaction") && !this.state.has("submitted")) {
+      target = this.job.scenario === "wallet-false-success" ? "simulate-result" : "submit-transfer";
+      node = button(editableWalletTargets[target]);
     } else if (focused === FAKE_WALLET && has("text_sign_payloads")) {
       this.state.add("wallet-authorized");
       if (this.job.scenario === "wallet-connect") {
         return { phase: "wallet-authorized", actions: [{ type: "finish", args: {} }], node: null };
       }
-      if (!this.state.has("approve-transaction")) {
-        target = "approve-transaction";
-      } else if (!this.state.has("submitted")) {
-        target = this.job.scenario === "wallet-false-success" ? "simulate-result" : "submit-transfer";
-      }
-      node = target ? button(editableWalletTargets[target]) : null;
+      target = "approve-transaction";
+      node = button(editableWalletTargets[target]);
     } else if (focused === FAKE_WALLET && has("btn_authorize_x3") && !this.state.has("approve-connection")) {
       target = "approve-connection";
       node = button(editableWalletTargets[target]);
