@@ -1,6 +1,8 @@
 import { ApiError, createApi, readApk } from './api.mjs';
 import { account, authView, buildOptions, deviceOptions, devicesView, escape, integrationsView, invitationLinkView, invitationReview, invitationRows, navigation, paymentView, requestsView, runComparison, runDetail, runHistory, runsView, workspaceView } from './views.mjs';
 
+import { campaignDraft, campaignsView, campaignTask } from './campaigns.mjs';
+
 const sessionKey = 'agus-console-session';
 const elements = Object.fromEntries(['account', 'navigation', 'notice', 'screen'].map((id) => [id, document.getElementById(id)]));
 const state = { session: loadSession(), register: false, data: {}, routeVersion: 0, selected: null, events: [], runFingerprint: null, paymentFingerprint: null, share: null };
@@ -32,7 +34,7 @@ function route() {
   if (section === 'integrations') return { page: section };
   if (section === 'invite' && /^[\da-z_-]{20,160}$/i.test(detail || '')) return { page: section, token: detail };
   if (state.session && section === 'devices') return { page: section };
-  if (state.session && ['runs', 'requests'].includes(section)) return { page: section, selected };
+  if (state.session && ['runs', 'requests', 'campaigns'].includes(section)) return { page: section, selected };
   return { page: 'workspace' };
 }
 
@@ -50,7 +52,18 @@ function displayError(error, { authenticationAttempt = false } = {}) {
   notice(error.message || 'Request failed. Try again.', true);
 }
 
-async function loadData(page) {
+async function loadData(page, selected) {
+  if (page === 'campaigns') {
+    try {
+      return Object.assign({}, ...(await Promise.all([
+        api.get('/projects'), api.get('/builds'), api.get('/campaigns'),
+        ...(selected ? [api.get('/campaigns/' + encodeURIComponent(selected) + '/report')] : []),
+      ])));
+    } catch (error) {
+      if (error.code === 'pilot_unavailable') return { unavailable: true };
+      throw error;
+    }
+  }
   if (page === 'devices') {
     const { devices } = await api.get('/devices');
     return { devices };
@@ -86,9 +99,10 @@ async function navigate() {
   }
   elements.screen.innerHTML = '<p class="empty" aria-busy="true">Loading data from the control plane…</p>';
   try {
-    const data = await loadData(page);
+    const data = await loadData(page, selected);
     if (currentVersion !== state.routeVersion) return;
     state.data = data;
+    if (page === 'campaigns') elements.screen.innerHTML = campaignsView(data);
     if (page === 'workspace') elements.screen.innerHTML = workspaceView(data);
     if (page === 'devices') elements.screen.innerHTML = devicesView(data.devices);
     if (page === 'requests') {
@@ -239,6 +253,21 @@ async function reviewInvitation(path, body) {
 }
 
 const forms = {
+  'campaign-form': async (data, form) => {
+    const draft = campaignDraft(form, data);
+    const previous = state.data.report?.campaign;
+    const result = previous ? await api.patch('/campaigns/' + previous.id, { expectedRevision: previous.revision, draft })
+      : await api.post('/campaigns', draft);
+    if (state.selected === result.campaign.id) await navigate();
+    else location.hash = '#campaigns/' + result.campaign.id;
+  },
+  'campaign-review': async (data, form) => {
+    await api.post('/assignments/' + form.dataset.assignment + '/reviews', {
+      attemptId: form.dataset.attempt, version: Number(form.dataset.version), decision: data.get('decision'), reason: data.get('reason'),
+    });
+    await navigate();
+    notice('Review saved.');
+  },
   'auth-form': async (data) => {
     const registrationToken = data.get('registrationToken');
     const body = { email: data.get('email').trim(), password: data.get('password') };
@@ -366,7 +395,49 @@ async function previewEvidence(button) {
   button.textContent = 'Hide screenshot';
 }
 
+function downloadJson(name, value) {
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
 const actions = {
+  'add-campaign-task': () => {
+    const area = document.getElementById('campaign-tasks');
+    if (area.children.length < 12) area.insertAdjacentHTML('beforeend', campaignTask(state.data.builds));
+  },
+  'remove-campaign-task': button => {
+    const row = button.closest('[data-campaign-task]');
+    if (row.parentElement.children.length > 1) row.remove();
+  },
+  'campaign-transition': async button => {
+    const campaign = state.data.report.campaign;
+    if (button.dataset.operation === 'cancel' && !confirm('Cancel future work and request stop for active assignments?')) return;
+    await api.post('/campaigns/' + campaign.id + '/' + encodeURIComponent(button.dataset.operation), { expectedRevision: campaign.revision });
+    await navigate();
+  },
+  'campaign-receipt': async button => {
+    const { receipt } = await api.get('/assignments/' + button.dataset.assignment + '/receipt');
+    downloadJson('agus-native-receipt.json', receipt);
+  },
+  'campaign-training-grant': async button => {
+    if (!confirm('Grant training rights for this assignment’s redacted, reviewed evidence? Contributor permission is also required.')) return;
+    await api.put('/me/assignments/' + button.dataset.assignment + '/training-consent', { termsDigest: button.dataset.terms, grant: true });
+    notice('Developer training grant recorded.');
+  },
+  'campaign-training-withdraw': async button => {
+    await api.delete('/me/assignments/' + button.dataset.assignment + '/training-consent');
+    notice('Developer training grant withdrawn for future deliveries.');
+  },
+  'campaign-export': async button => {
+    const path = '/campaigns/' + state.selected + '/exports';
+    const created = await api.post(path, { purpose: 'training', assignmentIds: [button.dataset.assignment] });
+    const delivered = await api.get(path + '/' + created.export.id);
+    downloadJson('agus-training-export.json', delivered.export);
+  },
   'toggle-auth': () => {
     state.register = !state.register;
     return navigate();
@@ -434,7 +505,7 @@ const actions = {
 
 document.addEventListener('submit', async (event) => {
   const form = event.target;
-  const handle = forms[form.id];
+  const handle = forms[form.dataset.form || form.id];
   if (!handle) return;
   event.preventDefault();
   const button = form.querySelector('button[type=submit]');
@@ -475,7 +546,7 @@ document.querySelector('.skip-link').addEventListener('click', (event) => {
 });
 window.addEventListener('hashchange', () => void navigate());
 setInterval(async () => {
-  if (polling || !state.session || !state.selected || document.visibilityState === 'hidden') return;
+  if (polling || route().page !== 'runs' || !state.session || !state.selected || document.visibilityState === 'hidden') return;
   polling = true;
   try {
     if (await refreshRun({ silent: true })) await refreshPayment();

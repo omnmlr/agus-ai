@@ -66,7 +66,8 @@ def tap(label, scroll=True):
 def fill(hint, value):
     tap(hint, scroll=False)
     adb("shell", "input", "text", value)
-    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    if any(item in adb("shell", "dumpsys", "input_method") for item in ("mInputShown=true", "mIsInputViewShown=true")):
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
 
 
 def log():

@@ -13,6 +13,9 @@ agus start <project-id> <build-id> <scenario> <mode> [device-id]
 agus start <project-id> <build-id> <scenario> <mode> --expected-json <file>
 agus run <run-id> | events <run-id> | cancel <run-id> | actions <run-id>
 agus act <run-id> <action-type> [args-as-json]
+agus campaigns | campaign-report <campaign-id>
+agus campaign-create <draft-json-file>
+agus campaign-launch <campaign-id> <expected-revision>
 
 Set AGUS_API_URL. Authenticate with AGUS_API_TOKEN or AGUS_API_TOKEN_FILE.
 Login and registration read AGUS_API_PASSWORD and save a new token file
@@ -59,6 +62,10 @@ async function execute(client, command, args) {
     case 'devices': return client.devices();
     case 'builds': return client.builds();
     case 'runs': return client.runs();
+    case 'campaigns': return client.campaigns();
+    case 'campaign-report': return client.campaignReport(id);
+    case 'campaign-create': return client.createCampaign(JSON.parse(await readFile(id, 'utf8')));
+    case 'campaign-launch': return client.changeCampaign(id, 'launch', Number(second));
     case 'project': return client.createProject(id);
     case 'upload': return client.createBuild(await readBuild(id, second, third, fourth));
     case 'start': {
@@ -79,7 +86,7 @@ async function execute(client, command, args) {
 const counts = {
   login: [1], register: [1], projects: [0], devices: [0], builds: [0], runs: [0],
   project: [1], upload: [4], start: [4, 5, 6], run: [1], events: [1], cancel: [1],
-  actions: [1], act: [2, 3], mcp: [0],
+  actions: [1], act: [2, 3], mcp: [0], campaigns: [0], 'campaign-report': [1], 'campaign-create': [1], 'campaign-launch': [2],
 };
 
 async function main() {

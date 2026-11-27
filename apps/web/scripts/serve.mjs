@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 const extensionTypes = new Map([
   ['html', 'text/html; charset=utf-8'], ['css', 'text/css; charset=utf-8'], ['mjs', 'text/javascript; charset=utf-8'],
 ]);
-const staticPaths = new Set(['index.html', 'console.html', 'styles.css', 'api.mjs', 'views.mjs', 'console.mjs']);
+const staticPaths = new Set(['index.html', 'console.html', 'styles.css', 'api.mjs', 'views.mjs', 'console.mjs', 'campaigns.mjs']);
 const hopByHop = ['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade'];
 
 function forwardHeaders(headers) {

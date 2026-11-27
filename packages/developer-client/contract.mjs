@@ -129,6 +129,42 @@ const schemas = {
     acceptedAt: date, settlement: record }, ['runId', 'state', 'quote']),
 };
 
+const runtimeClass = values('phone_human', 'phone_cooperative', 'dedicated_runner');
+const taskFields = {
+  title: string, kind: values('automated_test', 'human_test', 'agent_evaluation', 'human_demonstration', 'agent_correction'),
+  runtimeClass, buildId: id, count: integer, instructions: string, maximumDurationSeconds: integer,
+  minimumApi: integer, abi: nullable(string), maximumNetworkLatencyMs: nullable(integer), skill: nullable(string),
+  actions: array(values('describe', 'advance')), scenario: of('Scenario'),
+  expectedTransaction: of('TransactionExpectation'), testUnits: integer, stopTestUnits: integer, trainingEligible: boolean, referenceRunId: id,
+};
+const draftFields = {
+  projectId: id, title: string, objective: string, tasks: array(of('CampaignTask')), deadlineAt: integer,
+  budgetTestUnits: integer, retentionDays: integer, visibility: values('qualified_preview', 'invited'), contributorIds: array(id),
+};
+Object.assign(schemas, {
+  CampaignTask: obj(taskFields, ['title', 'kind', 'runtimeClass', 'buildId', 'count', 'instructions']),
+  CampaignDraft: obj(draftFields, ['projectId', 'title', 'objective', 'tasks', 'deadlineAt']),
+  CampaignRevision: obj({ ...draftFields, tasks: array(record), sha256: sha }),
+  Campaign: obj({ id, state: values('draft', 'active', 'paused', 'cancelled', 'completed'), revision: integer,
+    revisions: array(of('CampaignRevision')), createdAt: integer, updatedAt: integer, assignmentIds: array(id) }),
+  Assignment: obj({ id, campaignId: id, campaignRevision: integer, task: record, slot: integer,
+    state: values('open', 'reserved', 'active', 'cleanup_pending', 'stopping', 'awaiting_submission', 'submitted',
+      'needs_revision', 'accepted', 'partially_accepted', 'rejected', 'cancelled', 'interrupted', 'expired', 'dedicated'),
+    terms: record, termsDigest: sha, expiresAt: integer, deadlineAt: integer, eligibleInstallationIds: array(id),
+    attempt: record, run: of('Run'), compensation: record, referenceActions: array(record),
+  }, ['id', 'campaignId', 'campaignRevision', 'task', 'slot', 'state', 'terms', 'termsDigest', 'expiresAt', 'deadlineAt']),
+  CoverageCell: obj({ taskIndex: integer, kind: string, runtimeClass, planned: integer, attempted: integer,
+    accepted: integer, measured: integer, passed: integer, failed: integer, blocked: integer, unverified: integer, missing: integer }),
+  CampaignReport: obj({ campaign: of('Campaign'), cells: array(of('CoverageCell')), findings: array(record),
+    reservedTestUnits: integer, acceptedTestUnits: integer, assignments: array(of('Assignment')) }),
+  NativeProof: obj({ payload: string, signature: string }),
+  NativeManifest: obj({ encoding: values('base64'), alg: values('ECDSA-P256-SHA256-DER'), payload: string,
+    signature: string, sha256: sha, keyId: sha }),
+  Installation: obj({ id, runtimeClass, policyVersion: string, readiness: string, policy: nullable(record),
+    lastSeenAt: nullable(integer), windowExpiresAt: nullable(integer), activeLeaseId: nullable(id),
+    credentialExpiresAt: integer, provenance: string }),
+});
+
 const paths = {};
 const json = schema => ({ 'application/json': { schema } });
 const err = { description: 'Stable error envelope', content: json(of('Error')) };
@@ -141,7 +177,7 @@ function operation(path, method, summary, response, {
   const responseDoc = emptyResponse ? { description: emptyResponse } : positive(response, extraContent);
   const item = paths['/api/v1' + path] ??= {};
   item[method] = {
-    summary, security: auth ? [{ SessionBearer: [] }] : [],
+    summary, security: auth ? [{ [auth === true ? 'SessionBearer' : auth]: [] }] : [],
     parameters: [...parameters, ...query],
     ...(body ? { requestBody: { required: true, content: json(body) } } : {}),
     responses: { [status]: responseDoc, default: err },
@@ -239,6 +275,10 @@ get('/me/sessions/{runId}/events', 'Poll the provider session event stream', env
 post('/me/sessions/{runId}/stop', 'Request stop on a provider-owned session', run);
 get('/me/earnings', 'Read actual provider settlement aggregates', envelope('earnings', record),
   [parameter('deviceId', string, 'query', true), parameter('from', string), parameter('to', string), parameter('bucket', values('day', 'week', 'month'))]);
+const inboxPreferences = obj({ completedRuns: boolean, campaignUpdates: boolean });
+get('/me/notifications/preferences', 'Read in-app notification preferences', envelope('preferences', inboxPreferences));
+operation('/me/notifications/preferences', 'patch', 'Change optional in-app notification categories', envelope('preferences', inboxPreferences),
+  { body: obj({ completedRuns: boolean, campaignUpdates: boolean }, []) });
 get('/me/notifications', 'Read owner-filtered notifications', envelopeList('notifications', of('Notification')));
 post('/me/notifications/{notificationId}/read', 'Mark a notification read', envelope('notification', of('Notification')));
 
@@ -255,12 +295,72 @@ post('/invitations/{invitationId}/revoke', 'Revoke a private authorization',
   obj({ invitation: of('Invitation'), run: of('Run') }, ['invitation']));
 get('/marketplace/jobs', 'List workload offers for an eligible provider device', envelopeList('jobs', of('MarketJob')),
   [parameter('deviceId', string, 'query', true)]);
+post('/marketplace/jobs/{runId}/decline', 'Hide this queued offer for an owned device', envelope('declined', boolean), envelope('deviceId', string));
 post('/marketplace/jobs/{runId}/accept', 'Reserve matching unpaid marketplace work',
   run, envelope('deviceId', string));
 
+const campaign = envelope('campaign', of('Campaign'));
+const assignment = envelope('assignment', of('Assignment'));
+const installation = envelope('installation', of('Installation'));
+const campaignConsent = obj({ purpose: values('training'), termsDigest: sha,
+  contributorGrantedAt: nullable(integer), developerGrantedAt: nullable(integer) });
+get('/campaigns', 'List owned campaigns in the local preview', envelopeList('campaigns', of('Campaign')));
+post('/campaigns', 'Create an immutable first draft revision', campaign, of('CampaignDraft'), { query: idempotency });
+get('/campaigns/{campaignId}', 'Read a campaign and its immutable revisions', campaign);
+operation('/campaigns/{campaignId}', 'patch', 'Revise an owned draft', campaign,
+  { body: obj({ expectedRevision: integer, draft: of('CampaignDraft') }) });
+for (const action of ['launch', 'pause', 'resume', 'cancel', 'complete']) {
+  post('/campaigns/{campaignId}/' + action, 'Transition an owned campaign', campaign, envelope('expectedRevision', integer));
+}
+get('/campaigns/{campaignId}/report', 'Read qualified coverage, review and findings', envelope('report', of('CampaignReport')));
+post('/campaigns/{campaignId}/exports', 'Prepare accepted evidence after both training grants', envelope('export', record),
+  obj({ purpose: values('training'), assignmentIds: array(id) }));
+get('/campaigns/{campaignId}/exports/{exportId}', 'Deliver redacted data with current consent', envelope('export', record));
+get('/me/assignments', 'List assigned or eligible coverage slots', envelopeList('assignments', of('Assignment')));
+post('/me/assignments/{assignmentId}/accept', 'Reserve a coverage slot after reviewing scope', assignment,
+  obj({ termsDigest: sha, installationId: id, consent: { const: true } }));
+post('/me/assignments/{assignmentId}/decline', 'Decline a coverage slot', envelope('declined', boolean), obj({}));
+post('/me/assignments/{assignmentId}/stop', 'Request owner stop on the active attempt', assignment, obj({}));
+const consentPath = '/me/assignments/{assignmentId}/training-consent';
+get(consentPath, 'Read separate training rights for the assignment', campaignConsent);
+operation(consentPath, 'put', 'Grant current training rights', campaignConsent, { body: obj({ termsDigest: sha, grant: { const: true } }) });
+operation(consentPath, 'delete', 'Withdraw future training delivery rights', campaignConsent);
+post('/assignments/{assignmentId}/submissions', 'Submit redacted structured evidence after cleanup', assignment,
+  obj({ attemptId: id, expectedVersion: integer, steps: array(string), expected: string, actual: string,
+    result: values('passed', 'failed', 'blocked'), category: values('bug', 'usability', 'validation', 'agent_correction'),
+    correction: record }, ['attemptId', 'expectedVersion', 'steps', 'expected', 'actual', 'result', 'category']));
+post('/assignments/{assignmentId}/reviews', 'Review an exact submission or record disclosed partial credit', assignment,
+  obj({ attemptId: id, version: integer, decision: values('accept', 'revise', 'reject', 'partial'), reason: string }));
+get('/assignments/{assignmentId}/receipt', 'Download the scoped native receipt and key', envelope('receipt', record));
+get('/me/qualifications', 'Read exercises, current qualification and review history', record);
+post('/me/qualifications/{version}/submissions', 'Score the reviewed qualification exercise', record,
+  obj({ sequence: array(string), expectedCode: string, actualCode: string, walletAnswer: string, evidenceNote: string }));
+post('/me/qualifications/{qualificationId}/appeal', 'Submit a person-owned qualification appeal', record, envelope('reason', string));
+get('/me/campaign-earnings', 'Read nontransferable preview obligations', envelope('earnings', record));
+post('/me/runtime-enrollments', 'Create a single-use native enrollment challenge', envelope('enrollment', record),
+  obj({ runtimeClass: values('phone_human', 'phone_cooperative'), appVersion: string, policyVersion: string }));
+post('/me/runtime-enrollments/{installationId}/complete', 'Verify native installation proof', obj({ installation: of('Installation'), credential: string }),
+  obj({ publicKey: string, proof: of('NativeProof') }));
+get('/me/runtime-installations', 'List owned native installations', envelopeList('installations', of('Installation')));
+operation('/me/runtime-installations/{installationId}', 'delete', 'Revoke an owned native installation', installation);
+post('/runtime/installations/{installationId}/heartbeat', 'Record a signed native policy observation', installation,
+  of('NativeProof'), { auth: 'RuntimeBearer' });
+post('/runtime/installations/{installationId}/claim', 'Exchange a reservation for a signed workload grant',
+  envelope('lease', obj({ id, manifest: of('NativeManifest'), credential: string, expiresAt: integer, serverNow: integer })),
+  envelope('assignmentId', id), { auth: 'RuntimeBearer' });
+operation('/runtime/leases/{leaseId}', 'get', 'Renew and read native authority', envelope('lease', record), { auth: 'LeaseBearer' });
+operation('/runtime/leases/{leaseId}/build', 'get', 'Download the leased reviewed APK', null, {
+  auth: 'LeaseBearer', emptyResponse: 'Reviewed pinned APK bytes',
+});
+post('/runtime/leases/{leaseId}/report', 'Seal a native execution report', envelope('report', record), of('NativeProof'), { auth: 'LeaseBearer' });
+post('/runtime/leases/{leaseId}/cleanup', 'Acknowledge actual profile cleanup', envelope('cleanup', record), of('NativeProof'), { auth: 'LeaseBearer' });
+
 const spec = {
   openapi: '3.1.0', info: { title: 'AGUS AI control plane', version: '0.1.0' },
-  paths, components: { schemas, securitySchemes: { SessionBearer: { type: 'http', scheme: 'bearer' } } },
+  paths, components: { schemas, securitySchemes: {
+    SessionBearer: { type: 'http', scheme: 'bearer' }, RuntimeBearer: { type: 'http', scheme: 'bearer' },
+    LeaseBearer: { type: 'http', scheme: 'bearer' },
+  } },
 };
 const specPath = new URL('./openapi.json', import.meta.url);
 const typesPath = new URL('./src/http.generated.d.ts', import.meta.url);

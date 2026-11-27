@@ -4,6 +4,7 @@
 
     <queries>
         <package android:name="com.solana.mobilewalletadapter.fakewallet" />
+        <package android:name="app.agus.runtime.preview" />
     </queries>
 
     <application

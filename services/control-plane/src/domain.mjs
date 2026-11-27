@@ -18,12 +18,15 @@ export function getOwned(records, id, user, name) {
 
 export function publicProject({ ownerId, ...project }) { return project; }
 export function publicBuild({ ownerId, artifactId, ...build }) { return build; }
-export function publicRun({ ownerId, leaseId, assignedProviderId, assignedPayoutWallet, authorizedProviderId, paymentNotificationStates, trainingConsent, ...run }) { return run; }
+export function publicRun({ ownerId, leaseId, assignedProviderId, assignedPayoutWallet, authorizedProviderId, paymentNotificationStates, trainingConsent, campaignContributorIds, ...run }) { return run; }
 export function publicUser({ id, email, displayName, providerEnabled }) {
   return { id, email, ...(displayName ? { displayName } : {}), capabilities: { developer: true, provider: Boolean(providerEnabled) } };
 }
 
 export function notice(state, userId, type, data, now) {
+  const preferences = state.notificationPreferences?.[userId];
+  if (preferences?.campaignUpdates === false && type.startsWith('assignment.')) return;
+  if (preferences?.completedRuns === false && ['run.passed', 'run.failed', 'run.unverified'].includes(type)) return;
   const items = state.notifications[userId] ?? (state.notifications[userId] = []);
   items.push({ id: randomUUID(), type, data, createdAt: timestamp(now), readAt: null });
   if (items.length > 200) items.shift();

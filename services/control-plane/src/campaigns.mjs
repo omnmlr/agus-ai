@@ -23,7 +23,7 @@ function text(value, field, maximum) {
 
 function normalizeTask(state, user, input, projectId, config) {
   exact(input, ['title', 'kind', 'runtimeClass', 'buildId', 'count', 'instructions', 'maximumDurationSeconds',
-    'minimumApi', 'abi', 'maximumNetworkLatencyMs', 'skill', 'actions', 'scenario', 'expectedTransaction', 'testUnits', 'stopTestUnits', 'trainingEligible'], 'task');
+    'minimumApi', 'abi', 'maximumNetworkLatencyMs', 'skill', 'actions', 'referenceRunId', 'scenario', 'expectedTransaction', 'testUnits', 'stopTestUnits', 'trainingEligible'], 'task');
   requireCondition(classes.includes(input.runtimeClass) && taskKinds.includes(input.kind), 'Unsupported assignment class');
   const human = input.runtimeClass === 'phone_human';
   const dedicated = input.runtimeClass === 'dedicated_runner';
@@ -55,6 +55,14 @@ function normalizeTask(state, user, input, projectId, config) {
   requireCondition(SCENARIOS.includes(scenario), 'Unsupported test scenario');
   requireCondition(dedicated || (scenario === 'app-launch' && input.expectedTransaction === undefined),
     'Phone preview supports its offline reviewed app activity');
+  let referenceRunId;
+  if (input.kind === 'agent_correction') {
+    const reference = getOwned(state.runs, input.referenceRunId, user, 'Reference run');
+    requireCondition(reference.projectId === projectId && reference.mode === 'agent' && !!reference.receipt
+      && (state.actions[reference.id] ?? []).some(action => action.state === 'completed'),
+    'An owned sealed agent run with recorded actions is required');
+    referenceRunId = reference.id;
+  } else requireCondition(input.referenceRunId === undefined, 'Reference run is only applicable to a correction');
   const transfer = expectedTransaction(input.expectedTransaction, scenario, config);
   return {
     title: text(input.title, 'task title', 100), kind: input.kind, runtimeClass: input.runtimeClass,
@@ -62,12 +70,12 @@ function normalizeTask(state, user, input, projectId, config) {
     count: integer(input.count, 1, 12, 'coverage count'), instructions: text(input.instructions, 'instructions', 2_000),
     maximumDurationSeconds: integer(input.maximumDurationSeconds ?? 120, 30, Math.min(900, config.leaseMs / 1000), 'duration'),
     minimumApi, abi, maximumNetworkLatencyMs, skill, actions, scenario, ...(transfer ? { expectedTransaction: transfer } : {}),
-    testUnits, stopTestUnits, trainingEligible: input.trainingEligible === true, rubric: 'structured-outcome-v1',
+    testUnits, stopTestUnits, ...(referenceRunId && { referenceRunId }), trainingEligible: input.trainingEligible === true, rubric: 'structured-outcome-v1',
   };
 }
 
 function revision(state, user, input, config, now) {
-  exact(input, ['projectId', 'title', 'objective', 'tasks', 'deadlineAt', 'budgetTestUnits', 'retentionDays'], 'campaign');
+  exact(input, ['projectId', 'title', 'objective', 'tasks', 'deadlineAt', 'budgetTestUnits', 'retentionDays', 'visibility', 'contributorIds'], 'campaign');
   const project = getOwned(state.projects, input.projectId, user, 'Project');
   const tasks = array(input.tasks, 'task list', 12).map(task => normalizeTask(state, user, task, project.id, config));
   const slots = tasks.reduce((count, task) => count + task.count, 0);
@@ -75,7 +83,15 @@ function revision(state, user, input, config, now) {
   const budget = integer(input.budgetTestUnits ?? 0, 0, 24_000_000, 'campaign budget');
   requireCondition(tasks.reduce((sum, task) => sum + task.count * task.testUnits, 0) <= budget,
     'Coverage terms exceed the test-unit budget');
+  const visibility = input.visibility ?? 'qualified_preview';
+  requireCondition(['qualified_preview', 'invited'].includes(visibility), 'Unknown visibility');
+  const contributorIds = array(input.contributorIds ?? [], 'contributor IDs', 30);
+  requireCondition(new Set(contributorIds).size === contributorIds.length
+    && contributorIds.every(id => typeof id === 'string' && own(state.users, id) && id !== user.id)
+    && (visibility === 'invited' ? contributorIds.length > 0 : contributorIds.length === 0),
+  'Supply distinct contributor account IDs for invited campaigns');
   const value = {
+    visibility, contributorIds,
     projectId: project.id, title: text(input.title, 'campaign title', 100), objective: text(input.objective, 'objective', 1_000),
     deadlineAt: integer(input.deadlineAt, now + minutes, now + 30 * 86_400_000, 'deadline'),
     tasks, budgetTestUnits: budget, retentionDays: integer(input.retentionDays ?? 7, 1, 30, 'retention period'),
@@ -188,6 +204,7 @@ export function changeCampaign(state, user, id, action, input, config, now) {
             maximumDurationSeconds: task.maximumDurationSeconds, expectedTransaction: task.expectedTransaction,
           }, config, now);
           run.campaignDeadlineAt = draft.deadlineAt;
+          if (draft.visibility === 'invited') run.campaignContributorIds = draft.contributorIds;
           assignment.runId = run.id;
         }
         state.assignments[id] = assignment;
@@ -236,7 +253,9 @@ function installationFor(state, user, assignment, id, now) {
 }
 
 function canSeeOffer(state, user, assignment, now) {
-  return assignment.state === 'open' && assignment.ownerId !== user.id && !assignment.declines.includes(user.id)
+  const publication = current(state.campaigns[assignment.campaignId]);
+  return (publication.visibility !== 'invited' || publication.contributorIds.includes(user.id))
+    && assignment.state === 'open' && assignment.ownerId !== user.id && !assignment.declines.includes(user.id)
     && assignment.deadlineAt > now && state.campaigns[assignment.campaignId].state === 'active'
     && qualified(state, user.id, assignmentTask(state, assignment).skill, now);
 }
@@ -251,7 +270,11 @@ function assignmentView(state, assignment, user, now) {
   const retain = retentionDeadline > now;
   return {
     id: assignment.id, campaignId: assignment.campaignId, campaignRevision: assignment.campaignRevision,
-    task, slot: assignment.slot, state: assignment.state, terms: assignment.terms, termsDigest: assignment.termsDigest,
+    task: owned ? task : { ...task, referenceRunId: undefined },
+    ...(task.referenceRunId && (mine || canSeeOffer(state, user, assignment, now)) && {
+      referenceActions: (state.actions[task.referenceRunId] ?? []).map(action => ({ type: action.type, status: action.state })),
+    }),
+    slot: assignment.slot, state: assignment.state, terms: assignment.terms, termsDigest: assignment.termsDigest,
     expiresAt: assignment.reservationExpiresAt ?? assignment.deadlineAt, deadlineAt: assignment.deadlineAt,
     ...(canSeeOffer(state, user, assignment, now) && { eligibleInstallationIds: Object.keys(state.runtimes)
       .filter(id => installationFor(state, user, assignment, id, now)) }),
@@ -319,7 +342,7 @@ export function contributorTransition(state, user, id, action, input, now) {
   return { assignment: assignmentView(state, assignment, user, now) };
 }
 
-function structuredSubmission(task, input) {
+function structuredSubmission(state, task, input) {
   exact(input, ['attemptId', 'expectedVersion', 'steps', 'expected', 'actual', 'result', 'category', 'correction'], 'submission');
   requireCondition(outcomes.includes(input.result), 'Choose a structured result');
   requireCondition(['bug', 'usability', 'validation', 'agent_correction'].includes(input.category), 'Choose a finding category');
@@ -330,9 +353,12 @@ function structuredSubmission(task, input) {
   if (task.kind === 'agent_correction') {
     exact(input.correction, ['actionIndex', 'actualAction', 'suggestedAction'], 'correction');
     const { actionIndex, actualAction, suggestedAction } = input.correction;
-    requireCondition(['describe', 'advance'].includes(actualAction) && ['describe', 'advance'].includes(suggestedAction)
-      && actualAction !== suggestedAction, 'Correction needs two distinct supported actions');
-    evidence.correction = { actionIndex: integer(actionIndex, 0, 3, 'action index'), actualAction, suggestedAction };
+    const steps = state.actions[task.referenceRunId] ?? [];
+    integer(actionIndex, 0, steps.length - 1, 'action index');
+    requireCondition(steps[actionIndex].state === 'completed' && steps[actionIndex].type === actualAction
+      && ['launch', 'describe', 'tap', 'wait', 'finish'].includes(suggestedAction)
+      && actualAction !== suggestedAction, 'Correction must refer to a recorded action and a bounded alternative');
+    evidence.correction = { actionIndex, actualAction, suggestedAction };
   } else requireCondition(input.correction === undefined, 'Correction requires a correction assignment');
   return evidence;
 }
@@ -346,7 +372,7 @@ export function sendSubmission(state, user, id, input, now) {
   conflict(now <= assignment.deadlineAt && campaign.state !== 'cancelled', 'Submission window closed', 'grant_expired');
   const submissions = assignment.attempt.submissions;
   conflict(submissions.length === input.expectedVersion && submissions.length < 4, 'Submission version changed', 'revision_conflict');
-  const evidence = structuredSubmission(assignmentTask(state, assignment), input);
+  const evidence = structuredSubmission(state, assignmentTask(state, assignment), input);
   submissions.push({ version: submissions.length + 1, at: now, sha256: digest(stableJson(evidence)), evidence });
   assignment.state = 'submitted';
   notice(state, assignment.ownerId, 'assignment.submitted', { campaignId: campaign.id, assignmentId: id }, now);

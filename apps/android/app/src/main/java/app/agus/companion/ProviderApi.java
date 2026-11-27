@@ -20,7 +20,7 @@ final class ProviderApi {
         this.client = client;
     }
 
-    Snapshot load(String sessionId, String deviceId, boolean marketplace, boolean payouts) throws IOException, JSONException {
+    Snapshot load(String sessionId, String deviceId, boolean marketplace, boolean payouts, boolean inbox) throws IOException, JSONException {
         JSONObject user = client.get("/auth/me").getJSONObject("user");
         JSONArray devices = optionalArray(MY_DEVICES, "devices");
         JSONArray runs = optionalArray(MY_SESSIONS, "runs");
@@ -46,6 +46,7 @@ final class ProviderApi {
                 }
             }
         }
+        JSONArray notifications = inbox ? optionalArray("/me/notifications", "notifications") : null;
         JSONObject run = null;
         JSONArray events = null;
         if (sessionId != null) {
@@ -53,7 +54,7 @@ final class ProviderApi {
             run = client.get(path).getJSONObject("run");
             events = client.get(path + "/events").getJSONArray("events");
         }
-        return new Snapshot(user, devices, runs, invitations, run, events, scope, jobs, earnings);
+        return new Snapshot(user, devices, runs, invitations, run, events, scope, jobs, earnings, notifications);
     }
 
     private JSONArray optionalArray(String route, String key) throws IOException, JSONException {
@@ -125,9 +126,10 @@ final class ProviderApi {
         final String deviceScope;
         final JSONArray jobs;
         final JSONObject earnings;
+        final JSONArray notifications;
 
         Snapshot(JSONObject user, JSONArray devices, JSONArray runs, JSONArray invitations, JSONObject run, JSONArray events,
-            String deviceScope, JSONArray jobs, JSONObject earnings) {
+            String deviceScope, JSONArray jobs, JSONObject earnings, JSONArray notifications) {
             this.user = user;
             this.devices = devices;
             this.runs = runs;
@@ -137,12 +139,13 @@ final class ProviderApi {
             this.deviceScope = deviceScope;
             this.jobs = jobs;
             this.earnings = earnings;
+            this.notifications = notifications;
         }
 
         boolean sameAs(Snapshot other) {
             return sameJson(user, other.user) && sameJson(devices, other.devices) && sameJson(runs, other.runs)
                 && sameJson(invitations, other.invitations) && sameJson(run, other.run) && sameJson(events, other.events)
-                && deviceScope.equals(other.deviceScope) && sameJson(jobs, other.jobs) && sameJson(earnings, other.earnings);
+                && deviceScope.equals(other.deviceScope) && sameJson(jobs, other.jobs) && sameJson(earnings, other.earnings) && sameJson(notifications, other.notifications);
         }
 
         private static boolean sameJson(Object first, Object second) {

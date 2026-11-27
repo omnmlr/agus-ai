@@ -36,6 +36,9 @@ export function createApi(token, fetcher = fetch) {
   }
   return {
     get: (path) => request(path),
+    patch: (path, body) => request(path, { method: 'PATCH', body }),
+    put: (path, body) => request(path, { method: 'PUT', body }),
+    delete: path => request(path, { method: 'DELETE' }),
     post: (path, body) => request(path, { method: 'POST', body }),
     download: (path) => request(path, { responseType: 'blob' }),
   };

@@ -24,6 +24,26 @@ export async function serveMcp(client) {
       return { content: [{ type: 'text', text: error.message }], isError: true };
     }
   });
+  add('list_campaigns', 'List owned campaigns in an enabled local preview.', {}, true, () => client.campaigns());
+  add('get_campaign_report', 'Read the campaign’s planned and measured coverage, review, and evidence summaries.', {
+    campaignId: z.uuid(),
+  }, true, ({ campaignId }) => client.campaignReport(campaignId));
+  add('create_campaign_draft', 'Create a draft of authorized, versioned coverage tasks in an owned project.', {
+    draft: z.object({
+      projectId: z.uuid(), title: z.string().max(100), objective: z.string().max(1000),
+      deadlineAt: z.number().int().positive(),
+      visibility: z.enum(['qualified_preview', 'invited']).optional(), contributorIds: z.array(z.uuid()).max(30).optional(),
+      budgetTestUnits: z.number().int().nonnegative().optional(), retentionDays: z.number().int().min(1).max(30).optional(),
+      tasks: z.array(z.object({
+        title: z.string().max(100), instructions: z.string().max(2000), buildId: z.uuid(), count: z.number().int().min(1).max(12),
+        runtimeClass: z.enum(['phone_human', 'phone_cooperative', 'dedicated_runner']),
+        kind: z.enum(['automated_test', 'human_test', 'agent_evaluation', 'human_demonstration', 'agent_correction']),
+        scenario: z.enum(scenarios).optional(), expectedTransaction: expectedTransaction.optional(),
+        testUnits: z.number().int().nonnegative().optional(), referenceRunId: z.uuid().optional(), trainingEligible: z.boolean().optional(),
+      })).min(1).max(12),
+    }),
+    idempotencyKey,
+  }, false, ({ draft, idempotencyKey }) => client.createCampaign(draft, idempotencyKey));
   add('list_devices', 'List dedicated Android devices and supported scenarios visible to this account.', {}, true,
     () => client.devices());
   add('list_projects', 'List projects owned by the authenticated developer.', {}, true,

@@ -320,6 +320,8 @@ export function expireMarketplace(state, now) {
 function matchingMarketJob(state, run, device, now) {
   return run.allocation === 'marketplace' && run.state === 'queued' && run.ownerId !== device.ownerId
     && !run.campaignPaused && (!run.campaignDeadlineAt || run.campaignDeadlineAt > now)
+    && (!run.campaignContributorIds || run.campaignContributorIds.includes(device.ownerId))
+    && !(device.declinedMarketJobs?.[run.id] > now)
     && (!run.deviceId || run.deviceId === device.id) && device.scenarios.includes(run.scenario) && walletNetworkMatches(device, run.expectedTransaction)
     && Date.parse(run.createdAt) + marketplaceDurationMs > now && state.builds[run.buildId]
     && (!run.paymentTerms || (run.paymentTerms.status === 'funded' && run.paymentTerms.providerId === device.providerId));
@@ -347,6 +349,18 @@ export function marketJobs(state, device, config, now) {
     });
 }
 
+export function declineMarketJob(state, device, id, now) {
+  const run = state.runs[id];
+  requireCondition(run && matchingMarketJob(state, run, device, now), 'Job is unavailable', 'job_unavailable', 409);
+  const declined = device.declinedMarketJobs ??= {};
+  for (const [runId, expiry] of Object.entries(declined)) {
+    if (expiry <= now) delete declined[runId];
+  }
+  requireCondition(Object.keys(declined).length < 200, 'Offer response limit reached', 'rate_limited', 429);
+  declined[id] = Date.parse(run.createdAt) + marketplaceDurationMs;
+  return { declined: true };
+}
+
 export function reserveMarketJob(state, device, id, config, now) {
   const run = state.runs[id];
   requireCondition(run && matchingMarketJob(state, run, device, now), 'Job is unavailable', 'job_unavailable', 409);
@@ -369,7 +383,8 @@ export function recordMarketAcceptance(state, device, run, now, method) {
 }
 
 export function claimAllowed(state, run, device, config, now) {
-  if (run.campaignPaused || (run.campaignDeadlineAt && run.campaignDeadlineAt <= now)) return false;
+  if (run.campaignPaused || (run.campaignDeadlineAt && run.campaignDeadlineAt <= now)
+    || (run.campaignContributorIds && !run.campaignContributorIds.includes(device.ownerId))) return false;
   const agreesWithDevice = (!run.deviceId || run.deviceId === device.id) && device.scenarios.includes(run.scenario) && walletNetworkMatches(device, run.expectedTransaction);
   if (!agreesWithDevice) return false;
   if (device.reservedRunId) {

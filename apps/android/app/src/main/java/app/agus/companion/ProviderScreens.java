@@ -82,7 +82,9 @@ final class ProviderScreens {
     }
 
     private void enrollment(LinearLayout content) {
-        heading(content, "Enrollment", "Pair the desktop runner with this account.");
+        heading(content, "Enrollment", "Choose an approved test environment.");
+        button(content, "Open phone-native preview", 0, false, view -> host.openPhonePreview());
+        detail(content, "The phone-native preview is for disposable Android test environments.", false);
         detail(content, "Use a clean test phone or emulator. Enable USB debugging only on the dedicated test device and authorize your own desktop.", false);
         detail(content, "Open the project’s provider runner setup on the desktop, select the device and approved builds, then enter the one-time pairing code.", false);
         JSONObject pairing = host.pairing;
@@ -287,6 +289,17 @@ final class ProviderScreens {
             });
         });
 
+        section(content, "In-app inbox");
+        JSONArray notifications = host.snapshot == null ? null : host.snapshot.notifications;
+        if (notifications == null || notifications.length() == 0) detail(content, "No inbox messages are available.", false);
+        forEach(notifications, notification -> {
+            LinearLayout card = ui.card(content);
+            detail(card, status(string(notification, "type")), false);
+            named(card, "Received", notification, "createdAt");
+            if (string(notification, "readAt").isEmpty()) button(card, "Mark read", 0, false, view ->
+                host.perform("Updating inbox…", api -> api.post(ProviderApi.item("/me/notifications", string(notification, "id")) + "/read",
+                    new JSONObject()), result -> {}, host::statusError, true));
+        });
         showRunGroup(content, "Running", false);
         showRunGroup(content, "History", true);
     }
@@ -385,6 +398,12 @@ final class ProviderScreens {
                 "The control plane will check current device readiness and reserve an exclusive lease for this work.", "Accept",
                 () -> host.perform("Accepting offer…", api -> api.post(ProviderApi.item(MARKETPLACE, string(job, "id")) + "/accept",
                     new JSONObject().put("deviceId", deviceId)), response -> host.openRun(response.optJSONObject("run")), host::statusError, true)));
+        }
+        if (!string(job, "id").isEmpty() && host.selectedOfferDeviceId != null) {
+            button(content, "Decline offer", 0, false, view -> host.perform("Declining offer…", api ->
+                api.post(ProviderApi.item(ProviderApi.MARKETPLACE, string(job, "id")) + "/decline",
+                    new JSONObject().put("deviceId", host.selectedOfferDeviceId)),
+                result -> host.navigate(MainActivity.Screen.ACTIVITY, null), host::statusError, true));
         }
         button(content, "Back to Activity", 0, false, view -> host.navigate(MainActivity.Screen.ACTIVITY, null));
     }
@@ -598,18 +617,19 @@ final class ProviderScreens {
         ui.add(privacy, ui.heading("Privacy and consent", 18), 0);
         detail(privacy, "Review workload scope and allowed evidence before approving each invitation. Use only dedicated environments and disposable accounts.", false);
         wallet(content);
+        button(content, "In-app notification preferences", 0, false, view -> host.notificationPreferences());
         button(content, "Sign out", R.id.auth_sign_out, false, view -> host.signOut(true));
     }
 
     private void wallet(LinearLayout content) {
         LinearLayout card = ui.card(content);
         ui.add(card, ui.heading("Devnet payout wallet", 18), 0);
-        if (host.snapshot == null || host.snapshot.deviceScope.isBlank()) {
+        if (host.snapshot == null || host.snapshot.deviceScope.isEmpty()) {
             detail(card, "Pair a dedicated test device to configure its payout wallet.", false);
             return;
         }
         detail(card, "The official Fake Wallet signs an exact ownership challenge for a disposable Devnet account.", false);
-        if (host.walletAddress != null && host.walletVerifiedAt != null) {
+        if (host.hasCurrentWallet()) {
             detail(card, host.walletAddress, true);
             detail(card, "Verified " + host.walletVerifiedAt, false);
             button(card, "Copy verified address", 0, false, view -> host.copy("Devnet address", host.walletAddress));
@@ -618,7 +638,7 @@ final class ProviderScreens {
         if (host.walletStatus != null) detail(card, host.walletStatus, false);
         button(card, "Refresh verified wallet", 0, false, view -> host.loadWallet()).setEnabled(!host.walletInFlight);
         Button connect = button(card, host.walletInFlight ? "Waiting for wallet…" :
-            host.walletVerifiedAt == null ? "Verify test wallet" : "Replace payout wallet",
+            host.hasCurrentWallet() ? "Replace payout wallet" : "Verify test wallet",
             R.id.connect_test_wallet, false, view -> host.connectWallet());
         connect.setEnabled(!host.walletInFlight);
     }

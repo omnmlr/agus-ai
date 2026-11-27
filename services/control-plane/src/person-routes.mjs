@@ -1,5 +1,5 @@
 import {
-  acceptInvitation, closeInvitation, deviceDiagnostics, expireInvitations, expireMarketplace,
+  acceptInvitation, closeInvitation, declineMarketJob, deviceDiagnostics, expireInvitations, expireMarketplace,
   getOwnedDevice, listInvitations, marketJobs, newInvitation, replayInvitation, reserveMarketJob, reviewInvitation,
   revokeDevice, startPairing, updateDevice,
 } from './access.mjs';
@@ -82,6 +82,14 @@ export async function handlePersonRoutes({ response, request, route, url, user, 
         state, getOwnedDevice(state, user, deviceId), config, now,
       ));
       send(response, { jobs });
+      return true;
+    }
+    if (route.length === 4 && route[3] === 'decline' && method === 'POST') {
+      const { deviceId } = await readJson(request, 8_192);
+      const result = await execute((state, now) => declineMarketJob(
+        state, getOwnedDevice(state, user, deviceId, { active: true }), route[2], now,
+      ));
+      send(response, result);
       return true;
     }
     if (route.length === 4 && route[3] === 'accept' && method === 'POST') {
@@ -174,6 +182,18 @@ export async function handlePersonRoutes({ response, request, route, url, user, 
     return true;
   }
   if (resource === 'notifications') {
+    if (route.length === 3 && id === 'preferences' && ['GET', 'PATCH'].includes(method)) {
+      const input = method === 'PATCH' ? await readJson(request, 8_192) : {};
+      const preferences = await execute(state => {
+        requireCondition(Object.entries(input).every(([key, value]) =>
+          ['completedRuns', 'campaignUpdates'].includes(key) && typeof value === 'boolean'), 'Invalid inbox preference');
+        const record = { completedRuns: true, campaignUpdates: true, ...state.notificationPreferences[user.id], ...input };
+        if (method === 'PATCH') state.notificationPreferences[user.id] = record;
+        return record;
+      });
+      send(response, { preferences });
+      return true;
+    }
     if (route.length === 2 && method === 'GET') {
       const notifications = await execute((state) => (state.notifications[user.id] ?? []).slice().reverse());
       send(response, { notifications });

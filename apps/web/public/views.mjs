@@ -48,7 +48,7 @@ export function account(user) {
 }
 
 export function navigation(page, user) {
-  const items = user ? { workspace: 'Workspace', devices: 'Devices', runs: 'Runs', requests: 'Private requests', integrations: 'Integrations' } : { workspace: 'Sign in', integrations: 'Integrations' };
+  const items = user ? { workspace: 'Workspace', devices: 'Devices', runs: 'Runs', campaigns: 'Campaigns', requests: 'Private requests', integrations: 'Integrations' } : { workspace: 'Sign in', integrations: 'Integrations' };
   return Object.entries(items).map(([key, text]) => `<a href="#${key}"${page === key ? ' aria-current="page"' : ''}>${text}</a>`).join('');
 }
 

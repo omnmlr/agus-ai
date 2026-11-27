@@ -34,6 +34,7 @@ public class RuntimeActivity extends Activity {
     private LinearLayout layout;
     private TextView message;
     private String person;
+    private String personId;
     private String windowId;
     private long windowEnd;
     private boolean busy;
@@ -100,8 +101,14 @@ public class RuntimeActivity extends Activity {
                 String account = email.getText().toString().trim();
                 String secret = password.getText().toString();
                 run(() -> {
-                    person = PilotApi.request("POST", "/auth/login", null,
-                        new JSONObject().put("email", account).put("password", secret)).getString("token");
+                    var result = PilotApi.request("POST", "/auth/login", null,
+                        new JSONObject().put("email", account).put("password", secret));
+                    String identifier = result.getJSONObject("user").getString("id");
+                    if (!RuntimeState.prefs(this).getString("personId", identifier).equals(identifier)) {
+                        throw new SecurityException("Sign in as this profile’s enrolled preview account.");
+                    }
+                    person = result.getString("token");
+                    personId = identifier;
                     runOnUiThread(this::render);
                     mark("PROFILE_PERSON_AUTHENTICATED");
                     return "Signed in.";
@@ -156,7 +163,8 @@ public class RuntimeActivity extends Activity {
                 .put("proof", PilotApi.sign(enrollment.getJSONObject("binding")));
             JSONObject result = PilotApi.request("POST", "/me/runtime-enrollments/" + enrollment.getString("id") + "/complete", person, body);
             if (!RuntimeState.prefs(this).edit().putString("installation", result.getJSONObject("installation").getString("id"))
-                .putString("credential", result.getString("credential")).putString("runtimeClass", kind).putLong("sequence", 0).commit())
+                .putString("credential", result.getString("credential")).putString("runtimeClass", kind)
+                .putString("personId", personId).putLong("sequence", 0).commit())
                 throw new IllegalStateException("Local enrollment could not be saved");
             mark("PROFILE_RUNTIME_ENROLLED");
             runOnUiThread(this::render);
@@ -168,7 +176,7 @@ public class RuntimeActivity extends Activity {
         run(() -> {
             var preferences = RuntimeState.prefs(this);
             PilotApi.request("DELETE", "/me/runtime-installations/" + preferences.getString("installation", ""), person, null);
-            preferences.edit().remove("installation").remove("runtimeClass").remove("credential").remove("sequence").commit();
+            preferences.edit().remove("installation").remove("runtimeClass").remove("credential").remove("sequence").remove("personId").commit();
             windowId = null;
             runOnUiThread(this::render);
             return "Installation revoked. Remove the test profile before setting up another device.";
@@ -208,9 +216,19 @@ public class RuntimeActivity extends Activity {
             label(task.optString("title") + " · " + item.optString("state"));
             if ("open".equals(item.optString("state"))) {
                 label(task.optString("instructions"));
+                if ("human_demonstration".equals(task.optString("kind"))) {
+                    label("This task records the fixture’s named actions and relative times as structured evidence.");
+                }
                 label(task.optString("packageName") + "\n" + task.optString("buildSha256"));
                 label(task.optInt("testUnits") + " nontransferable test units · structured evidence only");
-                button("Accept reviewed assignment", () -> new AlertDialog.Builder(this).setTitle("Authorize this foreground test?")
+                String installationId = RuntimeState.prefs(this).getString("installation", "");
+                var eligible = item.optJSONArray("eligibleInstallationIds");
+                boolean canAccept = false;
+                if (eligible != null) for (int slot = 0; slot < eligible.length(); slot++) {
+                    if (installationId.equals(eligible.optString(slot))) canAccept = true;
+                }
+                if (!canAccept) label("Open a compatible foreground testing window to accept this assignment.");
+                if (canAccept) button("Accept reviewed assignment", () -> new AlertDialog.Builder(this).setTitle("Authorize this foreground test?")
                     .setMessage("Install only the reviewed fixture in this work profile. Android will ask for package approval.")
                     .setNegativeButton("Back", null).setPositiveButton("Authorize", (dialog, button) -> accept(item)).show());
                 button("Decline assignment", () -> run(() -> {
@@ -222,6 +240,9 @@ public class RuntimeActivity extends Activity {
                 button("Prepare structured submission", () -> submission(item));
             }
             var attempt = item.optJSONObject("attempt");
+            if (attempt != null && item.optJSONObject("terms").optBoolean("trainingEligible")) {
+                button("Training consent", () -> training(item));
+            }
             if (attempt != null && attempt.optJSONObject("review") != null) {
                 label(attempt.optJSONObject("review").optString("reason"));
             }
@@ -353,6 +374,24 @@ public class RuntimeActivity extends Activity {
         });
     }
 
+    private void training(JSONObject item) {
+        run(() -> {
+            String path = "/me/assignments/" + item.getString("id") + "/training-consent";
+            var consent = PilotApi.request("GET", path, person, null);
+            runOnUiThread(() -> new AlertDialog.Builder(this).setTitle("Separate training-data permission")
+                .setMessage("AGUS can deliver redacted, accepted evidence only while both grants are current. " +
+                    (consent.isNull("contributorGrantedAt") ? "You have no active training grant." : "You have an active training grant."))
+                .setNegativeButton("Back", null).setNeutralButton("Withdraw", (dialog, which) -> run(() -> {
+                    PilotApi.request("DELETE", path, person, null);
+                    return "Training consent withdrawn for future deliveries.";
+                })).setPositiveButton("Grant", (dialog, which) -> run(() -> {
+                    PilotApi.request("PUT", path, person, new JSONObject().put("termsDigest", item.getString("termsDigest")).put("grant", true));
+                    return "Training grant recorded. Testing permission is unchanged.";
+                })).show());
+            return null;
+        });
+    }
+
     private void submission(JSONObject assignment) {
         render();
         label("Confirm that your report contains only the reviewed test fixture and disposable data.");
@@ -360,7 +399,15 @@ public class RuntimeActivity extends Activity {
         EditText expected = input("Expected outcome", InputType.TYPE_CLASS_TEXT);
         EditText actual = input("Actual outcome", InputType.TYPE_CLASS_TEXT);
         Spinner result = choices("failed", "passed", "blocked");
-        Spinner category = choices("bug", "usability", "validation");
+        boolean correction = "agent_correction".equals(assignment.optJSONObject("task").optString("kind"));
+        Spinner category = correction ? choices("agent_correction") : choices("bug", "usability", "validation");
+        EditText actionIndex = correction ? input("Recorded action index starting at zero", InputType.TYPE_CLASS_NUMBER) : null;
+        Spinner alternative = correction ? choices("launch", "describe", "tap", "wait", "finish") : null;
+        var reference = assignment.optJSONArray("referenceActions");
+        if (correction && reference != null) for (int index = 0; index < reference.length(); index++) {
+            var action = reference.optJSONObject(index);
+            label(index + " · " + action.optString("type") + " · " + action.optString("status"));
+        }
         var attempt = assignment.optJSONObject("attempt");
         button("Review submission", () -> {
             JSONObject body = new JSONObject().put("attemptId", attempt.optString("id"))
@@ -368,6 +415,11 @@ public class RuntimeActivity extends Activity {
                 .put("steps", new JSONArray(java.util.Arrays.asList(steps.getText().toString().split("\\n"))))
                 .put("expected", expected.getText().toString()).put("actual", actual.getText().toString())
                 .put("result", result.getSelectedItem()).put("category", category.getSelectedItem());
+            if (correction) {
+                int index = Integer.parseInt(actionIndex.getText().toString());
+                body.put("correction", new JSONObject().put("actionIndex", index)
+                    .put("actualAction", reference.getJSONObject(index).getString("type")).put("suggestedAction", alternative.getSelectedItem()));
+            }
             new AlertDialog.Builder(this).setTitle("Send this test report?")
                 .setMessage(body.getJSONArray("steps") + "\nExpected: " + body.getString("expected") + "\nActual: " + body.getString("actual"))
                 .setNegativeButton("Back", null).setPositiveButton("Send report", (dialog, button) -> run(() -> {

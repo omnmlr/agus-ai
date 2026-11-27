@@ -108,7 +108,8 @@ const databaseUrl = process.env.AGUS_TEST_PRODUCT_DATABASE_URL;
 test('Postgres preserves campaign data and serializes competing claims across service restart', { skip: !databaseUrl }, async t => {
   const { pilot, developer, first, as, path } = await setup(t, { databaseUrl });
   const runtime = await qualify(pilot, as, first);
-  const [offer] = (await as(first, 'GET', '/me/assignments')).assignments;
+  const [offer] = (await as(first, 'GET', '/me/assignments')).assignments
+    .filter(row => row.campaignId === path.split('/').at(-1));
   const { assignment } = await as(first, 'POST', '/me/assignments/' + offer.id + '/accept',
     { termsDigest: offer.termsDigest, installationId: runtime.id, consent: true });
   await pilot.restart();
@@ -122,7 +123,8 @@ test('Postgres preserves campaign data and serializes competing claims across se
 test('redacted export requires both purpose grants, rejects foreign access and invalidates withdrawn packages', async t => {
   const { pilot, developer, first, second, as, path } = await setup(t);
   const runtime = await qualify(pilot, as, first);
-  const [offer] = (await as(first, 'GET', '/me/assignments')).assignments;
+  const [offer] = (await as(first, 'GET', '/me/assignments')).assignments
+    .filter(row => row.campaignId === path.split('/').at(-1));
   const { assignment } = await as(first, 'POST', '/me/assignments/' + offer.id + '/accept',
     { termsDigest: offer.termsDigest, installationId: runtime.id, consent: true });
   const executed = await executeHuman({ pilot, as, person: first, runtime, offer, accepted: assignment });

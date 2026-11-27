@@ -83,6 +83,7 @@ public final class MainActivity extends Activity {
     JSONObject pairing;
     String walletAddress;
     String walletVerifiedAt;
+    private String walletDisplayedRoute;
     String walletStatus;
     boolean walletInFlight;
     String pendingInvitationCode;
@@ -342,6 +343,7 @@ public final class MainActivity extends Activity {
         Screen requestedScreen = screen;
         String device = selectedDevice;
         boolean marketplace = requestedScreen == Screen.ACTIVITY;
+        boolean inbox = requestedScreen == Screen.ACTIVITY;
         boolean payouts = requestedScreen == Screen.EARNINGS || requestedScreen == Screen.HOME;
         int version = mutationVersion;
         if (userInitiated || snapshot == null) {
@@ -349,7 +351,7 @@ public final class MainActivity extends Activity {
         }
         reads.execute(() -> {
             try {
-                ProviderApi.Snapshot next = current.api.load(runId, device, marketplace, payouts);
+                ProviderApi.Snapshot next = current.api.load(runId, device, marketplace, payouts, inbox);
                 runOnUiThread(() -> {
                     if (isDestroyed() || session != current) {
                         return;
@@ -478,6 +480,7 @@ public final class MainActivity extends Activity {
         mutating = false;
         walletAddress = null;
         walletVerifiedAt = null;
+        walletDisplayedRoute = null;
         walletStatus = null;
         walletInFlight = false;
         pairing = null;
@@ -600,10 +603,34 @@ public final class MainActivity extends Activity {
 
     private String walletRoute() {
         String device = snapshot == null ? "" : snapshot.deviceScope;
-        return device.isBlank() ? null : ProviderApi.item(ProviderApi.MY_DEVICES, device) + "/payout-wallet";
+        return device.isEmpty() ? null : ProviderApi.item(ProviderApi.MY_DEVICES, device) + "/payout-wallet";
+    }
+
+    boolean hasCurrentWallet() {
+        return walletVerifiedAt != null && Objects.equals(walletDisplayedRoute, walletRoute());
+    }
+
+    void openPhonePreview() {
+        Intent launch = getPackageManager().getLaunchIntentForPackage("app.agus.runtime.preview");
+        if (launch != null) startActivity(launch);
+        else statusError("Phone-native testing requires the separate local preview on a disposable test device.");
+    }
+
+    void notificationPreferences() {
+        perform("Loading inbox preferences…", api -> api.get("/me/notifications/preferences"), result -> {
+            JSONObject existing = result.optJSONObject("preferences");
+            boolean[] checked = { existing.optBoolean("completedRuns"), existing.optBoolean("campaignUpdates") };
+            new AlertDialog.Builder(this).setTitle("In-app notifications")
+                .setMultiChoiceItems(new String[]{"Completed runs", "Campaign updates"}, checked, (dialog, which, value) -> checked[which] = value)
+                .setNegativeButton("Back", null).setPositiveButton("Save", (dialog, which) ->
+                    perform("Saving inbox preferences…", api -> api.patch("/me/notifications/preferences",
+                        new JSONObject().put("completedRuns", checked[0]).put("campaignUpdates", checked[1])),
+                        value -> status("Inbox preferences saved.", false), this::statusError, false)).show();
+        }, this::statusError, false);
     }
 
     private void updateWallet(JSONObject wallet, String error) {
+        walletDisplayedRoute = walletRoute();
         walletAddress = wallet == null ? null : wallet.optString("address", null);
         walletVerifiedAt = wallet == null ? null : wallet.optString("verifiedAt", null);
         walletStatus = error;
@@ -613,8 +640,9 @@ public final class MainActivity extends Activity {
     void loadWallet() {
         String route = walletRoute();
         if (route == null || walletInFlight) return;
-        perform("Loading verified wallet…", api -> api.get(route), result -> updateWallet(
-            result.optJSONObject("payoutWallet"), null), this::statusError, false);
+        perform("Loading verified wallet…", api -> api.get(route), result -> {
+            if (Objects.equals(route, walletRoute())) updateWallet(result.optJSONObject("payoutWallet"), null);
+        }, this::statusError, false);
     }
 
     void disconnectWallet() {

@@ -8,7 +8,7 @@ const blank = () => ({
   devices: {}, runs: {}, leases: {}, events: {}, actions: {},
   runtimeEnrollments: {}, runtimes: {}, nativeLeases: {}, campaigns: {}, assignments: {},
   qualifications: {}, compensation: {}, campaignExports: {},
-  pairings: {}, invitations: {}, notifications: {}, walletChallenges: {}, idempotencyKeys: {},
+  pairings: {}, invitations: {}, notifications: {}, notificationPreferences: {}, walletChallenges: {}, idempotencyKeys: {},
 });
 
 function hydrate(state) {
