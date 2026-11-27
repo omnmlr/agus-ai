@@ -1,0 +1,54 @@
+name: AGUS AI preview artifacts
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Assemble backend and Android preview files
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifacts="$RUNNER_TEMP/agus-preview"
+          bundle="$RUNNER_TEMP/agus-function"
+          mkdir -p "$artifacts" "$bundle"
+
+          npm ci --prefix services/control-plane --omit=dev --no-audit --no-fund
+          npm ci --prefix services/settlement --omit=dev --no-audit --no-fund
+          npm ci --prefix deploy/neon --no-audit --no-fund
+          npm run build --prefix deploy/neon -- "$bundle"
+          zip -q -9 -X -j "$artifacts/agus-neon-function.zip" "$bundle/index.mjs"
+
+          sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f -print -quit)"
+          test -x "$sdkmanager"
+          "$sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+          (cd apps/android && ./gradlew --no-daemon assembleDebug)
+          cp apps/android/app/build/outputs/apk/debug/app-debug.apk "$artifacts/agus-provider-reference-debug.apk"
+          bash packages/mobile-test/lab/build-android.sh "$artifacts" devnet
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$artifacts/agus-provider-reference-debug.apk"
+          git rev-parse HEAD > "$artifacts/REVISION.txt"
+          (cd "$artifacts" && sha256sum ./*.apk ./*.zip REVISION.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+
+      - name: Publish preview artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: agus-ai-hackathon-preview
+          path: ${{ runner.temp }}/agus-preview/
+          if-no-files-found: error
+          retention-days: 60
