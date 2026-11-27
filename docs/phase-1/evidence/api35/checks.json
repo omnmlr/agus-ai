@@ -1,0 +1,58 @@
+{
+  "recordedAtUtc": "2026-11-27T10:23:07.881142+00:00",
+  "checks": [
+    {
+      "check": "environment",
+      "detail": {
+        "sdk": "35",
+        "fingerprint": "Android/sdk_phone64_x86_64/emu64x:15/AE3A.240806.019/12368160:userdebug/test-keys",
+        "harnessUid": 2000
+      }
+    },
+    {
+      "check": "profile_created_with_android_ui",
+      "detail": {
+        "user": "10",
+        "consentControls": [
+          "accept & continue",
+          "next"
+        ]
+      }
+    },
+    {
+      "check": "app_registered_and_authenticated_to_existing_control_plane",
+      "detail": null
+    },
+    {
+      "check": "install_requires_explicit_work_profile_source_approval",
+      "detail": null
+    },
+    {
+      "check": "profile_local_install_and_action",
+      "detail": {
+        "unreviewedRejected": true,
+        "noParentSentinel": true,
+        "explicitParentDenied": true,
+        "fixtureWithoutInternetSocketDenied": true
+      }
+    },
+    {
+      "check": "structured_selection_keystore_signature_verified_in_app",
+      "detail": null
+    },
+    {
+      "check": "cooperating_fixture_stop",
+      "detail": {
+        "reinstallStartedWithFreshFixtureData": true
+      }
+    },
+    {
+      "check": "two_uninstall_confirmations_with_no_fixture_in_parent",
+      "detail": null
+    },
+    {
+      "check": "profile_removed_personal_app_usable",
+      "detail": null
+    }
+  ]
+}
