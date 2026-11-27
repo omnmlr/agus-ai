@@ -77,7 +77,11 @@ For actual dedicated Android acceptance, supply the device serial, native fixtur
 
 ## Model-driven acceptance
 
-Run `NODE_USE_ENV_PROXY=1 AGUS_GEMINI_MODEL=gemini-3.1-flash-lite node services/provider-runner/test/gemini-live.mjs` with `AGUS_GEMINI_API_KEY` loaded privately. This uses real Gemini decisions with a synthetic Android adapter. For real Android, use the existing Android acceptance script with `AGUS_ANDROID_ACCEPTANCE_GEMINI=1`, or dispatch `Android wallet acceptance` with `provider_only=true` and `gemini_agent=true` after an authorized operator binds the existing project key as the destination repository's `AGUS_GEMINI_API_KEY` secret. Set `agent_wallet=true` for the Localnet wallet variant when the job has adequate time. The signed report records the model and its decision count. The server labels these metrics as runner-signed. Only minimizing synthetic phases and allowlisted choices leave the runner.
+Run `NODE_USE_ENV_PROXY=1 AGUS_GEMINI_MODEL=gemini-3.5-flash-lite node services/provider-runner/test/gemini-live.mjs` with `AGUS_GEMINI_API_KEY` loaded privately for the synthetic adapter smoke test. For real Android, use the Android acceptance script with `AGUS_ANDROID_ACCEPTANCE_GEMINI=1`, or dispatch `Android wallet acceptance` with `provider_only=true` and `gemini_agent=true` after an authorized operator binds the existing project key to the repository's `AGUS_GEMINI_API_KEY` secret. Set `agent_wallet=true` or, on the local runner, `AGUS_ANDROID_ACCEPTANCE_TRANSFER=1` with the pinned Fake Wallet APK to exercise transfer on Localnet.
+
+The signed report records the model and its decision count. The harness verifies the report against the separate enrollment public key and checks the hash of the attached Gemini trajectory. Only fixture phase names and allowlisted choices are sent to Gemini.
+
+For a software-emulated AVD, `AGUS_ANDROID_ACCEPTANCE_COMMAND_TIMEOUT_MS` can raise the command timeout floor up to 60000 ms. Allow Android to complete its first boot before starting the fixture.
 
 ## Public Devnet acceptance on dedicated USB hardware
 

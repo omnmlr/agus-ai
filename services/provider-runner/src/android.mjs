@@ -15,17 +15,20 @@ function kibibytes(value) {
 }
 
 export class AndroidDevice {
-  constructor(device, { adb = process.env.AGUS_ADB || "adb", aapt = process.env.AGUS_AAPT || "aapt" } = {}) {
+  constructor(device, {
+    adb = process.env.AGUS_ADB || "adb", aapt = process.env.AGUS_AAPT || "aapt", commandTimeoutMs = 8_000,
+  } = {}) {
     this.device = device;
     this.adb = adb;
     this.aapt = aapt;
+    this.commandTimeoutMs = commandTimeoutMs;
   }
 
   async command(args, signal, timeout = 8_000) {
     try {
       const { stdout } = await exec(this.adb, [
         "-H", "127.0.0.1", "-P", "5037", "-s", this.device.serial, ...args,
-      ], { encoding: "buffer", maxBuffer: 10 * 1024 * 1024, timeout, signal, windowsHide: true });
+      ], { encoding: "buffer", maxBuffer: 10 * 1024 * 1024, timeout: Math.max(timeout, this.commandTimeoutMs), signal, windowsHide: true });
       return stdout;
     } catch {
       signal?.throwIfAborted();

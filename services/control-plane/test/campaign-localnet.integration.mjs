@@ -66,7 +66,7 @@ test('funded campaign with Postgres settles full and partial entitlements and re
   skip: !genesisPin && !devnetDirectory && 'set a pinned Localnet genesis or opt into the disposable Devnet acceptance',
 }, async t => {
   const databaseUrl = process.env.AGUS_TEST_PRODUCT_DATABASE_URL;
-  assert(databaseUrl && new URL(databaseUrl).hostname === '127.0.0.1', 'Use disposable loopback Postgres');
+  assert(URL.parse(databaseUrl ?? '')?.hostname === '127.0.0.1', 'Use disposable loopback Postgres');
   const devnet = Boolean(devnetDirectory);
   assert(!(devnet && genesisPin), 'Select a single chain');
   const journal = devnet ? join(devnetDirectory, 'campaign-acceptance.json') : null;

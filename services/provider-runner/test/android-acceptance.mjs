@@ -27,6 +27,10 @@ if (!serial || !fixturePath || !outputDirectory) {
 }
 const planner = process.env.AGUS_ANDROID_ACCEPTANCE_GEMINI === "1" ? "gemini" : "remote";
 if (planner === "gemini" && !process.env.AGUS_GEMINI_API_KEY) throw new Error("Configure AGUS_GEMINI_API_KEY for model-driven acceptance");
+const commandTimeout = Number(process.env.AGUS_ANDROID_ACCEPTANCE_COMMAND_TIMEOUT_MS ?? 8_000);
+if (!Number.isInteger(commandTimeout) || commandTimeout < 8_000 || commandTimeout > 60_000) {
+  throw new Error("Use a dedicated Android acceptance command timeout from 8000 to 60000 ms");
+}
 const wallet = walletPath && walletPath !== "-";
 const correctionFixture = process.env.AGUS_PRODUCT_CORRECTION_FIXTURE;
 if (correctionFixture && (wallet || planner !== "remote" || serial !== "emulator-5554")) {
@@ -70,7 +74,7 @@ try {
       localnet: { genesis: process.env.AGUS_TEST_LOCAL_GENESIS },
     } : {}),
   }, temporary);
-  const android = new AndroidDevice(config.device);
+  const android = new AndroidDevice(config.device, { commandTimeoutMs: commandTimeout });
   assert.equal(await android.packageOf(resolve(fixturePath), control.signal), FIXTURE);
   assert.equal(await android.present(FIXTURE, control.signal), false, "Start with an uninstalled fixture on this dedicated device");
   if (wallet) {
@@ -217,12 +221,12 @@ try {
     assert.ok(receipt.manifest.evidence.some(item => item.kind === kind && item.sha256 === evidence.sha256));
     return bytes;
   }
-  async function verifyCompleted(runId, source) {
+  async function verifyCompleted(started, source) {
     const run = await poll(source + " result", async () => {
-      const current = await runState(runId);
+      const current = await runState(started.id);
       if (["failed", "cancelled", "expired", "unverified"].includes(current.state)) throw new Error(JSON.stringify(current));
       return current.state === "passed" ? current : null;
-    });
+    }, started.maximumDurationSeconds * 1_000 + 30_000);
     const { manifest, issuer, publicKeyPem, signature, manifestSha256 } = run.receipt;
     const canonical = Buffer.from(stableJson(manifest));
     assert.equal(run.acceptedWork.source, source);
@@ -252,7 +256,7 @@ try {
     return run;
   }
 
-  const completed = await verifyCompleted(privateRun.id, "private");
+  const completed = await verifyCompleted(privateRun, "private");
   assert.equal(completed.receipt.manifest.execution.planner, planner);
   if (planner === "gemini") assert.ok(completed.receipt.manifest.execution.modelActionCount >= 2);
   assert.ok(completed.receipt.manifest.execution.deviceActionCount >= (wallet ? 3 : 1));
@@ -281,7 +285,7 @@ try {
   const marketAccept = "/marketplace/jobs/" + marketplaceRun.id + "/accept";
   await request(marketAccept, owner, { deviceId: device.id });
   await request(marketAccept, owner, { deviceId: device.id }, { status: [409] });
-  const marketplace = await verifyCompleted(marketplaceRun.id, "marketplace");
+  const marketplace = await verifyCompleted(marketplaceRun, "marketplace");
   assert.equal(marketplace.acceptedWork.payout.kind, "unpaid");
   console.log(JSON.stringify({
     result: "passed", source: device.profile.source, androidApi: device.profile.apiLevel,
