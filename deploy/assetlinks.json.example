@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.agus.companion",
+      "sha256_cert_fingerprints": ["REPLACE_WITH_AUTHORIZED_RELEASE_CERTIFICATE_SHA256"]
+    }
+  }
+]

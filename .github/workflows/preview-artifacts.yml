@@ -2,6 +2,9 @@ name: AGUS AI preview artifacts
 
 on:
   workflow_dispatch:
+  push:
+    branches: [feature/phase-2-3-product]
+    paths: ['.github/workflows/preview-artifacts.yml', 'scripts/product-preview/package.sh']
 
 permissions:
   contents: read
@@ -9,7 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -26,29 +29,43 @@ jobs:
         run: |
           set -euo pipefail
           artifacts="$RUNNER_TEMP/agus-preview"
-          bundle="$RUNNER_TEMP/agus-function"
-          mkdir -p "$artifacts" "$bundle"
 
           npm ci --prefix services/control-plane --omit=dev --no-audit --no-fund
           npm ci --prefix services/settlement --omit=dev --no-audit --no-fund
           npm ci --prefix deploy/neon --no-audit --no-fund
-          npm run build --prefix deploy/neon -- "$bundle"
-          zip -q -9 -X -j "$artifacts/agus-neon-function.zip" "$bundle/index.mjs"
-
           sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f -print -quit)"
           test -x "$sdkmanager"
           "$sdkmanager" "platforms;android-35" "build-tools;35.0.0"
-          (cd apps/android && ./gradlew --no-daemon assembleDebug)
-          cp apps/android/app/build/outputs/apk/debug/app-debug.apk "$artifacts/agus-provider-reference-debug.apk"
-          bash packages/mobile-test/lab/build-android.sh "$artifacts" devnet
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$artifacts/agus-provider-reference-debug.apk"
-          git rev-parse HEAD > "$artifacts/REVISION.txt"
-          (cd "$artifacts" && sha256sum ./*.apk ./*.zip REVISION.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          bash scripts/product-preview/package.sh "$artifacts"
 
       - name: Publish preview artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: agus-ai-hackathon-preview
           path: ${{ runner.temp }}/agus-preview/
+          if-no-files-found: error
+          retention-days: 60
+
+  settlement-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - name: Build and verify isolated AMD64 images
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash deploy/package.sh HEAD "$RUNNER_TEMP"
+          release="$RUNNER_TEMP/agus-ai-$(git rev-parse HEAD)"
+          (cd "$release" && sha256sum --check --strict SHA256SUMS.txt)
+          mkdir "$RUNNER_TEMP/agus-settlement-upload"
+          tar -czf "$RUNNER_TEMP/agus-settlement-upload/agus-settlement-linux-amd64.tar.gz" -C "$release" .
+          (cd "$RUNNER_TEMP/agus-settlement-upload" && sha256sum agus-settlement-linux-amd64.tar.gz > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: agus-ai-settlement-linux-amd64
+          path: ${{ runner.temp }}/agus-settlement-upload
           if-no-files-found: error
           retention-days: 60
