@@ -48,7 +48,7 @@ function walletSpec(config, job) {
   const expected = job.expectedTransaction;
   if (!config.localnet || (job.scenario === "wallet-transfer" && !expected) ||
       (expected && (expected.network !== configured.network || expected.recipient !== configured.recipient ||
-        expected.lamports !== Number(configured.lamports)))) {
+        expected.lamports !== configured.lamports))) {
     throw new RunnerFailure("FIXTURE_WALLET_POLICY");
   }
   return configured;
@@ -68,7 +68,9 @@ function chainVerifier(config, spec) {
       try {
         signal.throwIfAborted();
         const finalized = await Promise.race([finalizedTransaction(rpc, transaction.signature, timeout), cancellation]);
-        return assertSolTransfer(finalized, transaction.signature, window.slot, { ...spec, payer: transaction.payer });
+        return assertSolTransfer(finalized, transaction.signature, window.slot, {
+          payer: transaction.payer, recipient: spec.recipient, lamports: String(spec.lamports),
+        });
       } finally {
         signal.removeEventListener("abort", stop);
       }
@@ -231,7 +233,10 @@ export async function executeJob({ api, config, identity, device, rawJob, shutdo
       const transaction = await waitForCallback(device, since, signal);
       check("wallet-callback", transaction.outcome === "submitted", transaction.code);
       if (transaction.outcome !== "submitted") throw new RunnerFailure(transaction.code);
-      report.transaction = { signature: transaction.signature, ...spec };
+      report.transaction = {
+        signature: transaction.signature, network: spec.network,
+        recipient: spec.recipient, lamports: spec.lamports,
+      };
       collect("log", "fixture-wallet-callback", Buffer.from(JSON.stringify(transaction)));
       try {
         const finalized = await verifier.finalize(transaction, window, job.scenario === "wallet-false-success" ? 10_000 : 45_000, signal);
