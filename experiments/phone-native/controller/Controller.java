@@ -247,7 +247,7 @@ public class Controller extends Activity {
             if (!store.containsAlias(ALIAS)) {
                 KeyPairGenerator generator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore");
                 generator.initialize(new KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_SIGN
-                        | KeyProperties.PURPOSE_VERIFY).setDigests(KeyProperties.DIGEST_SHA256).build());
+                        | KeyProperties.PURPOSE_VERIFY).setKeySize(256).setDigests(KeyProperties.DIGEST_SHA256).build());
                 generator.generateKeyPair();
             }
             KeyPair key = new KeyPair(store.getCertificate(ALIAS).getPublicKey(),
@@ -260,11 +260,12 @@ public class Controller extends Activity {
             signature.update(evidence);
             if (!signature.verify(bytes)) throw new IllegalStateException("Signature verification failed");
             say("FIXTURE_EVIDENCE_VERIFIED_" + label.toUpperCase(java.util.Locale.ROOT));
-            cleanup(false);
         } catch (Exception error) {
             say("EVIDENCE_ERROR_" + error.getClass().getSimpleName());
             cleanup(true);
+            return;
         }
+        cleanup(false);
     }
 
     private void cleanup(boolean emergency) {
@@ -277,7 +278,11 @@ public class Controller extends Activity {
             if (policy.setPackagesSuspended(Admin.component(this), new String[]{FIXTURE}, true).length != 0) {
                 mark("FIXTURE_SUSPENSION_FAILED");
             }
-            getPackageManager().getPackageInstaller().uninstall(FIXTURE, callback("FIXTURE_REMOVE", 2));
+            try {
+                getPackageManager().getPackageInstaller().uninstall(FIXTURE, callback("FIXTURE_REMOVE", 2));
+            } catch (SecurityException denied) {
+                say("FIXTURE_CLEANUP_UNCONFIRMED");
+            }
         }
     }
 
