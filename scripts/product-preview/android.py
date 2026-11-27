@@ -164,7 +164,8 @@ def run():
         tap("Stage reviewed APK")
         confirm_action("install_status_0", number, {"review android confirmation", "install", "ok"})
         assert package_present(profile) and not package_present("0")
-        tap("Launch reviewed fixture")
+        if mode != "offline":
+            tap("Launch reviewed fixture")
         if mode == "human":
             tap("Continue")
             tap("Return to review")
@@ -179,7 +180,7 @@ def run():
             expect("WATCHDOG_OWNER_STOP")
             adb("shell", "cmd", "statusbar", "collapse")
         if mode == "offline":
-            tap("Continue")
+            # Expire after staging and before launch, so the test APP cannot trigger its own stop.
             backend = int(os.environ["AGUS_PREVIEW_BACKEND_PID"])
             os.kill(backend, signal.SIGSTOP)
             try:
