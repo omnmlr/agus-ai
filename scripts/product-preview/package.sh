@@ -12,7 +12,9 @@ trap 'rm -rf -- "$work"' EXIT
 cd "$repo"
 (cd apps/android && ./gradlew --no-daemon testDebugUnitTest assembleDebug)
 cp apps/android/app/build/outputs/apk/debug/app-debug.apk "$out/agus-companion-debug.apk"
-AGUS_NATIVE_BUILD_TIER=development bash apps/android/native-preview/build.sh "$work/native"
+development_pin=${AGUS_NATIVE_MANIFEST_PUBLIC_FILE:-$repo/docs/phase-2-3/evidence/release-development-manifest.public.b64}
+AGUS_NATIVE_BUILD_TIER=development AGUS_NATIVE_MANIFEST_PUBLIC_FILE="$development_pin" \
+  bash apps/android/native-preview/build.sh "$work/native"
 cp "$work/native/runtime.apk" "$out/agus-runtime-development.apk"
 cp "$work/native/fixture.apk" "$out/agus-fixture-development.apk"
 cp "$work/native/partner.apk" "$out/agus-partner-development.apk"

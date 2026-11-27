@@ -20,7 +20,7 @@ if (packages.length > 16 || packages.some(pkg => pkg.length > 120 || !/^[a-z][a-
   throw new Error('Supply reviewed Android package IDs only');
 }
 let key;
-if (hosted) {
+if (hosted || process.env.AGUS_NATIVE_MANIFEST_PUBLIC_FILE) {
   const { createPublicKey } = await import('node:crypto');
   const encoded = readFileSync(process.env.AGUS_NATIVE_MANIFEST_PUBLIC_FILE, 'utf8').trim();
   key = createPublicKey({ key: Buffer.from(encoded, 'base64'), format: 'der', type: 'spki' });
