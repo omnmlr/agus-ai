@@ -48,19 +48,17 @@ def run():
     ui.tap("Profile")
     ui.tap("Verify test wallet")
     sign("btn_decline")
-    observe(ui.APP, "text", "Verify test wallet")
+    ui.tap("Verify test wallet")
     assert request("/me/payout-wallet", token=token)["payoutWallet"] is None
     ui.record("Declined signature leaves the account without a verified payout wallet")
-    ui.tap("Verify test wallet")
     sign("btn_authorize")
-    observe(ui.APP, "text", "Replace payout wallet")
+    ui.tap("Disconnect payout wallet")
     opened = request("/me/payout-wallet", token=token)["payoutWallet"]
     assert opened["verifiedAt"] and opened["address"]
     ui.record("Signed MWA ownership message verified by the local control plane")
-    ui.tap("Disconnect payout wallet")
     ui.tap("Disconnect", scroll=False)
-    observe(ui.APP, "text", "Verify test wallet")
-    assert request("/me/payout-wallet", token=token)["payoutWallet"] is None
+    ui.until(lambda: request("/me/payout-wallet", token=token)["payoutWallet"] is None,
+             "Disconnect did not clear the verified destination")
     ui.record("Disconnect cleared the verified destination")
 
 
