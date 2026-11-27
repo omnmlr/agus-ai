@@ -1,0 +1,35 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="app.agus.phase1">
+    <permission android:name="app.agus.phase1.EXECUTE_FIXTURE" android:protectionLevel="signature"/>
+    <uses-permission android:name="app.agus.phase1.EXECUTE_FIXTURE"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <queries>
+        <package android:name="app.agus.phase1.fixture"/>
+        <package android:name="app.agus.phase1.untrusted"/>
+    </queries>
+    <application android:label="AGUS Phase 1" android:allowBackup="false"
+        android:usesCleartextTraffic="true" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity android:name=".Controller" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <receiver android:name=".Admin" android:permission="android.permission.BIND_DEVICE_ADMIN" android:exported="true">
+            <meta-data android:name="android.app.device_admin" android:resource="@xml/admin"/>
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED"/>
+                <action android:name="android.app.action.PROFILE_PROVISIONING_COMPLETE"/>
+            </intent-filter>
+        </receiver>
+        <activity android:name=".Provisioning" android:permission="android.permission.BIND_DEVICE_ADMIN" android:exported="true">
+            <intent-filter>
+                <action android:name="android.app.action.GET_PROVISIONING_MODE"/>
+                <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+        </activity>
+        <receiver android:name=".InstallResult" android:exported="false"/>
+        <provider android:name=".CanaryProvider" android:authorities="app.agus.phase1.canary"
+            android:exported="true"/>
+    </application>
+</manifest>

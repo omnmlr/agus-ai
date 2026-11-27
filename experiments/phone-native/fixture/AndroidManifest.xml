@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="app.agus.phase1.fixture">
+    <queries><provider android:authorities="app.agus.phase1.canary"/></queries>
+    <application android:label="AGUS Reviewed Fixture" android:allowBackup="false"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity android:name=".Fixture" android:exported="true"
+            android:permission="app.agus.phase1.EXECUTE_FIXTURE"/>
+    </application>
+</manifest>

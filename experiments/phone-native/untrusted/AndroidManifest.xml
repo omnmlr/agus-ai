@@ -1,0 +1,3 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="app.agus.phase1.untrusted">
+    <application android:label="AGUS Unreviewed Negative Fixture" android:allowBackup="false"/>
+</manifest>
