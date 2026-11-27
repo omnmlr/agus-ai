@@ -8,7 +8,7 @@ On a fresh test device, compare the `wallet-false-success` and `wallet-transfer`
 
 ## Recording evidence
 
-Use the provider acceptance workflow for actual Android pairing, explicit private acceptance, agent launch, signed evidence and manual marketplace allocation. Use the wallet acceptance workflow for MWA, the missing-broadcast control, independently finalized Localnet transfer and test-token payout reconciliation. The provider acceptance offers were explicitly unpaid. [Provider acceptance](https://github.com/omnmlr/agus-ai/actions/runs/45922423658) · [Wallet acceptance](https://github.com/omnmlr/agus-ai/actions/runs/45888580906)
+Show the Android 15 run's private invitation, five scoped agent actions, independently finalized Localnet transfer, signed report and screenshot integrity. Then show the separate manually accepted marketplace job. Both provider offers were unpaid. The scripted wallet workflow supplies the missing-broadcast negative control and a reconciled Localnet test-token payout. [Agent wallet and marketplace workflow](https://github.com/omnmlr/agus-ai/actions/runs/45923508742) · [Scripted wallet and payout workflow](https://github.com/omnmlr/agus-ai/actions/runs/45888580906)
 
 ## Hosted demo acceptance
 
