@@ -1,0 +1,26 @@
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	header {
+		Referrer-Policy no-referrer
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+	}
+	@backend path /health /api/v1 /api/v1/*
+	@invite path /invite
+	handle @invite {
+		header Cache-Control no-store
+		redir /console.html 302
+	}
+	handle @backend {
+		reverse_proxy api:8080
+	}
+	handle {
+		root * /srv/agus-ai
+		encode gzip
+		file_server
+	}
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@mobile-execution/devnet-settlement",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "probe:devnet": "node probe-devnet.mjs",
+    "fund:devnet": "node fund-devnet.mjs"
+  },
+  "dependencies": {
+    "@solana-program/token": "0.18.0",
+    "@solana/kit": "8.6.0"
+  },
+  "devDependencies": {
+    "pg": "8.23.1"
+  }
+}

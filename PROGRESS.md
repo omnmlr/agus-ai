@@ -17,3 +17,11 @@
 - Hosted Postgres API, outbound provider runner, dashboard, Android companion, developer CLI/MCP and signed report path.
 - Exact Devnet test-USDC quote, funding, settlement and reconciliation path. A funded disposable wallet is required for a live payout.
 - Dedicated device and hosted demo acceptance. The managed environment has no attached handset or hardware Android acceleration.
+
+## November 27 recovery
+
+- Recovered the previously unpublished services, apps and typed contract. The provider runner and control-plane HTTP suites passed private-link authorization, exclusive claiming, stop acknowledgement, consent and signed evidence using synthetic devices. Chromium exercised the reference console against the local API.
+- The first new-repository Android CI run passed on a real booted API 35 AVD with Fake Wallet, Localnet finality, the missing-broadcast control and single-signed Localnet test-token settlement. [Acceptance workflow](https://github.com/omnmlr/agus-ai/actions/runs/45888580906)
+- The original signed ARM64 AGUS Crypto APK matched release SHA-256 and the published App Links signer. An upload through the reference console succeeded. A physical wallet journey still needs device access and disposable identities.
+- The founder supplied the design handoff and tokens. The frontend contract records the functional boundaries. Chisom owns final visuals. Antigravity owns Windows and physical-device preparation.
+- Next gate is the isolated Neon HTTPS deployment and the expanded CI workflow combining the actual runner, Android, private invite, marketplace, agent actions and independent chain verification. Live Devnet payout still needs funded disposable wallets.

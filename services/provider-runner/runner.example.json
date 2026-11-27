@@ -1,0 +1,18 @@
+{
+  "displayName": "Dedicated Android test rig",
+  "stateDirectory": "./provider",
+  "device": {
+    "id": "lab-android",
+    "serial": "LOCAL_DEVICE_SERIAL",
+    "kind": "android-device",
+    "dedicated": true
+  },
+  "approvedBuilds": [
+    {
+      "packageName": "app.agus.prototype",
+      "sha256": "d6f449dc6f71454b6fc554e8121f9b5db6cb5cadf3c4402c7483d4033d681e55",
+      "scenarios": ["app-launch"]
+    }
+  ],
+  "planner": "remote"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@agus-ai/neon-deploy",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test"
+  },
+  "devDependencies": { "esbuild": "0.28.2" }
+}

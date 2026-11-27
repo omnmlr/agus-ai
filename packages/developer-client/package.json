@@ -3,10 +3,29 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "bin": { "agus": "./src/cli.mjs" },
-  "scripts": { "test": "node --test" },
+  "exports": {
+    ".": {
+      "types": "./src/typed.d.mts",
+      "default": "./src/typed.mjs"
+    },
+    "./openapi.json": "./openapi.json"
+  },
+  "bin": {
+    "agus": "./src/cli.mjs"
+  },
+  "scripts": {
+    "contract:generate": "node contract.mjs",
+    "contract:check": "node contract.mjs --check",
+    "test": "node --test test/*.test.mjs && npm run contract:check",
+    "test:integration": "node --test test/http.integration.mjs"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
+    "openapi-fetch": "0.17.0",
     "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
   }
 }

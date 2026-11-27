@@ -1,0 +1,35 @@
+<resources>
+    <item name="screen_title" type="id" />
+    <item name="feedback" type="id" />
+    <item name="tab_home" type="id" />
+    <item name="tab_activity" type="id" />
+    <item name="tab_earnings" type="id" />
+    <item name="welcome_get_started" type="id" />
+    <item name="auth_origin" type="id" />
+    <item name="auth_email" type="id" />
+    <item name="auth_password" type="id" />
+    <item name="auth_registration_token" type="id" />
+    <item name="auth_sign_in" type="id" />
+    <item name="auth_register" type="id" />
+    <item name="auth_email_code" type="id" />
+    <item name="auth_email_send" type="id" />
+    <item name="auth_email_verify" type="id" />
+    <item name="auth_sign_out" type="id" />
+    <item name="open_enrollment" type="id" />
+    <item name="generate_pairing" type="id" />
+    <item name="open_my_device" type="id" />
+    <item name="device_diagnostics" type="id" />
+    <item name="device_options" type="id" />
+    <item name="developer_portal" type="id" />
+    <item name="home_earnings_chart" type="id" />
+    <item name="open_current_session" type="id" />
+    <item name="share_private_invitation" type="id" />
+    <item name="review_private_code" type="id" />
+    <item name="invitation_accept" type="id" />
+    <item name="invitation_decline" type="id" />
+    <item name="invitation_revoke" type="id" />
+    <item name="review_market_offer" type="id" />
+    <item name="accept_market_offer" type="id" />
+    <item name="session_stop" type="id" />
+    <item name="connect_test_wallet" type="id" />
+</resources>

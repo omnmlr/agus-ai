@@ -1,0 +1,11 @@
+{
+  "name": "@agus/provider-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.18.0" },
+  "scripts": {
+    "start": "node --import tsx src/cli.mjs",
+    "test": "node --import tsx --test test/*.test.mjs"
+  }
+}

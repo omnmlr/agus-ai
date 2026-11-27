@@ -1,0 +1,69 @@
+{
+  "provenance": "synthetic_ui_fixtures",
+  "device": {
+    "id": "d0000000-0000-4000-8000-000000000001:lab-one",
+    "label": "Dedicated Android lab",
+    "dedicated": true,
+    "state": "available",
+    "connectivity": "online",
+    "readiness": "ready",
+    "publicListing": false,
+    "autoMatch": false,
+    "marketplaceEligible": false,
+    "lastSeenAt": "2026-11-26T20:18:00.000Z",
+    "scenarios": ["app-launch", "wallet-transfer"],
+    "profile": {
+      "kind": "adb-emulator",
+      "provenance": "simulated_environment",
+      "hardwareAttested": false,
+      "seekerVerified": false,
+      "model": "Android API 35 AVD",
+      "androidVersion": "15",
+      "memoryTotalBytes": 4294967296,
+      "batteryPercent": 72,
+      "batteryHealth": null,
+      "thermalStatus": null,
+      "networkLatencyMs": null,
+      "measuredAt": "2026-11-26T20:18:00.000Z"
+    },
+    "schedule": { "timeZone": "Africa/Lagos", "windows": [{ "days": [4], "start": "22:00", "end": "02:00" }] },
+    "constraints": { "chargingRequired": true, "wifiRequired": true }
+  },
+  "invitation": {
+    "id": "a0000000-0000-4000-8000-000000000001",
+    "kind": "provider_share",
+    "state": "reviewed",
+    "deviceId": "d0000000-0000-4000-8000-000000000001:lab-one",
+    "packageName": "app.agus.testfixture",
+    "buildSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "scenario": "app-launch",
+    "mode": "agent",
+    "maximumDurationSeconds": 120,
+    "evidence": { "screenshots": true, "logs": false, "trajectory": false },
+    "consentVersion": "workload-v1",
+    "payout": "unpaid",
+    "createdAt": "2026-11-26T20:15:00.000Z",
+    "reviewedAt": "2026-11-26T20:18:00.000Z",
+    "expiresAt": "2026-11-27T20:15:00.000Z",
+    "requester": { "id": "b0000000-0000-4000-8000-000000000001", "email": "provider@example.com" },
+    "recipient": { "id": "b0000000-0000-4000-8000-000000000002", "email": "developer@example.com" },
+    "viewerRole": "recipient"
+  },
+  "runPatches": {
+    "active": { "state": "running", "executionState": "running", "leaseState": "running" },
+    "stopping": {
+      "state": "stopping", "executionState": "stopping", "leaseState": "stopping",
+      "stop": { "requestedAt": "2026-11-26T20:19:00.000Z", "requesterRole": "provider", "acknowledgedAt": null }
+    },
+    "signedNegativeControl": {
+      "state": "failed", "executionState": "completed", "leaseState": "released",
+      "evaluationOutcome": "failed", "reportSeal": "sealed",
+      "verification": { "transaction": { "status": "not_found", "network": "localnet" } }
+    }
+  },
+  "errors": {
+    "expired": { "error": { "code": "invitation_expired", "message": "Invitation expired" } },
+    "offline": { "error": { "code": "device_unavailable", "message": "Device is not ready for marketplace work" } },
+    "paymentNotConfigured": { "error": { "code": "payment_unavailable", "message": "Devnet payments are disabled on this deployment" } }
+  }
+}

@@ -1,70 +1,96 @@
 # Frontend integration contract
 
-Chisom can implement the screens in parallel using the REST API and the reference interfaces. The product design, final naming and visual assets are owned by the founder. Read [the endpoint contract](services/control-plane/API.md) for the exact transport, limits and provider requests.
+Use the [generated OpenAPI model](packages/developer-client/openapi.json) and [typed session client](packages/developer-client/src/typed.d.mts) for person-facing routes. Use the [control-plane API reference](services/control-plane/API.md) for provider-runner routes, exact status codes and report payloads. The reference web and Android interfaces are integration surfaces. The final visual system follows `UIUX_HANDOFF.md` and `DESIGN_TOKENS.json` (founder-provided November 26 handoff, reviewed).
 
-## Navigation and screens
+## Integrate now
 
-| Route | Responsibilities |
-| --- | --- |
-| `/` | Public product explanation, Solana Mobile workflow, integration guide and provider pilot scope. |
-| `/sign-in` | Email and password registration or sign-in. Accept invited registration where enabled and resume the requested authenticated route after login. Provide sign-out and explicit session expiry. |
-| `/dashboard` | Project list and recent real runs. A new account can create its first project and upload an APK. |
-| `/projects/:id` | Builds with Android package, SHA-256 and upload time. New workload selection starts with a project and a build. |
-| `/devices` | Dedicated devices by capability, freshness and supported scenarios. Show measured, declared and emulated attributes distinctly. |
-| `/runs/new` | Select build, scenario, optional device and scripted/agent mode. For wallet transfer, show cluster, expected exact recipient and lamports. Confirm before requesting a lease. |
-| `/runs/:id` | Live timeline, status, compatible device, evidence, independent chain verification and runner-signed report. Authenticate and check ownership on direct navigation. |
-| `/runs/:id/settlement` | Separate quote, funding, payout and reconciliation. Show an explicit transfer review and current network. |
-| `/developer` | CLI, API and MCP install instructions and a pointer to the API contract. Configure tokens outside browser code. |
-| Android provider | Enrollment instructions, dedicated device capability and readiness, active session and emergency stop, completed work and Devnet wallet/settlement views when configured. |
-| Android developer | Project/run status, device details, evidence and approval states. |
-
-## Wire shapes
-
-```ts
-type Id = string
-type Time = string // ISO 8601 UTC
-type RunState = 'queued' | 'running' | 'passed' | 'failed' | 'cancelled' | 'expired' | 'unverified'
-type Mode = 'scripted' | 'agent'
-type Scenario = 'app-launch' | 'wallet-connect' | 'wallet-transfer' | 'wallet-false-success'
-type DeviceState = 'available' | 'busy' | 'offline'
-type User = { id: Id; email: string }
-type Project = { id: Id; name: string; createdAt: Time }
-type Build = { id: Id; projectId: Id; name: string; packageName: string; sha256: string; createdAt: Time }
-type Device = {
-  id: Id; label: string; dedicated: true; state: DeviceState
-  lastSeenAt: Time; scenarios: Scenario[]
-  profile: { kind: string; hardwareAttested: false; seekerVerified: false } & Record<string, unknown>
-}
-type TransactionExpectation = { network: 'devnet' | 'localnet'; recipient: string; lamports: number }
-type CreateRun = {
-  projectId: Id; buildId: Id; deviceId?: Id; scenario: Scenario; mode: Mode
-  expectedTransaction?: TransactionExpectation
-}
-type Run = CreateRun & { id: Id; state: RunState; createdAt: Time; updatedAt: Time }
-type RunEvent = { id: number; type: string; at: Time; data: Record<string, unknown> }
+```sh
+npm ci
+npm ci --prefix services/control-plane
+AGUS_LOCAL_DATA_DIR=.data/local AGUS_PROVIDER_BOOTSTRAP_TOKEN=synthetic-local-bootstrap-only \
+  npm start --prefix services/control-plane
 ```
 
-Use the current API response schemas for verification, evidence and payment detail. Times and status are server-authoritative. Treat added fields or event types as forward-compatible. Keep unavailable profile fields blank and show evidence links only after access is granted.
+In a second terminal, run `npm run dev --prefix apps/web` and open the shown local origin. The web reference proxies `/api/v1` to loopback. Use your own synthetic email and a password of at least 12 characters. Configure a different state directory per teammate. A local Windows runner and dedicated handset can join through [provider setup](services/provider-runner/README.md). For a shared or hosted origin, use the [deployment configuration](DEPLOYMENT.md). All examples and fixtures in this contract use synthetic data.
 
-| Request | Result |
-| --- | --- |
-| `POST /api/v1/auth/register` or `/auth/login` with email and password | User and bearer session. Keep credentials in OS secure storage or ephemeral browser state, with reload recovery appropriate to the app. |
-| `GET /api/v1/projects`, `/builds`, `/devices`, `/runs` | Lists under plural keys. |
-| `POST /api/v1/projects` with name | `{project}`. |
-| `POST /api/v1/builds` with projectId, name, packageName, sha256 and apkBase64 | `{build}`. Compute the digest from the exact selected bytes before base64 encoding. |
-| `POST /api/v1/runs` with CreateRun | `{run}`. Show one in-flight request and refresh the list after ambiguous network failure before queueing again. |
-| `GET /api/v1/runs/:id` and `POST /api/v1/runs/:id/cancel` | `{run}`. Cancellation may await runner cleanup and preserves existing chain evidence. |
-| `GET /api/v1/runs/:id/events` | `{events}` by default. Use a bearer-capable fetch for SSE where supported. Reconnect using the last event ID and refresh the snapshot after a gap. |
-| `GET /api/v1/runs/:id/actions` and `POST /api/v1/runs/:id/actions` | `{actions}` or `{action}`. Apply one action at a time and re-read observations. Only semantic scenario targets, bounded waits and named actions. |
+```ts
+import { createAgusClient, type AgusTypes } from '@agus/developer-client';
 
-Expected ordering begins with `run.queued`, follows the active lease and any `action.queued` / `action.observed` events, and ends in a terminal snapshot. Keep callback, report signature and independently verified transaction status separately visible. Late or duplicate events cannot replace a newer observed snapshot.
+let token: string | undefined;
+const api = createAgusClient({ baseUrl: 'http://localhost:8080', getToken: () => token });
+const signedIn = await api.POST('/api/v1/auth/login', {
+  body: { email: 'tester@example.com', password: 'synthetic-only-passphrase' },
+});
+token = signedIn.data?.token;
+const projects = await api.GET('/api/v1/projects');
+type Run = AgusTypes['Run'];
+```
 
-## Funding and recovery
+The browser build uses its own origin proxy. A separately served browser requires `AGUS_CORS_ORIGIN` on the API. Regenerate the checked-in schema and types with `npm run contract:generate --workspace @agus/developer-client` after a route change. The contract check and a real HTTP integration test are in the same workspace.
 
-Show funding requirements as immutable Devnet review details with exact mint, amount, payer, payee, and job reference. Link only public Devnet signatures to the cluster-specific Explorer. Show `paid` only after finalized payout verification. On unknown submission or network interruption, keep the same intent and offer reconciliation. Keep provider wallet enrollment separate from the developer's review. A saved wallet address alone does not establish wallet ownership.
+## Android navigation
 
-Present loading, actionable empty states, repeatable fetch retries, a bounded upload error, expired session, unavailable resource, offline device, no compatible device, canceled/expired run, cleanup pending, and RPC unavailable. Failed application behavior and failed infrastructure require distinct remedies. Preserve inputs on recoverable errors. Never request seeded wallet secrets or expose device serials.
+Exactly three tabs persist as top-level destinations **Home**, **Activity**, and **Earnings**. Everything else is an authentication step, detail screen, or settings route. Open the web developer portal from Welcome and Profile.
 
-## Development
+| Screen and root test ID | Data and actions | State examples |
+| --- | --- | --- |
+| Welcome · `screen-welcome` | Explain dedicated-device participation, continue to Auth, open web Developer Portal. | First visit, alternate developer entry. |
+| Auth · `screen-auth` | Google and email code in the final companion when configured. Password sign-in is limited to the reference integration preview. Preserve a pending invitation through the verified login flow. | Invited registration, expired/wrong code, provider unavailable, session expired. |
+| Enrollment · `screen-enrollment` | Create expiring pairing code, show desktop runner setup and poll owned device records until first heartbeat. | Code issued, expired, device unseen, measured, revoked. |
+| Home · `screen-home` | Tappable earnings chart, effective readiness and participation, today’s contributions, current session or helpful empty state. | Available, offline, active lease, no earnings. |
+| My Device · `screen-my-device` | Capability readings with provenance, diagnostics, rename/revoke and private share overflow. | Missing measurement, stale heartbeat, unavailable tool, pending share. |
+| Activity · `screen-activity` | Availability schedule and manual/auto settings. Separate available, running, history and private requests. | Listing off, auto off, overnight active, no jobs, received invitation. |
+| Job Details · `screen-job-details` | Review requester, exact build, workload, duration, evidence, requirements and payout. Accept/decline only through authorized routes. | Available, unavailable, private reviewed, expired, explicit unpaid. |
+| Active Session · `screen-active-session` | Authorized run, observed timestamps, ordered events, stop and acknowledgement. Intervention where the runner supports it. | Reserved, running, verifying, stopping, expired with cleanup unconfirmed. |
+| Completed Session · `screen-completed-session` | Acceptance, evaluation outcome, report seal, chain effect, evidence access and payout status. | Accepted job with failed test, no receipt, unresolved chain, report verified. |
+| Earnings · `screen-earnings` | Actual settled and pending totals/buckets and history. Wallet and receipts are secondary. | Payments disabled, zero totals, settled Devnet, failed or review needed. |
+| Profile · `screen-profile` | Grouped account, settings, payout wallet, privacy/consent information and web developer portal. | Password workspace, optional configured auth, unverified wallet. |
 
-Run the control plane and web app using the repository setup. The reference UI consumes the same API as CLI/MCP. Use synthetic local registrations and a dedicated runner with a reviewed fixture. The historical [sample reports](packages/mobile-test/examples/reports.json) can exercise success, failure, wallet rejection and missing receipt copy. Its [archived evidence](docs/mobile-test/evidence/) shows the actual previous callback and screenshot paths. Fixtures, historical results and live runs need persistent visible provenance labels.
+These root IDs are design/testing integration identifiers. Use matching accessible semantics. The [fixture pack](packages/developer-client/fixtures/provider-states.json) provides opted-in snapshots for rendering and tests. Live environments must derive status from the API.
+
+## Core requests
+
+All paths below are under `/api/v1`. For person requests send `Authorization: Bearer <session>` unless marked public. Token review requires a session and target ownership. Runner credentials and lease tokens are outside the person client.
+
+| Method and path | Body → response | Access and recovery |
+| --- | --- | --- |
+| POST `/auth/register`, `/auth/login` | `{email,password,registrationToken?}` → `{user,token,expiresAt}` | Public, preview sign-up is invite-gated. `registration_required`, `invalid_credentials`, `account_exists`, `rate_limited`. |
+| POST `/auth/email/start`, `/auth/email/verify` | `{email,registrationToken?}` → acknowledgement, `{email,code}` → session | Public. Six digits, 10 minutes, five attempts, 60-second resend cooldown. `identity_unavailable` without server configuration. |
+| POST `/auth/google/start`, GET `/auth/google/callback`, POST `/auth/google/exchange` | `{challenge,registrationToken?}` → `{url}`. Callback redirects to configured origin with `#authCode=…` or error. `{code,verifier}` → session. | Public, configured Google provider. Generate a random 64-character lowercase hex verifier, persist it locally for the browser round trip, and send its SHA-256 hex challenge. Erase the fragment after exchange. |
+| GET/PATCH `/auth/me`, POST `/auth/refresh`, `/auth/logout` | Profile GET; `{displayName}` PATCH. Refresh returns a replacement session. Logout returns `{ok:true}`. | Person. Refresh atomically invalidates prior token. Expired auth needs sign-in. |
+| GET/POST `/projects`, GET/POST `/builds` | `{name}` → project. `{projectId,name,packageName,sha256,apkBase64}` → build. | Developer/owner. Reject hash mismatch and over-limit upload. A build still needs local provider approval. |
+| GET `/devices`, `/me/devices`, POST `/me/devices/pairings` | Visible or owned list, then `{pairing:{code,expiresAt}}`. | Person, only owned records in `/me`. Pairing is single-use, 15 minutes, latest code supersedes unused codes. |
+| GET/PATCH/DELETE `/me/devices/:deviceId`, POST `/me/devices/:deviceId/diagnostics` | Optional `{label,publicListing,autoMatch,schedule,constraints}` updates. Diagnostics returns server/heartbeat checks. DELETE revokes. | Device owner. `not_found` or `device_revoked`. On revoke retain audit status. |
+| GET/POST `/invitations` | List or create a target-bound request. Creation returns `{invitation,token}`. | Creator or designated recipient. Opaque token is returned once and is used only for authenticated review. |
+| POST `/invitations/review`, `/invitations/:id/review` | Link review sends `{token}`. Inbox review has no body. Returns `{invitation}`. | Intended recipient. Wrong account returns `not_found`; expiry or replay returns conflict. |
+| POST `/invitations/:id/accept`, `/decline`, `/revoke` | Accept developer request with `{}`. Accept provider share with `{projectId,buildId,expectedTransaction?}`. | Target review required. A mismatch is `invitation_mismatch`. Either party may revoke and request a stop where permitted. |
+| GET `/marketplace/jobs?deviceId=…`, POST `/marketplace/jobs/:id/accept` | Compatible offers and atomic `{deviceId}` acceptance → `{run}`. | Provider device owner. `job_unavailable` or `device_unavailable` on lost race, stale heartbeat or conflicting reservation. |
+| GET/POST `/runs`, GET `/runs/:id` | `{projectId,buildId,scenario,mode,deviceId?,maximumDurationSeconds?,evidence?,allocation?,expectedTransaction?,payment?}` → `{run}`. | Developer/owner. Wallet transfer requires explicit expectation; private work enters via invitation. |
+| GET `/runs/:id/events`, POST `/runs/:id/cancel`, `/verify` | Poll or authenticated SSE, request stop, or recheck saved transaction. | Developer/owner. Replay `after` or `Last-Event-ID`; refetch snapshot on gaps. Recheck the saved signature after network uncertainty. |
+| GET `/me/sessions`, `/me/sessions/:id`, `/events`, POST `/stop` | Provider summary and pollable events via `after`. Stop returns `{run}`. | Associated provider. `stopping` lasts until cleanup acknowledgement or expiry. |
+| GET/POST `/runs/:id/actions`, GET `/runs/:id/evidence/:sha256` | Action `{type,args?}` or list, separate authorized artifact bytes. | Developer/owner. One queued semantic action at a time, no shell. Only grant-backed signed digests can be downloaded. |
+| GET `/runs/:id/payment`, POST `/quote`, `/funding`, `/settle`, `/reconcile` | Quote returns immutable Devnet details, funding accepts `{signature}`, all return `{payment}`. | Eligible developer/owner. When off, `payment_unavailable`. Unknown broadcast uses only the saved signature. |
+| GET `/me/earnings`, GET/DELETE `/me/devices/:id/payout-wallet`, POST `/payout-wallet/challenge`, `/payout-wallet/verify` | Earnings query includes `deviceId`, optional `from/to`, `bucket`. Challenge `{wallet}`, verify `{challengeId,signature}`. | Device owner. Exact UTF-8 challenge, standard base64 signature. Wallet changes apply to future work. |
+| GET `/me/notifications`, POST `/me/notifications/:id/read` | Sanitized notifications with `readAt` and resource IDs. | Associated person. Push requires a separate integration. |
+
+## Private test on a specific device
+
+**Developer request.** Send `kind:"developer_request"`, the exact device ID, owned project and build IDs, scenario, mode, maximum duration and evidence choices. The provider sees the request privately and must review it before accepting.
+
+**Provider share.** Send `kind:"provider_share"`, the owned device ID, targeted developer account ID, exact APK package and SHA-256, scenario, mode, maximum duration and evidence choices. Share the opaque URL out of band. The targeted developer authenticates, reviews the terms, attaches their matching build, then accepts. Paid private workloads are outside this pilot. Display **Unpaid**.
+
+Review shows requesting person, exact APK and test, bounded duration, requested evidence and payout. A click on the link authorizes nothing. Listing and auto-match toggles are irrelevant to approved private grants. The device still needs a fresh ready heartbeat to claim the job. Accepting creates a queued run; the runner independently claims an exclusive expiring lease. The web fallback can begin a signed-in review. A verified Android App Link needs a published HTTPS association for the actual release signer.
+
+## State and transport rules
+
+- Device `connectivity`, `readiness`, `publicListing`, `autoMatch`, `marketplaceEligible`, and `revokedAt` have independent meanings. An offline device can retain a public listing without being eligible for jobs. IANA schedules accept `days` as Sunday=0 to Saturday=6, and `start`/ `end` as 24-hour times. An overnight window extends into the next local day. Avoid presenting missing measurement or charge as zero. A value can be runner-observed in a simulated environment. Hardware attestation and Seeker verification are separate.
+- `Run.state` is the API summary. `executionState` and `leaseState` expose reserved, running, verifying and cleanup distinctions. `stop.requestedAt` is the start of a stop, `acknowledgedAt` is the confirmed cleanup signal. An expired stop without acknowledgement remains unconfirmed. Backgrounding the companion has no effect on the device’s grant.
+- `acceptedWork` indicates acceptance of scope and terms. `evaluationOutcome` records test results. `reportSeal` and signed receipt identify the issuer and artifact hashes. Independently finalized `verification.transaction` governs chain effect. A failed app test can still have been executed and documented correctly.
+- A live agent chooses scoped actions from observations. Scripted tests and post-hoc report interpretation use separate labels. Show actual elapsed time and observed actions, with unmeasured progress absent. The current API has no general-purpose intervention approval endpoint.
+- Payment quote values are atomic decimal strings, with decimals, asset, Devnet cluster, funding reference and fixed destination. Provider earnings buckets are aggregates of recorded Devnet jobs. Show zero only when the returned aggregate is zero. Preserve expiry and submitted/unknown states, and link only actual public Devnet transactions. Training data use needs separate authorization. The workload evidence flags do not grant training rights.
+- Developer events support bearer-capable SSE and JSON polling; provider sessions/notifications poll. Apply monotonic IDs, discard duplicates and refetch a snapshot after a sequence gap. Use provider-visible evidence metadata and scoped downloads. Omit ADB serials, model tokens, arbitrary logs and unrelated screenshots from clients.
+- Send a unique `Idempotency-Key` on run and invitation creation. Reuse that key with the same JSON after an ambiguous response. The same person and route get the same resource for 24 hours. A different body returns `409/idempotency_conflict`.
+
+## Recovery states
+
+Use a retry for read failures, an inline remedy for validation and unavailable devices, reauthentication for 401, and a combined resource-unavailable state for missing or unauthorized records. Preserve form inputs across ordinary errors. During unknown write outcomes, refetch and reconcile before creating a second run or transaction. Treat Offline, job expired, lease expired, action rejected, cleanup unconfirmed, no matching wallet receipt, and payment unavailable as distinct states.

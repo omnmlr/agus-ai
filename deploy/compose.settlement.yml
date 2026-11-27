@@ -1,0 +1,9 @@
+services:
+  api:
+    volumes:
+      - type: bind
+        source: /etc/agus-ai/settlement-keypair.json
+        target: /run/agus-ai/settlement-keypair.json
+        read_only: true
+        bind:
+          create_host_path: false

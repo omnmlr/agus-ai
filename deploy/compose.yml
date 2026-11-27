@@ -1,0 +1,80 @@
+name: agus-ai
+
+x-service-defaults: &service-defaults
+  pull_policy: never
+  init: true
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  api:
+    <<: *service-defaults
+    image: ${AGUS_AI_API_IMAGE:?Set the verified AGUS AI API image}
+    env_file:
+      - path: ${AGUS_AI_RUNTIME_ENV:-/etc/agus-ai/runtime.env}
+        format: raw
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8080"
+      NODE_OPTIONS: --max-old-space-size=192
+    mem_limit: 320m
+    cpus: 0.50
+    pids_limit: 64
+    tmpfs:
+      - /tmp:size=32m,uid=1000,gid=1000,mode=0700
+    networks: [app]
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/health', { signal: AbortSignal.timeout(4000) }).then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
+
+  web:
+    <<: *service-defaults
+    image: ${AGUS_AI_WEB_IMAGE:?Set the verified AGUS AI web image}
+    environment:
+      NO_PROXY: api,127.0.0.1,localhost
+      no_proxy: api,127.0.0.1,localhost
+    depends_on:
+      api:
+        condition: service_healthy
+    mem_limit: 96m
+    cpus: 0.25
+    pids_limit: 32
+    ports:
+      - "127.0.0.1:${AGUS_AI_LOOPBACK_PORT:-4174}:8080"
+    tmpfs:
+      - /config:size=8m,uid=10001,gid=10001,mode=0700
+      - /data:size=8m,uid=10001,gid=10001,mode=0700
+      - /tmp:size=8m,uid=10001,gid=10001,mode=0700
+    networks:
+      app:
+      edge:
+        aliases: [agus-ai-web]
+    healthcheck:
+      test: [CMD, wget, -Y, "off", -q, --spider, http://127.0.0.1:8080/]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+      start_interval: 2s
+
+networks:
+  app:
+  edge:
+    name: agus-ai-edge
+    internal: true

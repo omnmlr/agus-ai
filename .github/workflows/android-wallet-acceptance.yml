@@ -56,6 +56,7 @@ jobs:
           test -f "$ANDROID_AVD_HOME/agus_ci.avd/config.ini"
           "$ANDROID_HOME/emulator/emulator" -list-avds | grep -x agus_ci
           npm ci --no-audit --no-fund
+          npm ci --prefix services/control-plane --no-audit --no-fund
           npm test --workspace @agus/mobile-test
       - name: Build native fixture and download local Solana
         shell: bash
@@ -121,6 +122,11 @@ jobs:
           rm -f "$AGUS_LAB/runner-key.pem"
           node --import tsx packages/mobile-test/lab/settlement.ts "$AGUS_LAB/job" "$run_id"
           node --import tsx packages/mobile-test/lab/settlement.ts "$AGUS_LAB/job" "$run_id"
+          adb -s emulator-5554 uninstall app.agus.testfixture
+          adb -s emulator-5554 uninstall com.solana.mobilewalletadapter.fakewallet
+          AGUS_ANDROID_ACCEPTANCE_TRANSFER=1 AGUS_AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt" \
+            node --import tsx services/provider-runner/test/android-acceptance.mjs emulator-5554 \
+            "$AGUS_LAB/agus-mwa-lab.apk" "$AGUS_LAB/wallet.apk" "$AGUS_LAB/provider-acceptance"
       - name: Upload disposable fixture evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -132,4 +138,6 @@ jobs:
             ${{ env.AGUS_LAB }}/sealed-report.json
             ${{ env.AGUS_LAB }}/runner.pub.pem
             ${{ env.AGUS_LAB }}/emulator.log
+            ${{ env.AGUS_LAB }}/provider-acceptance/*.json
+            ${{ env.AGUS_LAB }}/provider-acceptance/*.png
           retention-days: 7
