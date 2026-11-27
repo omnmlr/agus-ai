@@ -1,0 +1,15 @@
+agus-companion-debug.apk
+package: name='app.agus.companion' versionCode='1' versionName='0.1.0' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+Signer #1 certificate SHA-256 digest: d04d176718000bb73efb6e11fe6987a4fe00e05e081bbfadedadb92324a25b35
+agus-dedicated-wallet-devnet.apk
+package: name='app.agus.testfixture' versionCode='' versionName='' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+Signer #1 certificate SHA-256 digest: c1ac7b94516ca06486420a4de95bc97b788cfb76265c83673b3d14891c8b345a
+agus-fixture-development.apk
+package: name='app.agus.preview.fixture' versionCode='' versionName='' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+Signer #1 certificate SHA-256 digest: 39682dee1772d433fb2d73bf431fc76dcb5f8d4a03ebfe77457c539694101826
+agus-partner-development.apk
+package: name='org.example.agus.checklist' versionCode='' versionName='' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+Signer #1 certificate SHA-256 digest: 7c1773135dad069db65661d69aa9580dd3929f3856e00200523daedfa122b4f4
+agus-runtime-development.apk
+package: name='app.agus.runtime.preview' versionCode='' versionName='' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+Signer #1 certificate SHA-256 digest: 39682dee1772d433fb2d73bf431fc76dcb5f8d4a03ebfe77457c539694101826
