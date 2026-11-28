@@ -21,15 +21,15 @@ test('a finalized SAS account binds a signed receipt to an active trusted issuer
   const nonce = 'So11111111111111111111111111111111111111112';
   const [schema] = await deriveSchemaPda({ credential, name, version: 1 });
   const [attestation] = await deriveAttestationPda({ credential, schema, nonce });
-  const layout = { discriminator: 2, credential, name: Buffer.from(name), description: Buffer.alloc(0),
+  const layout = { discriminator: 1, credential, name: Buffer.from(name), description: Buffer.alloc(0),
     layout: Buffer.from([12]), fieldNames: Buffer.concat([Buffer.from([field.length, 0, 0, 0]), Buffer.from(field)]),
     isPaused: false, version: 1 };
   const encoded = (codec, value) => ({ owner: program, executable: false,
     data: [Buffer.from(codec.encode(value)).toString('base64'), 'base64'] });
   const accounts = [
-    encoded(getCredentialEncoder(), { discriminator: 1, authority: signer, name: Buffer.from('issuer'), authorizedSigners: [] }),
+    encoded(getCredentialEncoder(), { discriminator: 0, authority: signer, name: Buffer.from('issuer'), authorizedSigners: [] }),
     encoded(getSchemaEncoder(), layout),
-    encoded(getAttestationEncoder(), { discriminator: 0, nonce, credential, schema, signer, expiry: 9_000n,
+    encoded(getAttestationEncoder(), { discriminator: 2, nonce, credential, schema, signer, expiry: 9_000n,
       tokenAccount: credential, data: serializeAttestationData(layout, receiptClaim(receipt)) }),
   ];
   const rpc = async (method, params) => {
@@ -58,13 +58,13 @@ test('issuance signs only trusted receipt claims and reuses the deterministic fi
   const nonce = getAddressDecoder().decode(Buffer.from(digest('agus-sas-receipt-v1:' + receipt.manifestSha256), 'hex'));
   const [schema] = await deriveSchemaPda({ credential, name, version: 1 });
   const [attestation] = await deriveAttestationPda({ credential, schema, nonce });
-  const layout = { discriminator: 2, credential, name: Buffer.from(name), description: Buffer.alloc(0),
+  const layout = { discriminator: 1, credential, name: Buffer.from(name), description: Buffer.alloc(0),
     layout: Buffer.from([12]), fieldNames: Buffer.concat([Buffer.from([field.length, 0, 0, 0]), Buffer.from(field)]),
     isPaused: false, version: 1 };
   const encoded = (codec, value) => ({ owner: program, executable: false,
     data: [Buffer.from(codec.encode(value)).toString('base64'), 'base64'] });
   const entries = {
-    [credential]: encoded(getCredentialEncoder(), { discriminator: 1, authority: issuer.address, name: Buffer.from('issuer'), authorizedSigners: [] }),
+    [credential]: encoded(getCredentialEncoder(), { discriminator: 0, authority: issuer.address, name: Buffer.from('issuer'), authorizedSigners: [] }),
     [schema]: encoded(getSchemaEncoder(), layout),
   };
   let submissions = 0;
@@ -77,7 +77,7 @@ test('issuance signs only trusted receipt claims and reuses the deterministic fi
     if (method === 'sendTransaction') {
       assert.ok(Buffer.from(params[0], 'base64').length > 100);
       submissions++;
-      entries[attestation] = encoded(getAttestationEncoder(), { discriminator: 0, nonce, credential, schema, signer: issuer.address,
+      entries[attestation] = encoded(getAttestationEncoder(), { discriminator: 2, nonce, credential, schema, signer: issuer.address,
         expiry: BigInt(Math.floor(Date.now() / 1000) + 1800), tokenAccount: credential, data: serializeAttestationData(layout, receiptClaim(receipt)) });
       throw new Error('simulated lost acknowledgement');
     }

@@ -1,0 +1,112 @@
+{
+    "id":  "92b49912-3ecc-469a-81fe-e0f7b0ea357e",
+    "issuer":  "d0bf0b04-656b-4ff8-81dd-83501ed39a22",
+    "publicKeyPem":  "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAHHX0b0QkG8fs7gAOal3C+wY6Cca7bus0oN0otyy/78Q=\n-----END PUBLIC KEY-----\n",
+    "signature":  "CmZPzL7v2P8EBbicMQvhOYtXyIEGSzhVWKHNnpaqR3Q9ODMGvsK9ZouGV863B434AnO4g7mMtWAr36iMeYo3CA==",
+    "manifestSha256":  "6efbe29c0747ca5da53ec31396a7b2085a5edf45de68caef5175bb369aca723a",
+    "manifest":  {
+                     "version":  1,
+                     "runId":  "3b470551-3e28-4783-8606-855031ab54f1",
+                     "leaseId":  "5d4e0a23-43fc-42bb-a1f6-a0fedb7b9d1c",
+                     "challenge":  "zS9bE4Cd6VX-ZbgpiE08CVaf0ZXd6D1Fr8iWX354WJQ",
+                     "buildSha256":  "88ee825be999b9b243dd4e6471221ae8eee37c07f17507de3cc440303b4f7433",
+                     "scenario":  "wallet-transfer",
+                     "mode":  "agent",
+                     "startedAt":  "2026-11-27T16:16:46.408Z",
+                     "finishedAt":  "2026-11-27T16:17:29.874Z",
+                     "outcome":  "completed",
+                     "checks":  [
+                                    {
+                                        "id":  "approved-build",
+                                        "passed":  true
+                                    },
+                                    {
+                                        "id":  "app-launched",
+                                        "passed":  true
+                                    },
+                                    {
+                                        "id":  "wallet-authorized",
+                                        "passed":  true
+                                    },
+                                    {
+                                        "id":  "wallet-callback",
+                                        "passed":  true
+                                    },
+                                    {
+                                        "id":  "transaction-finalized",
+                                        "passed":  true
+                                    },
+                                    {
+                                        "id":  "cleanup",
+                                        "passed":  true
+                                    }
+                                ],
+                     "evidence":  [
+                                      {
+                                          "kind":  "trajectory",
+                                          "sha256":  "2e9cfc70893284c09ee1e4d392ee48b4ff064aba368e621e2986bee727ba7b3f",
+                                          "label":  "evaluated-actions"
+                                      },
+                                      {
+                                          "kind":  "log",
+                                          "sha256":  "df2d6e9eb07e63574e8fbdad24225506e66f337eff3c51176234c44c1ca27dfc",
+                                          "label":  "fixture-wallet-callback"
+                                      },
+                                      {
+                                          "kind":  "log",
+                                          "sha256":  "01ce443042a66ba74c7ac62cc7d6134ae884dcfc8880a4eb81f732cf236a4b7d",
+                                          "label":  "finalized-transfer"
+                                      },
+                                      {
+                                          "kind":  "screenshot",
+                                          "sha256":  "24f33af417ed7329c17d8860a15a0ef18047ce30a32bb8a8cbef9e00d695c87e",
+                                          "label":  "approved-screen"
+                                      }
+                                  ],
+                     "metrics":  {
+                                     "actionCount":  7,
+                                     "invalidActions":  0,
+                                     "recoveryCount":  0,
+                                     "policyViolations":  0
+                                 },
+                     "execution":  {
+                                       "deviceActionCount":  5,
+                                       "planner":  "gemini",
+                                       "testSpecSha256":  "fbae8503e342cbd290b61eba7546713341785b262dd8d5d7563ba37f4eb04ea2",
+                                       "modelId":  "gemini-3.5-flash-lite",
+                                       "modelActionCount":  7
+                                   },
+                     "transaction":  {
+                                         "signature":  "2e2mLx9wPT1QVeeeXCAF1GD2cSDPwtXrioMUS2D9mJoZfmEfubtP6EJkLfwRvCd1jgbJ63di2nNktQJXpEz3p6x3",
+                                         "network":  "localnet",
+                                         "recipient":  "EMtq5F54UxgEwYx1bmZpRJXNodBPPqjFekwQZNjpzH3w",
+                                         "lamports":  1000000
+                                     }
+                 },
+    "evidence":  [
+                     {
+                         "kind":  "trajectory",
+                         "sha256":  "2e9cfc70893284c09ee1e4d392ee48b4ff064aba368e621e2986bee727ba7b3f",
+                         "label":  "evaluated-actions",
+                         "url":  "/api/v1/runs/3b470551-3e28-4783-8606-855031ab54f1/evidence/2e9cfc70893284c09ee1e4d392ee48b4ff064aba368e621e2986bee727ba7b3f"
+                     },
+                     {
+                         "kind":  "log",
+                         "sha256":  "df2d6e9eb07e63574e8fbdad24225506e66f337eff3c51176234c44c1ca27dfc",
+                         "label":  "fixture-wallet-callback",
+                         "url":  "/api/v1/runs/3b470551-3e28-4783-8606-855031ab54f1/evidence/df2d6e9eb07e63574e8fbdad24225506e66f337eff3c51176234c44c1ca27dfc"
+                     },
+                     {
+                         "kind":  "log",
+                         "sha256":  "01ce443042a66ba74c7ac62cc7d6134ae884dcfc8880a4eb81f732cf236a4b7d",
+                         "label":  "finalized-transfer",
+                         "url":  "/api/v1/runs/3b470551-3e28-4783-8606-855031ab54f1/evidence/01ce443042a66ba74c7ac62cc7d6134ae884dcfc8880a4eb81f732cf236a4b7d"
+                     },
+                     {
+                         "kind":  "screenshot",
+                         "sha256":  "24f33af417ed7329c17d8860a15a0ef18047ce30a32bb8a8cbef9e00d695c87e",
+                         "label":  "approved-screen",
+                         "url":  "/api/v1/runs/3b470551-3e28-4783-8606-855031ab54f1/evidence/24f33af417ed7329c17d8860a15a0ef18047ce30a32bb8a8cbef9e00d695c87e"
+                     }
+                 ]
+}

@@ -39,10 +39,10 @@ function decoded(account, discriminator, decoder) {
   return data;
 }
 
-export const decodeCredential = account => decoded(account, 1, getCredentialDecoder());
+export const decodeCredential = account => decoded(account, 0, getCredentialDecoder());
 
 export function decodeReceiptSchema(account, credential) {
-  const layout = decoded(account, 2, getSchemaDecoder());
+  const layout = decoded(account, 1, getSchemaDecoder());
   if (layout.credential !== credential || Buffer.from(layout.name).toString() !== name ||
       layout.version !== 1 || layout.isPaused || !Buffer.from(layout.layout).equals(Buffer.from([12])) ||
       !Buffer.from(layout.fieldNames).equals(fields)) throw new Error('Unexpected or paused AGUS receipt schema');
@@ -59,7 +59,7 @@ export async function verifyDevnetAttestation({ receipt, credential, signer, non
   }]);
   const issuer = decodeCredential(value[0]);
   const layout = decodeReceiptSchema(value[1], credential);
-  const attestation = decoded(value[2], 0, getAttestationDecoder());
+  const attestation = decoded(value[2], 2, getAttestationDecoder());
   if (attestation.credential !== credential || attestation.schema !== schema || attestation.nonce !== nonce ||
       attestation.signer !== signer || !(issuer.authority === signer || issuer.authorizedSigners.includes(signer)) ||
       attestation.expiry <= BigInt(Math.floor(now / 1000)) ||

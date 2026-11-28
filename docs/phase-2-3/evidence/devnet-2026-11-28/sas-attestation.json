@@ -1,0 +1,48 @@
+{
+  "network": "devnet",
+  "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "program": "22zoJMtdu4tQc2PzL74ZUT7FrwgB1Udec8DdW4yw4BdG",
+  "label": "agus-rc-demo",
+  "schemaName": "agus-execution-v1",
+  "schemaVersion": 1,
+  "authority": "3Yv1jJnvwJQkCPwHZs1cb9yqzi9Q7igcd8iV3y1Z5Zaz",
+  "issuer": "CsabkMjpeHytxppS8mXwvCnN5PbJ9uBzumkkskT1xBqc",
+  "credential": {
+    "address": "3n18sJwKkaH3zXtR4mvzDMq4qaAqpKfAf14BzFbNF7mh",
+    "signature": "W2KdhjytCJYkhcZYwi9Pj2eZXTekeQMPyw44RkFtFCTKJSKteXrN5hgyJSkqmMEpLAoRPmTKsdtaHNXQoohGgzF",
+    "slot": 527140100,
+    "commitment": "finalized"
+  },
+  "schema": {
+    "address": "Fv8RjNckaAubwMYWrFuYVRwHvRb4nDzjPahAQyQAUSkp",
+    "signature": "MgiQdLCp4WPUhAqdNuHkMdn9BDDZcyQgt32tfUrizqjAotJgcKcUQEXbKvESQQrFh5YQndk1Rf7KnAUE2TUKBhA",
+    "slot": 527143021,
+    "commitment": "finalized"
+  },
+  "attestation": {
+    "address": "FXnAJamsS8b2VNG8BkxNLjWXh2A2Ni77SRuyB9ondeYi",
+    "nonce": "A4pTmXpCnZM7JQfWHfBdocs65U2r4q6ufWTcS5r9cTG5",
+    "signature": "2QbXjrHnXC5roGQtNxPrHcU9tM3P6niwXfdb46ghv68ntMVNnCHzNiEufdaFFbNi6gV35B4pBRSoS8duUNBTP299",
+    "issuanceTxSlot": 527148221,
+    "issuedReadSlot": 527148227,
+    "commitment": "finalized",
+    "scope": "receipt-digest",
+    "claim": {
+      "manifest_sha256": "6efbe29c0747ca5da53ec31396a7b2085a5edf45de68caef5175bb369aca723a"
+    }
+  },
+  "independentVerification": {
+    "address": "FXnAJamsS8b2VNG8BkxNLjWXh2A2Ni77SRuyB9ondeYi",
+    "schema": "Fv8RjNckaAubwMYWrFuYVRwHvRb4nDzjPahAQyQAUSkp",
+    "credential": "3n18sJwKkaH3zXtR4mvzDMq4qaAqpKfAf14BzFbNF7mh",
+    "signer": "CsabkMjpeHytxppS8mXwvCnN5PbJ9uBzumkkskT1xBqc",
+    "slot": 527148291,
+    "network": "devnet",
+    "claim": {
+      "manifest_sha256": "6efbe29c0747ca5da53ec31396a7b2085a5edf45de68caef5175bb369aca723a"
+    },
+    "scope": "receipt-digest"
+  },
+  "receiptFile": "receipt-private.json",
+  "trustedRunnerKeyFile": "runner-enrollment.pub.pem"
+}

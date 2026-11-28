@@ -1,0 +1,86 @@
+{
+  "network": "disposable Devnet",
+  "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  "database": "disposable PostgreSQL 17 (127.0.0.1:55432/agus_campaign_acceptance)",
+  "revision": "ad38c4133c03c49a2d4b9ece1bf47ffcfb2a5a0c",
+  "campaignId": "1b2c4b14-ceb9-4b28-8746-c6471865bc2d",
+  "quote": {
+    "reference": "954fd1bd-2faf-46fc-a224-68b9795051cd",
+    "revision": 1,
+    "revisionSha256": "a0c243dd35d42563677397b6f1c8cae9c46c91e9a6f7d4c3cc176569679354ac",
+    "funder": "Carxc39kWwR9fk8hamY5WsW2u8vz4Wtxc8ggpatosgJ6",
+    "deposit": "UAEngDfn4nHQZhKj2QXRmf58WLxqnAM8F3CkKCaHhJn",
+    "source": "CUeMZCL3BLgH31944CrERaHhBaz9mrujTxEomsr4hya8",
+    "destination": "6u7Ncd3E5RKa2a8TmmcThkMnYCbC7pViyejiDBjQMdCe",
+    "memo": "agus:campaign:funding:v1:1b2c4b14-ceb9-4b28-8746-c6471865bc2d:a0c243dd35d42563677397b6f1c8cae9c46c91e9a6f7d4c3cc176569679354ac",
+    "amountAtoms": "1700000",
+    "createdAt": 1795847834942,
+    "expiresAt": 1795849634942,
+    "afterSlot": 527139827
+  },
+  "funding": {
+    "signature": "3gtjcd876aZuDfxi8eDuFbjFrNyZ7XTSv2aFab73v4Hh22gfvxzYVvfY4izXsoxbxwd9NfeN7DkoZr4GCjvZMe2",
+    "slot": 527139836,
+    "commitment": "finalized",
+    "cluster": "devnet",
+    "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "amountAtoms": "1700000",
+    "source": "CUeMZCL3BLgH31944CrERaHhBaz9mrujTxEomsr4hya8",
+    "destination": "6u7Ncd3E5RKa2a8TmmcThkMnYCbC7pViyejiDBjQMdCe",
+    "payer": "Carxc39kWwR9fk8hamY5WsW2u8vz4Wtxc8ggpatosgJ6",
+    "recipient": "UAEngDfn4nHQZhKj2QXRmf58WLxqnAM8F3CkKCaHhJn"
+  },
+  "automatic": {
+    "signature": "dDrLq4wvKHLQjdFTm2HD3SHSxF1dztNRFFeXWGebPbKZqTKVvKoMumNocm7rZNTxkUF8JTykMmieCnpBsbPGmLM",
+    "slot": 527139876,
+    "commitment": "finalized",
+    "cluster": "devnet",
+    "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "amountAtoms": "700000",
+    "source": "6u7Ncd3E5RKa2a8TmmcThkMnYCbC7pViyejiDBjQMdCe",
+    "destination": "6vYwY8ehDdVmwuLUGudrArtuwdm35buhoBJzkWsozZxo",
+    "payer": "UAEngDfn4nHQZhKj2QXRmf58WLxqnAM8F3CkKCaHhJn",
+    "recipient": "C1xjBBeAf3ZSHcsJFcXFCvKwdYmRatL9b4wAsUsd8HmJ"
+  },
+  "partial": {
+    "signature": "ra56SDP4n6ptZQBF63JYvqYTb99tnkA9HsfgUWKUGqHGnouB8pNwc82Du6xhHdrYqs7VvgyXx5RVSEzij1srW1o",
+    "slot": 527139895,
+    "commitment": "finalized",
+    "cluster": "devnet",
+    "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "amountAtoms": "200000",
+    "source": "6u7Ncd3E5RKa2a8TmmcThkMnYCbC7pViyejiDBjQMdCe",
+    "destination": "6vYwY8ehDdVmwuLUGudrArtuwdm35buhoBJzkWsozZxo",
+    "payer": "UAEngDfn4nHQZhKj2QXRmf58WLxqnAM8F3CkKCaHhJn",
+    "recipient": "C1xjBBeAf3ZSHcsJFcXFCvKwdYmRatL9b4wAsUsd8HmJ"
+  },
+  "refund": {
+    "signature": "pDhcSUXuNs4ADt3LVDjwtEMc4eJoyhMPhj6xY5PJkjk9NJ8wQdZEhRNp52F5UTWUoYmmyWNXFDja2aMJtVv6SfP",
+    "slot": 527139934,
+    "commitment": "finalized",
+    "cluster": "devnet",
+    "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "amountAtoms": "800000",
+    "source": "6u7Ncd3E5RKa2a8TmmcThkMnYCbC7pViyejiDBjQMdCe",
+    "destination": "CUeMZCL3BLgH31944CrERaHhBaz9mrujTxEomsr4hya8",
+    "payer": "UAEngDfn4nHQZhKj2QXRmf58WLxqnAM8F3CkKCaHhJn",
+    "recipient": "Carxc39kWwR9fk8hamY5WsW2u8vz4Wtxc8ggpatosgJ6"
+  },
+  "finalDepositAtoms": "0",
+  "assertions": {
+    "concurrentSettlementWorkers": true,
+    "duplicatePaymentPrevention": true,
+    "payoutDestinationPinnedAfterWalletReplacement": true,
+    "duplicateRefundPrevention": true,
+    "independentFinalizedRpcVerification": true
+  },
+  "priorLocalRun": {
+    "note": "Initial funded Devnet campaign acceptance run recorded in activation-98aeb20/funded-devnet-acceptance.log",
+    "fundingSignature": "2ykNao18DNY1u5pwnauMi4QkG4GH2hEuQSJgavGr2228W9xEfh4ptNbF38nEkwEjJeig6gtSQ5x26hw43KdrjvgS",
+    "automaticSignature": "3759LPQeTTtXGxjj7WS1dUrbJ6bXGQ3LAZCbP1yUu7WJMovFMqJ9jVaYtVNUjpQKKBq6o11p1TzWqeTr6Qnsyb5K",
+    "partialSignature": "491UHjEym8HoLrxhCdurci9y69gPBEWNXXiQQc2bdWK8oeJ1qpnfw1RKt51dnT7McVwVKNa5rHaQ7amw1Gq9pAAc",
+    "refundSignature": "2cchLJoqPkG5r1Ht3UsnwpEcTf19U95exkqLpjbqSE3aq3tPwrSjLubRn1YfY6KiD9vUa1cHhDryNvVA4JvtyvHY",
+    "finalDepositAtoms": "0"
+  }
+}

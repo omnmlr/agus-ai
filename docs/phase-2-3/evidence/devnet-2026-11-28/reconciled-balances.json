@@ -1,0 +1,51 @@
+{
+  "network": "devnet",
+  "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  "slot": 527148463,
+  "commitment": "finalized",
+  "wallets": [
+    {
+      "role": "app-test-payer",
+      "address": "F6YpckyS1JoqeQYyThAq7dPDq8PNNvoSvRFhtdvviFrp",
+      "solLamports": 327018120,
+      "ata": null,
+      "usdcAtoms": null
+    },
+    {
+      "role": "campaign-funder",
+      "address": "Carxc39kWwR9fk8hamY5WsW2u8vz4Wtxc8ggpatosgJ6",
+      "solLamports": 498496560,
+      "ata": "CUeMZCL3BLgH31944CrERaHhBaz9mrujTxEomsr4hya8",
+      "usdcAtoms": "18200000"
+    },
+    {
+      "role": "settlement-operator",
+      "address": "UAEngDfn4nHQZhKj2QXRmf58WLxqnAM8F3CkKCaHhJn",
+      "solLamports": 49970000,
+      "ata": "6u7Ncd3E5RKa2a8TmmcThkMnYCbC7pViyejiDBjQMdCe",
+      "usdcAtoms": "0"
+    },
+    {
+      "role": "contributor-payout",
+      "address": "C1xjBBeAf3ZSHcsJFcXFCvKwdYmRatL9b4wAsUsd8HmJ",
+      "solLamports": 20000000,
+      "ata": "6vYwY8ehDdVmwuLUGudrArtuwdm35buhoBJzkWsozZxo",
+      "usdcAtoms": "1800000"
+    },
+    {
+      "role": "sas-authority",
+      "address": "3Yv1jJnvwJQkCPwHZs1cb9yqzi9Q7igcd8iV3y1Z5Zaz",
+      "solLamports": 47551600,
+      "ata": null,
+      "usdcAtoms": null
+    },
+    {
+      "role": "sas-issuer",
+      "address": "CsabkMjpeHytxppS8mXwvCnN5PbJ9uBzumkkskT1xBqc",
+      "solLamports": 48120480,
+      "ata": null,
+      "usdcAtoms": null
+    }
+  ]
+}
