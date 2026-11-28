@@ -15,7 +15,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
-import android.widget.ProgressBar;
+import android.widget.ImageView;
 import android.widget.TextView;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -48,123 +48,223 @@ final class ProviderScreens {
             case COMPLETED_SESSION: session(content, true); break;
             case EARNINGS: earnings(content); break;
             case PROFILE: profile(content); break;
+            case INBOX: inbox(content); break;
         }
     }
 
     private void welcome(LinearLayout content) {
-        LinearLayout.LayoutParams mascot = new LinearLayout.LayoutParams(-1, ui.dp(108));
-        content.addView(ui.brandImage(R.drawable.brand_mascot, true), mascot);
-        LinearLayout.LayoutParams wordmark = new LinearLayout.LayoutParams(-1, ui.dp(29));
-        wordmark.topMargin = ui.dp(8);
+        LinearLayout.LayoutParams wordmark = new LinearLayout.LayoutParams(-1, ui.dp(26));
+        wordmark.topMargin = ui.dp(12);
         content.addView(ui.brandImage(R.drawable.brand_wordmark_dark, false), wordmark);
-        heading(content, "Welcome", "Contribute a dedicated Android device to authorized mobile testing.");
-        detail(content, "The provider runner runs on a desktop and connects to the test phone over USB, or uses a controlled emulator.", false);
+        ui.hero(content, host.getResources().getConfiguration().screenHeightDp < 720 ? 150 : 202);
+        title(content, "Put your phone to work. Get paid.", 34, 20);
+        detail(content, "Contribute eligible Android device time for app testing and earn on paid assignments.", false);
         button(content, "Get started", R.id.welcome_get_started, true, view -> host.navigate(MainActivity.Screen.AUTH, null));
+        button(content, "I already have an account", 0, false, view -> host.navigate(MainActivity.Screen.AUTH, null));
+        ui.rule(content, 18);
         button(content, "Developer portal", R.id.developer_portal, false, view -> host.openPortal(false));
         button(content, "Review a private invitation", R.id.review_private_code, false, view -> ProviderForms.reviewCode(host));
     }
 
     private void auth(LinearLayout content) {
-        heading(content, "Auth", host.pendingInvitationCode == null
-            ? "Sign in to your provider workspace." : "Sign in to review the private invitation.");
-        LinearLayout card = ui.card(content);
-        EditText origin = input(card, "Control-plane origin", GoogleSignIn.ORIGIN.toString(),
-            InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI, R.id.auth_origin);
-        origin.setText(host.preference("control_plane_origin"));
-        EditText email = input(card, "Email", "you@example.com", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, R.id.auth_email);
-        EditText password = input(card, "Password", "Password", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD, R.id.auth_password);
-        EditText registration = input(card, "Registration invite (if required)", "Pilot access code",
-            InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD, R.id.auth_registration_token);
-        button(card, "Sign in", R.id.auth_sign_in, true, view -> host.authenticate(false, origin, email, password, registration));
-        button(card, "Create account", R.id.auth_register, false, view -> host.authenticate(true, origin, email, password, registration));
-        button(card, "Continue with Google", 0, false, view -> host.startGoogle(origin, registration));
-        button(card, "Cancel Google sign-in", 0, false, view -> host.cancelGoogle());
-        LinearLayout emailCode = ui.card(content);
-        ui.add(emailCode, ui.heading("Email code", 18), 0);
-        EditText code = input(emailCode, "Six-digit code", "000000", InputType.TYPE_CLASS_NUMBER, R.id.auth_email_code);
-        button(emailCode, "Send email code", R.id.auth_email_send, false, view -> host.emailCode(false, origin, email, code, registration));
-        button(emailCode, "Verify email code", R.id.auth_email_verify, false, view -> host.emailCode(true, origin, email, code, registration));
-        button(content, "Developer portal", R.id.developer_portal, false, view -> host.openPortal(false));
-        button(content, "Back to Welcome", 0, false, view -> host.navigate(MainActivity.Screen.WELCOME, null));
+        if (host.authMethod == MainActivity.AuthMethod.CHOICE) {
+            ui.hero(content, 132);
+            title(content, "Your AGUS account", 32, 16);
+            detail(content, host.pendingInvitationCode == null ? "Sign in or create an account to manage your contributions."
+                : "Sign in with the account that received the private invitation.", false);
+            boolean awaiting = host.waitingForGoogle();
+            button(content, awaiting ? "Cancel Google sign-in" : "Continue with Google", 0, true,
+                view -> { if (awaiting) host.cancelGoogle(); else host.startGoogle(); });
+            button(content, "Continue with email", R.id.auth_use_email, false,
+                view -> host.changeAuth(MainActivity.AuthMethod.EMAIL));
+            if (BuildConfig.DEBUG) {
+                button(content, "Use a password or test server", R.id.auth_use_password, false,
+                    view -> host.changeAuth(MainActivity.AuthMethod.PASSWORD));
+            } else {
+                button(content, "Use a password", R.id.auth_use_password, false,
+                    view -> host.changeAuth(MainActivity.AuthMethod.PASSWORD));
+            }
+            legal(content);
+            return;
+        }
+        if (host.authMethod == MainActivity.AuthMethod.PASSWORD) {
+            heading(content, "Use a password", "Sign in to an existing account or create one.");
+            EditText origin = null;
+            if (BuildConfig.DEBUG) {
+                origin = input(content, "Test server (optional)", GoogleSignIn.ORIGIN.toString(),
+                    InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI, R.id.auth_origin);
+                origin.setText(host.preference("control_plane_origin"));
+            }
+            EditText server = origin;
+            EditText email = input(content, "Email", "you@example.com", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, R.id.auth_email);
+            email.setText(host.authEmail);
+            EditText password = input(content, "Password", "At least 12 characters", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD, R.id.auth_password);
+            button(content, "Sign in", R.id.auth_sign_in, true, view -> host.authenticate(false, server, email, password));
+            button(content, "Create account", R.id.auth_register, false, view -> host.authenticate(true, server, email, password));
+            legal(content);
+            return;
+        }
+        if (host.emailCodeSent) {
+            heading(content, "Check your inbox", "Enter the six-digit code sent to " + host.authEmail + ".");
+            EditText code = input(content, "Email code", "Six digits", InputType.TYPE_CLASS_NUMBER, R.id.auth_email_code);
+            code.setFilters(new android.text.InputFilter[] { new android.text.InputFilter.LengthFilter(6) });
+            code.setAutofillHints("emailOTPCode");
+            button(content, "Verify code", R.id.auth_email_verify, true, view -> host.emailCode(null, code));
+            Button resend = button(content, "Resend code", R.id.auth_email_send, false, view -> host.emailCode(null, null));
+            host.retryCode(resend);
+            button(content, "Use another address", 0, false, view -> host.editAuthEmail());
+        } else {
+            heading(content, "Continue with email", "We’ll email a sign-in code. The same code flow creates a new account if needed.");
+            EditText email = input(content, "Email address", "you@example.com", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, R.id.auth_email);
+            email.setAutofillHints(View.AUTOFILL_HINT_EMAIL_ADDRESS);
+            email.setText(host.authEmail);
+            button(content, "Email me a code", R.id.auth_email_send, true, view -> host.emailCode(email, null));
+        }
+        legal(content);
+    }
+
+    private void legal(LinearLayout content) {
+        ui.rule(content, 18);
+        LinearLayout links = ui.row();
+        ui.weighted(links, ui.button("Privacy", false, view -> host.openPublicPage("/privacy")), 8);
+        ui.weighted(links, ui.button("Terms", false, view -> host.openPublicPage("/terms")), 0);
+        ui.add(content, links, 12);
     }
 
     private void enrollment(LinearLayout content) {
-        heading(content, "Enrollment", "Choose an approved test environment.");
-        button(content, "Open Work Runtime", 0, false, view -> host.openWorkRuntime());
-        detail(content, "The Work Runtime preview is for disposable Android test environments.", false);
-        detail(content, "Use a clean test phone or emulator. Enable USB debugging only on the dedicated test device and authorize your own desktop.", false);
-        detail(content, "Open the project’s provider runner setup on the desktop, select the device and approved builds, then enter the one-time pairing code.", false);
+        JSONObject device = firstDevice();
+        boolean connected = "online".equals(string(device, "connectivity"));
+        ui.hero(content, 112);
+        heading(content, "Set up your device", "Pair an authorized test phone or emulator with the desktop runner.");
+        LinearLayout steps = ui.card(content);
+        step(steps, "1", "Choose a test environment", "Use a dedicated Android phone or controlled emulator.");
+        step(steps, "2", "Authorize your desktop runner", "Connect only the device you intend to use and approve its USB debugging prompt.");
+        step(steps, "3", "Pair and check connection",
+            connected ? "The server sees a connected runner." : "The runner must check in before the device can take work.");
         JSONObject pairing = host.pairing;
         if (pairing != null) {
             LinearLayout card = ui.card(content);
-            named(card, "Pairing code", pairing, "code");
+            ui.add(card, ui.heading(title(pairing, "code", "Pairing code unavailable"), 24), 0);
             named(card, "Expires", pairing, "expiresAt");
-            button(card, "Copy pairing code", 0, false, view -> host.copy("pairing code", string(pairing, "code")));
+            button(card, "Copy pairing code", 0, true, view -> host.copy("pairing code", string(pairing, "code")));
         }
         if (devices() != null) {
-            button(content, "Generate pairing code", R.id.generate_pairing, true, view ->
+            button(content, pairing == null ? "Generate pairing code" : "Generate new code", R.id.generate_pairing, pairing == null, view ->
                 host.perform("Generating pairing code…", api -> api.post(MY_DEVICES + "/pairings", new JSONObject()),
                     result -> {
                         host.pairing = result.optJSONObject("pairing");
                         host.render(true);
                     }, host::statusError, false));
         } else {
-            detail(content, host.snapshot == null ? "Checking enrollment access…" : "This control plane has no provider enrollment API.", false);
+            detail(content, host.snapshot == null ? "Checking enrollment access…" : "This server does not offer enrollment.", false);
+            button(content, "Retry connection", 0, false, view -> host.refresh(true));
         }
-        button(content, "Open My Device", 0, false, view -> host.navigate(MainActivity.Screen.MY_DEVICE, null));
+        button(content, "Runner setup guide", 0, false, view -> host.openPublicPage("/docs/quickstart"));
+        button(content, "Set up later", 0, false, view -> host.navigate(MainActivity.Screen.HOME, null));
+        section(content, "Work Runtime preview");
+        detail(content, "Separate managed-profile testing for approved disposable environments.", false);
+        button(content, "Open Work Runtime", 0, false, view -> host.openWorkRuntime());
+    }
+
+    private void step(LinearLayout parent, String number, String label, String explanation) {
+        LinearLayout line = ui.row();
+        TextView badge = ui.text(number, 14, ACCENT, true);
+        badge.setGravity(android.view.Gravity.CENTER);
+        badge.setBackground(ui.surface(CompanionViews.RAISED, CompanionViews.BORDER, 18));
+        line.addView(badge, new LinearLayout.LayoutParams(ui.dp(34), ui.dp(34)));
+        LinearLayout copy = ui.column();
+        copy.setPadding(ui.dp(12), 0, 0, 0);
+        ui.add(copy, ui.text(label, 15, TEXT, true), 0);
+        detail(copy, explanation, false);
+        ui.weighted(line, copy, 0);
+        ui.add(parent, line, 9);
     }
 
     private void home(LinearLayout content) {
-        heading(content, "Home", host.email());
+        JSONObject device = firstDevice();
+        JSONObject active = activeRun();
+        String readiness = string(device, "readiness");
+        String connection = string(device, "connectivity");
+        String headline = active != null ? "Session in progress" : device == null
+            ? (host.snapshot == null ? "Checking your workspace" : "Set up your first device")
+            : "ready".equals(readiness) && "online".equals(connection) ? "Your device is ready"
+            : "online".equals(connection) ? "Your device needs attention" : "Your device is offline";
+        LinearLayout intro = ui.card(content);
+        var gradient = new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+            new int[] {0xff25262d, 0xff151619, CompanionViews.PANEL});
+        gradient.setCornerRadius(ui.dp(22));
+        intro.setBackground(gradient);
+        LinearLayout lead = ui.row();
+        LinearLayout copy = ui.column();
+        title(copy, headline, 28, 0);
+        String message = device == null ? "Pair a test environment to start contributing." :
+            title(device, "label", "Dedicated device") + " · " + status(connection);
+        detail(copy, message, false);
+        ui.weighted(lead, copy, 8);
+        lead.addView(ui.brandImage(R.drawable.brand_mascot, true), new LinearLayout.LayoutParams(ui.dp(82), ui.dp(82)));
+        ui.add(intro, lead, 0);
+        if (active != null) {
+            button(intro, "Open current session", R.id.open_current_session, true, view -> host.openRun(active));
+            stopAction(intro, active);
+        } else if (device == null && host.snapshot != null) {
+            button(intro, "Set up device", R.id.open_enrollment, true, view -> host.navigate(MainActivity.Screen.ENROLLMENT, null));
+        }
+
         LinearLayout chart = ui.card(content);
-        ui.add(chart, ui.heading("Earnings", 18), 0);
+        ui.add(chart, ui.text("Settled earnings", 13, ACCENT, true), 0);
         JSONObject data = earningsData();
-        if (data == null) {
-            detail(chart, "No Devnet payout chart is available for this device.", false);
-        } else {
-            plot(chart, data, 5);
+        ui.add(chart, ui.heading(data == null ? "—" : amount(data, data.optJSONObject("totals"), "settledAtoms"), 29), 2);
+        detail(chart, "Devnet test tokens · total last 30 days", false);
+        if (data != null) plot(chart, data, 7, false);
+        button(chart, "View earnings", R.id.home_earnings_chart, false, view -> host.navigate(MainActivity.Screen.EARNINGS, null));
+        if (device != null) {
+            LinearLayout deviceInfo = ui.card(content);
+            deviceLead(deviceInfo, title(device, "label", "Dedicated device"), status(connection) + " · " + status(readiness));
+            button(deviceInfo, "My Device", R.id.open_my_device, false,
+                view -> host.navigate(MainActivity.Screen.MY_DEVICE, string(device, "id")));
+            detail(deviceInfo, device.optBoolean("marketplaceEligible") ? "Available for matching" : "Marketplace availability inactive", false);
+            button(deviceInfo, "Manage availability", 0, false, view -> {
+                host.activitySection = 0;
+                host.navigate(MainActivity.Screen.ACTIVITY, null);
+            });
         }
-        button(chart, "Open earnings chart", R.id.home_earnings_chart, false, view -> host.navigate(MainActivity.Screen.EARNINGS, null));
-
-        LinearLayout device = ui.card(content);
-        ui.add(device, ui.heading("Device readiness", 18), 0);
-        JSONObject first = firstDevice();
-        if (first == null) {
-            detail(device, devices() == null ? "Waiting for provider device data." : "Pair a dedicated test device to get started.", false);
-            button(device, "Enrollment", R.id.open_enrollment, true, view -> host.navigate(MainActivity.Screen.ENROLLMENT, null));
-        } else {
-            detail(device, title(first, "label", "Dedicated device") + " · " + status(string(first, "readiness")), false);
-            named(device, "Connectivity", first, "connectivity");
-            detail(device, first.optBoolean("marketplaceEligible") ? "Eligible for matching" : "Marketplace matching inactive", false);
-            button(device, "My Device", R.id.open_my_device, false, view -> host.navigate(MainActivity.Screen.MY_DEVICE, string(first, "id")));
-        }
-
-        LinearLayout today = ui.card(content);
-        ui.add(today, ui.heading("Today’s contributions", 18), 0);
         JSONArray runs = runs();
-        if (runs == null) {
-            detail(today, "Provider session data is unavailable.", false);
-        } else {
+        if (runs != null) {
             int completed = 0;
-            JSONObject active = null;
             for (int index = 0; index < runs.length(); index++) {
                 JSONObject run = runs.optJSONObject(index);
-                if (ProviderApi.terminal(run) && occurredToday(string(run, "updatedAt"))) {
-                    completed++;
-                }
-                if (active == null && ProviderApi.active(run)) {
-                    active = run;
-                }
+                if (ProviderApi.terminal(run) && occurredToday(string(run, "updatedAt"))) completed++;
             }
-            detail(today, completed + (completed == 1 ? " session reached a terminal state" : " sessions reached a terminal state"), false);
-            if (active != null) {
-                JSONObject current = active;
-                detail(today, "Current session · " + status(string(current, "state")), false);
-                button(today, "Open current session", R.id.open_current_session, true, view -> host.openRun(current));
-            } else {
-                detail(today, "No current session.", false);
+            section(content, "Today’s contributions");
+            detail(content, completed + (completed == 1 ? " finished session" : " finished sessions"), false);
+        }
+    }
+
+    private JSONObject activeRun() {
+        JSONArray runs = runs();
+        if (runs != null) {
+            for (int index = 0; index < runs.length(); index++) {
+                JSONObject run = runs.optJSONObject(index);
+                if (ProviderApi.active(run)) return run;
             }
         }
+        return null;
+    }
+
+    private void deviceLead(LinearLayout parent, String title, String subtitle) {
+        LinearLayout row = ui.row();
+        ImageView phone = new ImageView(host);
+        phone.setImageResource(R.drawable.ic_phone);
+        phone.setScaleType(ImageView.ScaleType.CENTER);
+        phone.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        phone.setBackground(ui.surface(CompanionViews.RAISED, CompanionViews.BORDER, 12));
+        row.addView(phone, new LinearLayout.LayoutParams(ui.dp(46), ui.dp(46)));
+        LinearLayout label = ui.column();
+        label.setPadding(ui.dp(12), 0, 0, 0);
+        ui.add(label, ui.text(title, 16, TEXT, true), 0);
+        detail(label, subtitle, false);
+        ui.weighted(row, label, 0);
+        ui.add(parent, row, 0);
     }
 
     private void myDevice(LinearLayout content) {
@@ -244,7 +344,24 @@ final class ProviderScreens {
     }
 
     private void activity(LinearLayout content) {
-        heading(content, "Activity", "Set participation and review work.");
+        heading(content, "Activity", "Review opportunities, sessions and requests.");
+        LinearLayout filters = ui.row();
+        String[] sections = { "Available", "Running", "History" };
+        for (int index = 0; index < sections.length; index++) {
+            int sectionIndex = index;
+            Button filter = ui.button(sections[index], index == host.activitySection, view -> {
+                host.activitySection = sectionIndex;
+                host.render(false);
+            });
+            filter.setSelected(index == host.activitySection);
+            ui.weighted(filters, filter, index == sections.length - 1 ? 0 : 6);
+        }
+        ui.add(content, filters, 14);
+        if (host.activitySection != 0) {
+            boolean history = host.activitySection == 2;
+            showRunGroup(content, history ? "Session history" : "Current sessions", history);
+            return;
+        }
         section(content, "Availability");
         JSONObject device = firstDevice();
         if (device == null) {
@@ -296,19 +413,33 @@ final class ProviderScreens {
             });
         });
 
-        section(content, "In-app inbox");
+    }
+
+    private void inbox(LinearLayout content) {
+        heading(content, "Inbox", "Invitations and updates from your workspace.");
         JSONArray notifications = host.snapshot == null ? null : host.snapshot.notifications;
-        if (notifications == null || notifications.length() == 0) detail(content, "No inbox messages are available.", false);
+        if (notifications == null) detail(content, "Inbox updates are unavailable. Refresh to try again.", false);
+        else if (notifications.length() == 0) detail(content, "You’re all caught up.", false);
         forEach(notifications, notification -> {
             LinearLayout card = ui.card(content);
-            detail(card, status(string(notification, "type")), false);
+            String type = status(string(notification, "type"));
+            ui.add(card, ui.heading(type, 17), 0);
             named(card, "Received", notification, "createdAt");
+            JSONObject data = notification.optJSONObject("data");
+            JSONObject run = ProviderApi.find(runs(), string(data, "runId"));
+            JSONObject invitation = host.snapshot == null ? null
+                : ProviderApi.find(host.snapshot.invitations, string(data, "invitationId"));
+            if (run != null) button(card, "Open session", 0, false, view -> host.openRun(run));
+            if (invitation != null) button(card, "Find private request", 0, false, view -> {
+                host.activitySection = 0;
+                host.navigate(MainActivity.Screen.ACTIVITY, null);
+            });
             if (string(notification, "readAt").isEmpty()) button(card, "Mark read", 0, false, view ->
                 host.perform("Updating inbox…", api -> api.post(ProviderApi.item("/me/notifications", string(notification, "id")) + "/read",
                     new JSONObject()), result -> {}, host::statusError, true));
         });
-        showRunGroup(content, "Running", false);
-        showRunGroup(content, "History", true);
+        button(content, "Refresh inbox", 0, false, view -> host.refresh(true));
+        button(content, "Notification preferences", 0, false, view -> host.notificationPreferences());
     }
 
     private void showRunGroup(LinearLayout content, String title, boolean history) {
@@ -423,18 +554,50 @@ final class ProviderScreens {
                 result -> host.openInvitation(result.optJSONObject("invitation")), host::statusError, true));
     }
 
-    private void session(LinearLayout content, boolean completed) {
-        heading(content, completed ? "Completed Session" : "Active Session", "Provider-owned workload status and evidence.");
+    private JSONObject currentRun() {
         JSONObject run = host.selectedRunOverride == null
             ? (host.snapshot == null ? null : host.snapshot.run) : host.selectedRunOverride;
-        if (run == null || !string(run, "id").equals(host.selectedId)) {
-            run = ProviderApi.find(runs(), host.selectedId);
-        }
-        if (run == null) {
-            detail(content, "Loading session…", false);
+        return run == null || !string(run, "id").equals(host.selectedId) ? ProviderApi.find(runs(), host.selectedId) : run;
+    }
+
+    void stopBar(LinearLayout root, int gutter) {
+        JSONObject run = currentRun();
+        if (run == null || ProviderApi.terminal(run)) return;
+        ui.rule(root, 0);
+        LinearLayout actions = ui.column();
+        actions.setPadding(ui.dp(gutter), 0, ui.dp(gutter), ui.dp(10));
+        stopAction(actions, run);
+        ui.add(root, actions, 0);
+    }
+
+    private void stopAction(LinearLayout parent, JSONObject run) {
+        String state = string(run, "state");
+        if ("stopping".equals(state) || "verifying".equals(state)) {
+            detail(parent, "stopping".equals(state) ? "Stop requested · waiting for the runner" : "The runner is verifying the result.", false);
             return;
         }
-        JSONObject current = run;
+        button(parent, "Request stop", R.id.session_stop, false, view -> host.confirm("Request session stop?",
+            "The runner must acknowledge the stop. Use the desktop runner’s local stop for emergencies.", "Request stop",
+            () -> host.perform("Requesting stop…", api -> api.post(ProviderApi.item(MY_SESSIONS, string(run, "id")) + "/stop", new JSONObject()),
+                result -> host.openRun(result.optJSONObject("run")), host::statusError, true)));
+    }
+
+    private void session(LinearLayout content, boolean completed) {
+        JSONObject run = currentRun();
+        if (run == null) {
+            heading(content, "Session", "Loading session details…");
+            return;
+        }
+        String state = string(run, "state");
+        if (completed && "passed".equals(state)) ui.hero(content, 116);
+        String headline = completed ? switch (state) {
+            case "passed" -> "Session complete";
+            case "failed" -> "Session failed";
+            case "cancelled" -> "Session cancelled";
+            case "expired" -> "Session expired";
+            default -> "Review session result";
+        } : "Running session";
+        heading(content, headline, status(state));
         LinearLayout card = ui.card(content);
         ui.add(card, ui.heading(title(run, "scenario", "Workload"), 18), 0);
         named(card, "Execution", run, "state");
@@ -445,20 +608,14 @@ final class ProviderScreens {
         JSONObject stop = run.optJSONObject("stop");
         named(card, "Stop requested", stop, "requestedAt");
         named(card, "Stop acknowledged", stop, "acknowledgedAt");
-        String state = string(run, "state");
-        if (state.equals("stopping") || state.equals("cancelled") && stop != null && string(stop, "acknowledgedAt").isEmpty()) {
+        if ("stopping".equals(state) || "cancelled".equals(state) && stop != null && string(stop, "acknowledgedAt").isEmpty()) {
             detail(card, "Waiting for the runner to acknowledge termination. Stop locally on the runner if it is disconnected.", false);
         }
-        if (!completed && !state.equals("stopping") && !state.equals("verifying")) {
-            button(card, "Request stop", R.id.session_stop, true, view -> host.confirm("Request session stop?",
-                "The runner must acknowledge the stop. Use the desktop runner’s local stop for emergencies.", "Request stop",
-                () -> host.perform("Requesting stop…", api -> api.post(ProviderApi.item(MY_SESSIONS, string(current, "id")) + "/stop", new JSONObject()),
-                    result -> host.openRun(result.optJSONObject("run")), host::statusError, true)));
-        }
+        if (!completed) detail(card, "For immediate intervention, use the local stop on the desktop runner.", false);
         showVerification(content, run);
         LinearLayout timeline = ui.card(content);
         ui.add(timeline, ui.heading("Timeline", 18), 0);
-        JSONArray events = host.snapshot == null || !host.selectedId.equals(string(host.snapshot.run, "id"))
+        JSONArray events = host.snapshot == null || !java.util.Objects.equals(host.selectedId, string(host.snapshot.run, "id"))
             ? null : host.snapshot.events;
         if (events == null || events.length() == 0) {
             detail(timeline, "No timeline events yet.", false);
@@ -503,9 +660,19 @@ final class ProviderScreens {
     private void earnings(LinearLayout content) {
         heading(content, "Earnings", "Devnet settlement history.");
         scopedDevice(content);
+        LinearLayout ranges = ui.row();
+        int[] days = { 7, 30, 365 };
+        String[] labels = { "7 days", "30 days", "12 months" };
+        for (int index = 0; index < days.length; index++) {
+            int period = days[index];
+            Button range = ui.button(labels[index], period == host.earningsDays, view -> host.chooseEarningsPeriod(period));
+            range.setSelected(period == host.earningsDays);
+            ui.weighted(ranges, range, index == days.length - 1 ? 0 : 6);
+        }
+        ui.add(content, ranges, 12);
         JSONObject data = earningsData();
         LinearLayout summary = ui.card(content);
-        ui.add(summary, ui.heading("Settled and pending", 18), 0);
+        ui.add(summary, ui.heading("Settled earnings", 18), 0);
         LinearLayout chart = ui.card(content);
         ui.add(chart, ui.heading("Earnings chart", 18), 0);
         if (data == null) {
@@ -513,12 +680,14 @@ final class ProviderScreens {
             detail(chart, "No payout records are available for the chart.", false);
         } else {
             JSONObject total = data.optJSONObject("totals");
-            detail(summary, "Settled · " + amount(data, total, "settledAtoms"), false);
+            ui.add(summary, ui.heading(amount(data, total, "settledAtoms"), 32), 4);
+            detail(summary, "Devnet test tokens · " + string(data, "from") + " to " + endDate(data, "to"), false);
+            ui.rule(summary, 12);
             detail(summary, "Pending · " + amount(data, total, "pendingAtoms"), false);
             detail(summary, "Failed · " + amount(data, total, "failedAtoms"), false);
             detail(summary, "Needs review · " + amount(data, total, "needsReviewAtoms"), false);
             named(summary, "Cluster", data, "cluster");
-            plot(chart, data, 10);
+            plot(chart, data, 31, true);
         }
         section(content, "Payout history");
         JSONArray payouts = data == null ? null : data.optJSONArray("jobs");
@@ -561,26 +730,50 @@ final class ProviderScreens {
         return host.snapshot == null ? null : host.snapshot.earnings;
     }
 
-    private void plot(LinearLayout chart, JSONObject data, int maximumRows) {
+    private void plot(LinearLayout chart, JSONObject data, int days, boolean interactive) {
         JSONArray buckets = data.optJSONArray("buckets");
         if (buckets == null || buckets.length() == 0) {
             detail(chart, "No payout records for this period.", false);
             return;
         }
-        int start = Math.max(0, buckets.length() - maximumRows);
-        BigInteger maximum = BigInteger.ZERO;
-        for (int index = start; index < buckets.length(); index++) {
-            maximum = maximum.max(atoms(buckets.optJSONObject(index), "settledAtoms"));
+        java.util.List<JSONObject> points = new java.util.ArrayList<>();
+        java.util.List<BigInteger> values = new java.util.ArrayList<>();
+        for (int index = Math.max(0, buckets.length() - days); index < buckets.length(); index++) {
+            JSONObject point = buckets.optJSONObject(index);
+            if (point != null) {
+                points.add(point);
+                values.add(atoms(point, "settledAtoms"));
+            }
         }
-        for (int index = start; index < buckets.length(); index++) {
-            JSONObject bucket = buckets.optJSONObject(index);
-            detail(chart, string(bucket, "start") + "  ·  " + amount(data, bucket, "settledAtoms"), false);
-            ProgressBar bar = new ProgressBar(host, null, android.R.attr.progressBarStyleHorizontal);
-            bar.setIndeterminate(false);
-            bar.setMax(100);
-            bar.setProgress(maximum.signum() == 0 ? 0 : atoms(bucket, "settledAtoms").multiply(BigInteger.valueOf(100)).divide(maximum).intValue());
-            bar.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            ui.add(chart, bar, 2);
+        if (points.isEmpty()) return;
+        int[] selected = { points.size() - 1 };
+        TextView pointLabel = ui.text("", 13, ACCENT, true);
+        EarningsChart graph = new EarningsChart(host, values, interactive ? index -> {
+            selected[0] = index;
+            JSONObject point = points.get(index);
+            pointLabel.setText(title(point, "start", "Period") + " · " + amount(data, point, "settledAtoms"));
+        } : null);
+        LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(-1, ui.dp(interactive ? 118 : 53));
+        layout.topMargin = ui.dp(10);
+        chart.addView(graph, layout);
+        if (!interactive) {
+            detail(chart, "Settled per day · last seven UTC dates", false);
+            return;
+        }
+        graph.select(selected[0]);
+        pointLabel.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        ui.add(chart, pointLabel, 8);
+        LinearLayout controls = ui.row();
+        ui.weighted(controls, ui.button("Previous point", false, view -> graph.select(selected[0] - 1)), 6);
+        ui.weighted(controls, ui.button("Next point", false, view -> graph.select(selected[0] + 1)), 0);
+        ui.add(chart, controls, 8);
+    }
+
+    private static String endDate(JSONObject data, String key) {
+        try {
+            return LocalDate.parse(string(data, key)).minusDays(1).toString();
+        } catch (DateTimeParseException invalid) {
+            return "latest";
         }
     }
 
@@ -683,10 +876,14 @@ final class ProviderScreens {
     }
 
     private void heading(LinearLayout content, String heading, String description) {
-        TextView title = ui.heading(heading, 30);
-        title.setId(R.id.screen_title);
-        ui.add(content, title, 7);
+        title(content, heading, 30, 7);
         detail(content, description, false);
+    }
+
+    private void title(LinearLayout content, String text, int size, int top) {
+        TextView title = ui.heading(text, size);
+        title.setId(R.id.screen_title);
+        ui.add(content, title, top);
     }
 
     private void section(LinearLayout container, String title) {

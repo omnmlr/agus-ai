@@ -9,6 +9,20 @@ final class InvitationCode {
 
     private InvitationCode() {}
 
+    static String appLink(String value) {
+        try {
+            URI link = new URI(value);
+            if ("https".equals(link.getScheme()) && GoogleSignIn.ORIGIN.getRawAuthority().equals(link.getRawAuthority())
+                && link.getRawQuery() == null && link.getRawFragment() == null && link.getRawPath().startsWith("/invite/")) {
+                String code = link.getRawPath().substring("/invite/".length());
+                if (CODE.matcher(code).matches()) return code;
+            }
+        } catch (URISyntaxException invalid) {
+            // Ignore untrusted intents that do not match the published App Link.
+        }
+        return null;
+    }
+
     static String parse(String value, URI portal) {
         String text = value.trim();
         if (CODE.matcher(text).matches()) {

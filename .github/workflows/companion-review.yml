@@ -18,11 +18,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Set up the Android SDK
+        run: bash scripts/android/companion-review-sdk.sh 'platforms;android-35' 'build-tools;35.0.0'
       - name: Build and verify Companion
         run: |
           set -euo pipefail
           cd apps/android
-          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
           ./gradlew --no-daemon assembleDebug assembleRelease testDebugUnitTest lintDebug
           out="$RUNNER_TEMP/companion-review"
           mkdir -p "$out"

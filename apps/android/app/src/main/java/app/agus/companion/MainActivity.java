@@ -43,12 +43,14 @@ public final class MainActivity extends Activity {
 
     enum Screen {
         WELCOME, AUTH, ENROLLMENT, HOME, MY_DEVICE, ACTIVITY, JOB_DETAILS,
-        ACTIVE_SESSION, COMPLETED_SESSION, EARNINGS, PROFILE;
+        ACTIVE_SESSION, COMPLETED_SESSION, EARNINGS, PROFILE, INBOX;
 
         boolean isMainTab() {
             return this == HOME || this == ACTIVITY || this == EARNINGS;
         }
     }
+
+    enum AuthMethod { CHOICE, EMAIL, PASSWORD }
 
     interface Operation {
         JSONObject request(ApiClient api) throws IOException, JSONException;
@@ -89,6 +91,12 @@ public final class MainActivity extends Activity {
     String walletStatus;
     boolean walletInFlight;
     String pendingInvitationCode;
+    AuthMethod authMethod = AuthMethod.CHOICE;
+    String authEmail = "";
+    boolean emailCodeSent;
+    long resendAt;
+    int activitySection;
+    int earningsDays = 7;
     private Screen mainTab = Screen.HOME;
     private ProviderScreens screens;
     private LinearLayout content;
@@ -124,6 +132,12 @@ public final class MainActivity extends Activity {
             selectedOffer = retained.selectedOffer;
             selectedOfferDeviceId = retained.selectedOfferDeviceId;
             snapshot = retained.snapshot;
+            authMethod = retained.authMethod;
+            authEmail = retained.authEmail;
+            emailCodeSent = retained.emailCodeSent;
+            resendAt = retained.resendAt;
+            activitySection = retained.activitySection;
+            earningsDays = retained.earningsDays;
         } else {
             JSONObject saved = authStorage.read("session");
             if (saved != null) {
@@ -137,16 +151,29 @@ public final class MainActivity extends Activity {
                     authStorage.clear("session");
                 }
             }
-            if (session == null && googlePending() != null) screen = Screen.AUTH;
+            JSONObject invite = authStorage.read("invitation");
+            if (invite != null) pendingInvitationCode = invite.optString("code", null);
+            if (session == null && (googlePending() != null || pendingInvitationCode != null)) screen = Screen.AUTH;
         }
         render(false);
-        handleGoogleReturn(getIntent());
+        handleLink(getIntent());
         refresh(false);
     }
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        handleGoogleReturn(intent);
+        handleLink(intent);
+    }
+
+    private void handleLink(Intent intent) {
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction()) || intent.getDataString() == null) return;
+        String code = InvitationCode.appLink(intent.getDataString());
+        if (code == null) {
+            handleGoogleReturn(intent);
+            return;
+        }
+        intent.setData(null);
+        reviewCode(code);
     }
 
     @Override public Object onRetainNonConfigurationInstance() {
@@ -157,6 +184,7 @@ public final class MainActivity extends Activity {
         super.onResume();
         handler.removeCallbacks(poll);
         handler.postDelayed(poll, REFRESH_INTERVAL_MS);
+        if (session != null && pendingInvitationCode != null && !mutating) reviewCode(pendingInvitationCode);
     }
 
     @Override protected void onPause() {
@@ -172,11 +200,13 @@ public final class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        if (screen == Screen.AUTH) {
+        if (screen == Screen.AUTH && authMethod != AuthMethod.CHOICE) {
+            if (!mutating) changeAuth(AuthMethod.CHOICE);
+        } else if (screen == Screen.AUTH) {
             googleGeneration++;
             authStorage.clear("google");
             navigate(Screen.WELCOME, null);
-        } else if (screen == Screen.ENROLLMENT || screen == Screen.MY_DEVICE || screen == Screen.PROFILE) {
+        } else if (screen == Screen.ENROLLMENT || screen == Screen.MY_DEVICE || screen == Screen.PROFILE || screen == Screen.INBOX) {
             navigate(mainTab, null);
         } else if (screen == Screen.JOB_DETAILS || screen == Screen.ACTIVE_SESSION || screen == Screen.COMPLETED_SESSION) {
             navigate(Screen.ACTIVITY, null);
@@ -195,7 +225,7 @@ public final class MainActivity extends Activity {
         }
         statusMessage = "";
         render(false);
-        if (selectedSession() != null || snapshot == null || next.isMainTab()) {
+        if (selectedSession() != null || snapshot == null || next.isMainTab() || next == Screen.INBOX) {
             refresh(false);
         }
     }
@@ -220,24 +250,17 @@ public final class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT < 30) {
             root.setFitsSystemWindows(true);
         }
+        int gutter = getResources().getConfiguration().screenWidthDp <= 340 ? 16 : 22;
+        if (screen != Screen.WELCOME) drawHeader(root, gutter);
         scroll = new ScrollView(this);
+        scroll.setClipToPadding(false);
         scroll.setFillViewport(true);
         content = ui.column();
-        content.setPadding(ui.dp(20), ui.dp(23), ui.dp(20), ui.dp(24));
+        content.setPadding(ui.dp(gutter), ui.dp(12), ui.dp(gutter), ui.dp(24));
         scroll.addView(content);
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
 
-        if (screen != Screen.WELCOME) {
-            LinearLayout brand = ui.row();
-            brand.addView(ui.brandImage(R.drawable.brand_lockup_dark, false),
-                new LinearLayout.LayoutParams(ui.dp(135), ui.dp(31)));
-            if (session != null && screen != Screen.PROFILE) {
-                brand.addView(new Space(this), new LinearLayout.LayoutParams(0, 0, 1));
-                brand.addView(ui.button("Profile", false, view -> navigate(Screen.PROFILE, null)));
-            }
-            ui.add(content, brand, 0);
-        }
         statusView = ui.text("", 14, MUTED, false);
         statusView.setId(R.id.feedback);
         statusView.setAccessibilityLiveRegion(TextView.ACCESSIBILITY_LIVE_REGION_POLITE);
@@ -245,13 +268,14 @@ public final class MainActivity extends Activity {
         ui.add(content, statusView, 6);
         status(statusMessage, statusIsError);
         screens.show(screen, content);
+        if (screen == Screen.ACTIVE_SESSION) screens.stopBar(root, gutter);
         if (screen.isMainTab()) {
-            ui.add(content, ui.button("Refresh", false, view -> refresh(true)), 24);
+            ui.rule(root, 0);
             LinearLayout tabs = ui.row();
-            tabs.setPadding(ui.dp(20), ui.dp(6), ui.dp(20), ui.dp(10));
-            addTab(tabs, Screen.HOME, "Home", R.id.tab_home, 8);
-            addTab(tabs, Screen.ACTIVITY, "Activity", R.id.tab_activity, 8);
-            addTab(tabs, Screen.EARNINGS, "Earnings", R.id.tab_earnings, 0);
+            tabs.setPadding(ui.dp(gutter), ui.dp(6), ui.dp(gutter), ui.dp(6));
+            addTab(tabs, Screen.HOME, "Home", R.drawable.ic_home, R.id.tab_home, 8);
+            addTab(tabs, Screen.ACTIVITY, "Activity", R.drawable.ic_activity, R.id.tab_activity, 8);
+            addTab(tabs, Screen.EARNINGS, "Earnings", R.drawable.ic_earnings, R.id.tab_earnings, 0);
             ui.add(root, tabs, 0);
         }
         if (oldScroll > 0) {
@@ -260,8 +284,32 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void addTab(LinearLayout tabs, Screen target, String label, int id, int padding) {
-        var button = ui.button(label, screen == target, view -> navigate(target, null));
+    private void drawHeader(LinearLayout root, int gutter) {
+        LinearLayout bar = ui.row();
+        bar.setPadding(ui.dp(gutter), ui.dp(5), ui.dp(gutter), ui.dp(5));
+        bar.setMinimumHeight(ui.dp(57));
+        if (!screen.isMainTab()) {
+            bar.addView(ui.iconButton("Back", R.drawable.ic_back, view -> onBackPressed()));
+            Space gap = new Space(this);
+            bar.addView(gap, new LinearLayout.LayoutParams(ui.dp(13), 0));
+        }
+        bar.addView(ui.brandImage(R.drawable.brand_lockup_dark, false),
+            new LinearLayout.LayoutParams(ui.dp(128), ui.dp(29)));
+        bar.addView(new Space(this), new LinearLayout.LayoutParams(0, 0, 1));
+        if (screen.isMainTab()) {
+            if (screen == Screen.HOME) {
+                bar.addView(ui.iconButton("Inbox", R.drawable.ic_bell, view -> navigate(Screen.INBOX, null)));
+                bar.addView(new Space(this), new LinearLayout.LayoutParams(ui.dp(7), 0));
+                bar.addView(ui.iconButton("Profile", R.drawable.ic_profile, view -> navigate(Screen.PROFILE, null)));
+            } else {
+                bar.addView(ui.iconButton("Refresh", R.drawable.ic_refresh, view -> refresh(true)));
+            }
+        }
+        ui.add(root, bar, 0);
+    }
+
+    private void addTab(LinearLayout tabs, Screen target, String label, int icon, int id, int padding) {
+        var button = ui.tab(label, icon, screen == target, view -> navigate(target, null));
         button.setId(id);
         button.setSelected(screen == target);
         ui.weighted(tabs, button, padding);
@@ -275,26 +323,59 @@ public final class MainActivity extends Activity {
         getPreferences(MODE_PRIVATE).edit().putString(key, value).apply();
     }
 
-    void authenticate(boolean register, EditText originField, EditText emailField, EditText passwordField, EditText registrationField) {
+    void changeAuth(AuthMethod method) {
+        if (mutating) return;
+        authMethod = method;
+        render(false);
+    }
+
+    boolean waitingForGoogle() {
+        return googlePending() != null;
+    }
+
+    void authenticate(boolean register, EditText originField, EditText emailField, EditText passwordField) {
         String password = passwordField.getText().toString();
-        if (password.isEmpty()) {
-            statusError("Enter your password.");
+        if (password.length() < 12) {
+            statusError("Use a password with at least 12 characters.");
             return;
         }
         getSystemService(InputMethodManager.class).hideSoftInputFromWindow(passwordField.getWindowToken(), 0);
-        authRequest(register ? "/auth/register" : "/auth/login", originField, emailField, "password", password,
-            register ? registrationField.getText().toString().trim() : "", register ? "Creating account…" : "Signing in…", true);
+        authRequest(register ? "/auth/register" : "/auth/login", originField, emailField.getText().toString(),
+            "password", password, register ? "Creating account…" : "Signing in…", true);
     }
 
-    void emailCode(boolean verify, EditText originField, EditText emailField, EditText codeField, EditText registrationField) {
-        String code = codeField.getText().toString().trim();
+    void editAuthEmail() {
+        if (!mutating) {
+            emailCodeSent = false;
+            statusMessage = "";
+            render(false);
+        }
+    }
+
+    void emailCode(EditText emailField, EditText codeField) {
+        boolean verify = codeField != null;
+        String code = verify ? codeField.getText().toString().trim() : "";
         if (verify && !code.matches("[0-9]{6}")) {
             statusError("Enter the six-digit email code.");
             return;
         }
-        authRequest(verify ? "/auth/email/verify" : "/auth/email/start", originField, emailField,
-            verify ? "code" : null, code, verify ? "" : registrationField.getText().toString().trim(),
-            verify ? "Checking sign-in code…" : "Requesting email code…", verify);
+        authRequest(verify ? "/auth/email/verify" : "/auth/email/start", null,
+            emailField == null ? authEmail : emailField.getText().toString(),
+            verify ? "code" : null, code, verify ? "Checking code…" : "Requesting code…", verify);
+    }
+
+    void retryCode(android.widget.Button button) {
+        long remaining = Math.max(0, resendAt - android.os.SystemClock.elapsedRealtime());
+        if (remaining > 0) {
+            button.setEnabled(false);
+            button.setText("Resend in " + ((remaining + 999) / 1000) + "s");
+            handler.postDelayed(() -> {
+                if (button.isAttachedToWindow()) retryCode(button);
+            }, Math.min(remaining, 1000));
+        } else {
+            button.setEnabled(true);
+            button.setText("Resend code");
+        }
     }
 
     private JSONObject googlePending() {
@@ -307,13 +388,14 @@ public final class MainActivity extends Activity {
     void cancelGoogle() {
         googleGeneration++;
         authStorage.clear("google");
+        render(false);
         status("Google sign-in cancelled. You can try again.", false);
     }
 
-    void startGoogle(EditText originField, EditText registrationField) {
+    void startGoogle() {
         if (mutating) return;
         try {
-            if (!GoogleSignIn.ORIGIN.equals(authOrigin(originField, false))) {
+            if (!GoogleSignIn.ORIGIN.equals(authOrigin(null, false))) {
                 statusError("Continue with Google is available at agusai.grindcity.app.");
                 return;
             }
@@ -322,14 +404,12 @@ public final class MainActivity extends Activity {
             return;
         }
         String verifier = GoogleSignIn.verifier();
-        String registration = registrationField.getText().toString().trim();
         int generation = ++googleGeneration;
         mutating = true;
         status("Opening Google sign-in…", false);
         network.execute(() -> {
             try {
                 JSONObject body = new JSONObject().put("client", "android").put("challenge", GoogleSignIn.challenge(verifier));
-                if (!registration.isEmpty()) body.put("registrationToken", registration);
                 JSONObject reply = new ApiClient(GoogleSignIn.ORIGIN, null).post("/auth/google/start", body);
                 URI browser = URI.create(reply.getString("url"));
                 if (!GoogleSignIn.browserUrl(browser)) throw new IOException("Unexpected Google sign-in URL");
@@ -340,6 +420,7 @@ public final class MainActivity extends Activity {
                         authStorage.write("google", new JSONObject().put("verifier", verifier)
                             .put("expiresAt", System.currentTimeMillis() + GOOGLE_ATTEMPT_MS));
                         startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(browser.toString())).addCategory(Intent.CATEGORY_BROWSABLE));
+                        render(false);
                         status("Finish in your browser or cancel here and try again.", false);
                     } catch (ActivityNotFoundException | GeneralSecurityException | JSONException unavailable) {
                         authStorage.clear("google");
@@ -373,7 +454,7 @@ public final class MainActivity extends Activity {
         if (callback.group(2) != null) {
             String message = switch (callback.group(2)) {
                 case "google_declined" -> "Google sign-in was cancelled. You can try again.";
-                case "registration_required" -> "An approved registration invite is required.";
+                case "registration_required" -> "This server is not accepting new accounts. You can still sign in with an existing account.";
                 default -> "Google sign-in is unavailable. Try again or use another method.";
             };
             statusError(message);
@@ -410,7 +491,7 @@ public final class MainActivity extends Activity {
     }
 
     private URI authOrigin(EditText field, boolean debug) {
-        String entered = field.getText().toString().trim();
+        String entered = field == null ? preference("control_plane_origin") : field.getText().toString().trim();
         return entered.isEmpty() ? GoogleSignIn.ORIGIN : ApiOrigin.parse(entered, debug);
     }
 
@@ -439,8 +520,8 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void authRequest(String path, EditText originField, EditText emailField, String key, String value,
-        String registrationToken, String progress, boolean createsSession) {
+    private void authRequest(String path, EditText originField, String submittedEmail, String key, String value,
+        String progress, boolean createsSession) {
         if (mutating) {
             return;
         }
@@ -451,11 +532,12 @@ public final class MainActivity extends Activity {
             status(invalid.getMessage(), true);
             return;
         }
-        String email = emailField.getText().toString().trim();
-        if (email.isEmpty()) {
-            status("Enter your email.", true);
+        String email = submittedEmail.trim();
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            status("Enter a valid email address.", true);
             return;
         }
+        authEmail = email;
         mutating = true;
         status(progress, false);
         network.execute(() -> {
@@ -463,9 +545,6 @@ public final class MainActivity extends Activity {
                 JSONObject input = new JSONObject().put("email", email);
                 if (key != null) {
                     input.put(key, value);
-                }
-                if (!registrationToken.isEmpty()) {
-                    input.put("registrationToken", registrationToken);
                 }
                 JSONObject result = new ApiClient(origin, null).post(path, input);
                 Session newSession = createsSession ? new Session(origin, result) : null;
@@ -481,7 +560,11 @@ public final class MainActivity extends Activity {
                         return;
                     }
                     if (newSession == null) {
-                        status("If email sign-in is enabled for this address, check your inbox for a code.", false);
+                        emailCodeSent = true;
+                        resendAt = android.os.SystemClock.elapsedRealtime() + 1000L * Math.max(1, result.optInt("retryAfterSeconds", 60));
+                        statusMessage = "";
+                        render(false);
+                        status("Check your inbox for a six-digit code.", false);
                         return;
                     }
                     acceptSession(newSession);
@@ -511,15 +594,15 @@ public final class MainActivity extends Activity {
         Screen requestedScreen = screen;
         String device = selectedDevice;
         boolean marketplace = requestedScreen == Screen.ACTIVITY;
-        boolean inbox = requestedScreen == Screen.ACTIVITY;
-        boolean payouts = requestedScreen == Screen.EARNINGS || requestedScreen == Screen.HOME;
+        boolean inbox = requestedScreen == Screen.INBOX;
+        int payoutDays = requestedScreen == Screen.EARNINGS ? earningsDays : requestedScreen == Screen.HOME ? 30 : 0;
         int version = mutationVersion;
         if (userInitiated || snapshot == null) {
             status("Refreshing workspace…", false);
         }
         reads.execute(() -> {
             try {
-                ProviderApi.Snapshot next = current.api.load(runId, device, marketplace, payouts, inbox);
+                ProviderApi.Snapshot next = current.api.load(runId, device, marketplace, payoutDays, inbox);
                 runOnUiThread(() -> {
                     if (isDestroyed() || session != current) {
                         return;
@@ -532,7 +615,8 @@ public final class MainActivity extends Activity {
                     boolean changed = snapshot == null || !snapshot.sameAs(next);
                     snapshot = next;
                     if (!Objects.equals(runId, selectedSession()) || !Objects.equals(device, selectedDevice)
-                        || requestedScreen != screen && screen.isMainTab()) {
+                        || requestedScreen != screen && (screen.isMainTab() || screen == Screen.INBOX)
+                        || screen == Screen.EARNINGS && payoutDays != earningsDays) {
                         refresh(false);
                         return;
                     }
@@ -669,7 +753,10 @@ public final class MainActivity extends Activity {
         mainTab = Screen.HOME;
         navigate(Screen.WELCOME, null);
         if (revoke && old != null) {
-            pendingInvitationCode = null;
+            clearInvitation(pendingInvitationCode);
+            authMethod = AuthMethod.CHOICE;
+            authEmail = "";
+            emailCodeSent = false;
             revoke(old);
         }
     }
@@ -694,14 +781,14 @@ public final class MainActivity extends Activity {
 
     URI portal() {
         String configured = preference("developer_portal");
-        return configured.isEmpty() ? null : ApiOrigin.parse(configured, BuildConfig.DEBUG);
+        return configured.isEmpty() ? GoogleSignIn.ORIGIN : ApiOrigin.parse(configured, BuildConfig.DEBUG);
     }
 
     void openPortal(boolean configure) {
         URI portal = portal();
         if (portal != null && !configure) {
             try {
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(portal.toString())));
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(portal.resolve("/console.html").toString())));
             } catch (ActivityNotFoundException missing) {
                 statusError("A browser is required to open the developer portal.");
             }
@@ -719,19 +806,42 @@ public final class MainActivity extends Activity {
     }
 
     void reviewCode(String code) {
-        pendingInvitationCode = code;
+        if (!code.equals(pendingInvitationCode)) {
+            pendingInvitationCode = code;
+            try {
+                authStorage.write("invitation", new JSONObject().put("code", code));
+            } catch (GeneralSecurityException | JSONException unavailable) {
+                // The current activity can still resume the link after sign-in.
+            }
+        }
         if (session == null) {
             navigate(Screen.AUTH, null);
             return;
         }
+        if (mutating) return;
         perform("Reviewing invitation…", api -> api.post(INVITATIONS + "/review", new JSONObject().put("token", code)),
             result -> {
-                pendingInvitationCode = null;
+                clearInvitation(code);
                 openInvitation(result.optJSONObject("invitation"));
             }, error -> {
-                pendingInvitationCode = null;
+                clearInvitation(code);
                 statusError(error);
             }, true);
+    }
+
+    private void clearInvitation(String code) {
+        if (Objects.equals(pendingInvitationCode, code)) {
+            pendingInvitationCode = null;
+            authStorage.clear("invitation");
+        }
+    }
+
+    void openPublicPage(String path) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(GoogleSignIn.ORIGIN.resolve(path).toString())));
+        } catch (ActivityNotFoundException unavailable) {
+            statusError("A browser is required to open this page.");
+        }
     }
 
     void openInvitation(JSONObject invitation) {
@@ -755,6 +865,12 @@ public final class MainActivity extends Activity {
             selectedRunOverride = run;
             navigate(ProviderApi.terminal(run) ? Screen.COMPLETED_SESSION : Screen.ACTIVE_SESSION, string(run, "id"));
         }
+    }
+
+    void chooseEarningsPeriod(int days) {
+        if (earningsDays == days) return;
+        earningsDays = days;
+        refresh(true);
     }
 
     void chooseDevice(String id) {
@@ -890,6 +1006,12 @@ public final class MainActivity extends Activity {
         final JSONObject selectedOffer;
         final String selectedOfferDeviceId;
         final ProviderApi.Snapshot snapshot;
+        final AuthMethod authMethod;
+        final String authEmail;
+        final boolean emailCodeSent;
+        final long resendAt;
+        final int activitySection;
+        final int earningsDays;
 
         Retained(MainActivity activity) {
             session = activity.session;
@@ -902,6 +1024,12 @@ public final class MainActivity extends Activity {
             selectedOffer = activity.selectedOffer;
             selectedOfferDeviceId = activity.selectedOfferDeviceId;
             snapshot = activity.snapshot;
+            authMethod = activity.authMethod;
+            authEmail = activity.authEmail;
+            emailCodeSent = activity.emailCodeSent;
+            resendAt = activity.resendAt;
+            activitySection = activity.activitySection;
+            earningsDays = activity.earningsDays;
         }
     }
 }

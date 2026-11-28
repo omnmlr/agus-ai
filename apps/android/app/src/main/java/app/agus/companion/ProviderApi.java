@@ -20,7 +20,7 @@ final class ProviderApi {
         this.client = client;
     }
 
-    Snapshot load(String sessionId, String deviceId, boolean marketplace, boolean payouts, boolean inbox) throws IOException, JSONException {
+    Snapshot load(String sessionId, String deviceId, boolean marketplace, int payoutDays, boolean inbox) throws IOException, JSONException {
         JSONObject user = client.get("/auth/me").getJSONObject("user");
         JSONArray devices = optionalArray(MY_DEVICES, "devices");
         JSONArray runs = optionalArray(MY_SESSIONS, "runs");
@@ -36,9 +36,11 @@ final class ProviderApi {
         if (!scope.isEmpty() && marketplace) {
             jobs = optionalArray(MARKETPLACE + "?deviceId=" + Uri.encode(scope), "jobs");
         }
-        if (!scope.isEmpty() && payouts) {
+        if (!scope.isEmpty() && payoutDays > 0) {
             LocalDate today = LocalDate.now(ZoneOffset.UTC);
-            String path = "/me/earnings?deviceId=" + Uri.encode(scope) + "&from=" + today.minusDays(29) + "&to=" + today + "&bucket=day";
+            String interval = payoutDays > 30 ? "month" : "day";
+            String path = "/me/earnings?deviceId=" + Uri.encode(scope)
+                + "&from=" + today.plusDays(1).minusDays(payoutDays) + "&to=" + today.plusDays(1) + "&bucket=" + interval;
             try {
                 earnings = client.get(path).optJSONObject("earnings");
             } catch (ApiClient.ApiError unavailable) {
@@ -47,7 +49,7 @@ final class ProviderApi {
                 }
             }
         }
-        if (payouts) {
+        if (payoutDays > 0) {
             try {
                 campaignEarnings = client.get("/me/campaign-earnings").getJSONObject("earnings");
             } catch (ApiClient.ApiError unavailable) {
