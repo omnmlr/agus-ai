@@ -1,0 +1,21 @@
+# Import only this vhost into the existing edge after capacity and TLS approval.
+agusai.grindcity.app {
+	header Strict-Transport-Security "max-age=31536000"
+
+	@appLinks {
+		path /.well-known/assetlinks.json
+		method GET HEAD
+	}
+	handle @appLinks {
+		header Content-Type "application/json"
+		header Cache-Control "no-cache"
+		root * /etc/caddy/agus-app-links
+		rewrite * /assetlinks.json
+		file_server
+	}
+
+	handle {
+		# For an edge running directly on the host, use 127.0.0.1:4174 instead.
+		reverse_proxy agus-ai-web:8080
+	}
+}

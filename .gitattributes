@@ -1,0 +1,2 @@
+deploy/package.sh text eol=lf
+deploy/stockholm/*.sh text eol=lf
