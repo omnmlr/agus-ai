@@ -824,8 +824,24 @@ public final class MainActivity extends Activity {
     }
 
     void copy(String label, String value) {
-        getSystemService(ClipboardManager.class).setPrimaryClip(ClipData.newPlainText(label, value));
-        Toast.makeText(this, "Copied " + label, Toast.LENGTH_SHORT).show();
+        copy(label, value, false);
+    }
+
+    void copySensitive(String label, String value) {
+        copy(label, value, true);
+    }
+
+    private void copy(String label, String value, boolean sensitive) {
+        ClipData clip = ClipData.newPlainText(label, value);
+        if (sensitive && android.os.Build.VERSION.SDK_INT >= 33) {
+            android.os.PersistableBundle flags = new android.os.PersistableBundle();
+            flags.putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true);
+            clip.getDescription().setExtras(flags);
+        }
+        getSystemService(ClipboardManager.class).setPrimaryClip(clip);
+        if (android.os.Build.VERSION.SDK_INT < 33) {
+            Toast.makeText(this, "Copied " + label, Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void saveInvitation(String code, URI origin) {

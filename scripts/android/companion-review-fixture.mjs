@@ -54,7 +54,10 @@ if (mode === 'serve') {
 } else if (mode === 'seed') {
   const owner = await request('/auth/login', null, { email, password });
   const developer = await request('/auth/register', null, { email: 'developer@example.invalid', password });
-  const { pairing } = await request('/me/devices/pairings', owner.token, {});
+  process.stdin.setEncoding('utf8');
+  let pairingCode = '';
+  for await (const part of process.stdin) pairingCode += part;
+  if (!/^[A-Za-z0-9_-]{43}$/.test(pairingCode)) throw Error('Missing Companion pairing code');
   const { publicKey } = generateKeyPairSync('ed25519');
   const device = {
     id: 'review-target', dedicated: true, ready: true, online: true, scenarios: ['app-launch'],
@@ -65,7 +68,7 @@ if (mode === 'serve') {
       dataTotalBytes: 8 * 1024 ** 3, batteryPercent: 82,
     },
   };
-  const runner = await request('/provider/enroll', pairing.code, {
+  const runner = await request('/provider/enroll', pairingCode, {
     displayName: 'Android review emulator', publicKeyPem: publicKey.export({ format: 'pem', type: 'spki' }),
     devices: [device],
   });

@@ -146,7 +146,7 @@ final class ProviderScreens {
             LinearLayout card = ui.card(content);
             ui.add(card, ui.heading(title(pairing, "code", "Pairing code unavailable"), 24), 0);
             named(card, "Expires", pairing, "expiresAt");
-            button(card, "Copy pairing code", 0, true, view -> host.copy("pairing code", string(pairing, "code")));
+            button(card, "Copy pairing code", 0, true, view -> host.copySensitive("pairing code", string(pairing, "code")));
         }
         if (devices() != null) {
             button(content, pairing == null ? "Generate pairing code" : "Generate new code", R.id.generate_pairing, pairing == null, view ->
@@ -158,7 +158,7 @@ final class ProviderScreens {
                         if (!code.isEmpty() && host.screen == MainActivity.Screen.ENROLLMENT) {
                             new android.app.AlertDialog.Builder(host).setTitle("Pairing code")
                                 .setMessage(code + "\n\nExpires " + string(host.pairing, "expiresAt"))
-                                .setPositiveButton("Copy pairing code", (dialog, which) -> host.copy("pairing code", code))
+                                .setPositiveButton("Copy pairing code", (dialog, which) -> host.copySensitive("pairing code", code))
                                 .setNegativeButton("Close", null).show();
                         }
                     }, host::statusError, false));
@@ -422,7 +422,7 @@ final class ProviderScreens {
         }
         forEach(jobs, offer -> {
             LinearLayout card = ui.card(content);
-            ui.add(card, ui.heading(title(offer, "scenario", "Public offer"), 18), 0);
+            ui.add(card, ui.heading(workloadTitle(offer, "Public offer"), 18), 0);
             named(card, "App", offer, "packageName");
             named(card, "Expires", offer, "expiresAt");
             button(card, "Review offer", R.id.review_market_offer, false, view -> host.openOffer(offer));
@@ -435,7 +435,7 @@ final class ProviderScreens {
         }
         forEach(invitations, invitation -> {
             LinearLayout request = ui.card(content);
-            ui.add(request, ui.heading(title(invitation, "scenario", "Private request"), 18), 0);
+            ui.add(request, ui.heading(workloadTitle(invitation, "Private request"), 18), 0);
             detail(request, status(string(invitation, "state")), false);
             named(request, "Expires", invitation, "expiresAt");
             button(request, "Review job details", 0, false, view -> {
@@ -484,7 +484,7 @@ final class ProviderScreens {
             if (history == ProviderApi.terminal(run)) {
                 displayed[0] = true;
                 LinearLayout card = ui.card(content);
-                ui.add(card, ui.heading(title(run, "scenario", "Session"), 17), 0);
+                ui.add(card, ui.heading(workloadTitle(run, "Session"), 17), 0);
                 detail(card, status(string(run, "state")), false);
                 named(card, "Updated", run, "updatedAt");
                 button(card, history ? "Open completed session" : "Open active session", 0, false, view -> host.openRun(run));
@@ -512,11 +512,13 @@ final class ProviderScreens {
         }
         JSONObject request = invitation;
         LinearLayout card = ui.card(content);
-        ui.add(card, ui.heading(title(request, "scenario", "Private request"), 18), 0);
+        ui.add(card, ui.heading(workloadTitle(request, "Private request"), 18), 0);
         named(card, "Status", request, "state");
         named(card, "Requester", request.optJSONObject("requester"), "email");
         named(card, "Recipient", request.optJSONObject("recipient"), "email");
-        named(card, "Device", request, "deviceId");
+        JSONObject target = ProviderApi.find(devices(), string(request, "deviceId"));
+        if (target == null) named(card, "Device", request, "deviceId");
+        else detail(card, "Device · " + title(target, "label", "Dedicated device"), false);
         named(card, "App", request, "packageName");
         named(card, "Build SHA-256", request, "buildSha256");
         named(card, "Mode", request, "mode");
@@ -549,7 +551,7 @@ final class ProviderScreens {
 
     private void publicJob(LinearLayout content, JSONObject job) {
         LinearLayout card = ui.card(content);
-        ui.add(card, ui.heading(title(job, "scenario", "Public offer"), 18), 0);
+        ui.add(card, ui.heading(workloadTitle(job, "Public offer"), 18), 0);
         named(card, "Requester", job.optJSONObject("requester"), "email");
         named(card, "App", job, "packageName");
         named(card, "Build SHA-256", job, "buildSha256");
@@ -631,10 +633,17 @@ final class ProviderScreens {
             case "cancelled" -> "Session cancelled";
             case "expired" -> "Session expired";
             default -> "Review session result";
-        } : "Running session";
+        } : switch (state) {
+            case "queued", "reserved" -> "Queued session";
+            case "preparing" -> "Preparing session";
+            case "awaiting_approval" -> "Waiting for approval";
+            case "stopping" -> "Stopping session";
+            case "verifying" -> "Verifying results";
+            default -> "Running session";
+        };
         heading(content, headline, status(state));
         LinearLayout card = ui.card(content);
-        ui.add(card, ui.heading(title(run, "scenario", "Workload"), 18), 0);
+        ui.add(card, ui.heading(workloadTitle(run, "Workload"), 18), 0);
         named(card, "Execution", run, "state");
         named(card, "Mode", run, "mode");
         named(card, "Device", run, "deviceId");
@@ -997,6 +1006,17 @@ final class ProviderScreens {
 
     private static String enabled(boolean value) {
         return value ? "On" : "Off";
+    }
+
+    private static String workloadTitle(JSONObject work, String fallback) {
+        return switch (string(work, "scenario")) {
+            case "" -> fallback;
+            case "app-launch" -> "App launch";
+            case "wallet-connect" -> "Wallet connection";
+            case "wallet-transfer" -> "Wallet transfer";
+            case "wallet-false-success" -> "Wallet false-success check";
+            default -> title(work, "scenario", fallback);
+        };
     }
 
     private static String title(JSONObject entry, String key, String fallback) {

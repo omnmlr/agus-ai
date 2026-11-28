@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -52,9 +53,18 @@ def run():
     ui.tap(ident("open_enrollment"))
     screen("03-enrollment", "Set up your device")
     ui.tap(ident("generate_pairing"))
+    def find_code():
+        for node in ui.tree().iter("node"):
+            if node.get("resource-id") == "android:id/message":
+                match = re.match(r"^([A-Za-z0-9_-]{43})\s", node.get("text", ""))
+                if match:
+                    return match.group(1)
+        return None
+    pairing_code = ui.until(find_code, "The pairing dialog did not show a code")
     ui.tap("Copy pairing code")
-    ui.record("Generated and copied a server-issued pairing code")
-    subprocess.run(["node", str(fixture), "seed", str(out), os.environ["AGUS_WORKLOAD_APK"]], check=True)
+    subprocess.run(["node", str(fixture), "seed", str(out), os.environ["AGUS_WORKLOAD_APK"]],
+                   input=pairing_code, text=True, check=True)
+    ui.record("Redeemed the pairing code issued by the Companion")
     back()
     screen("04-home", "Your device is ready")
     ui.tap(ident("open_my_device"))
@@ -67,7 +77,7 @@ def run():
     ui.tap(ident("invitation_accept"))
     ui.tap("Accept", scroll=False)
     ui.tap("Open session")
-    screen("08-running", "Running session")
+    screen("08-running", "Queued session")
     ui.tap(ident("session_stop"), scroll=False)
     ui.tap("Request stop", scroll=False)
     screen("09-completed", "Session cancelled")
