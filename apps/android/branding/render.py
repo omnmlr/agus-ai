@@ -9,7 +9,9 @@ from PIL import Image
 
 BRANDING = Path(__file__).resolve().parent
 SOURCE = BRANDING.parents[1] / "web" / "public" / "assets"
-DRAWABLES = BRANDING / "res" / "drawable-nodpi"
+SHARED = BRANDING / "res"
+COMPANION = BRANDING.parent / "app" / "src" / "main" / "res"
+RUNTIME = BRANDING.parent / "native-preview" / "runtime" / "res"
 
 
 def render_symbol(size, width, destination):
@@ -23,14 +25,18 @@ def render_symbol(size, width, destination):
 
 
 def main():
-    for name, width in [("brand-lockup-dark", 550), ("brand-lockup-light", 550), ("brand-wordmark-dark", 608)]:
-        target = DRAWABLES / f"{name.replace('-', '_')}.png"
+    for name, width, resources in [
+        ("brand-lockup-dark", 550, COMPANION),
+        ("brand-wordmark-dark", 608, COMPANION),
+        ("brand-lockup-light", 550, RUNTIME),
+    ]:
+        target = resources / "drawable-nodpi" / f"{name.replace('-', '_')}.png"
         subprocess.run(["inkscape", str(SOURCE / f"{name}.svg"), f"--export-width={width}",
                         f"--export-filename={target}"], check=True)
-    shutil.copyfile(SOURCE / "orbital-ghost.webp", DRAWABLES / "brand_mascot.webp")
-    shutil.copyfile(SOURCE / "agus-orbital-mark.png", BRANDING / "res" / "mipmap-nodpi" / "brand_launcher.png")
-    render_symbol(432, 208, DRAWABLES / "brand_launcher_foreground.png")
-    render_symbol(96, 80, BRANDING / "res" / "drawable-xxxhdpi" / "brand_notification.png")
+    shutil.copyfile(SOURCE / "orbital-ghost.webp", COMPANION / "drawable-nodpi" / "brand_mascot.webp")
+    shutil.copyfile(SOURCE / "agus-orbital-mark.png", SHARED / "mipmap-nodpi" / "brand_launcher.png")
+    render_symbol(432, 208, SHARED / "drawable-nodpi" / "brand_launcher_foreground.png")
+    render_symbol(96, 80, RUNTIME / "drawable-xxxhdpi" / "brand_notification.png")
 
 
 if __name__ == "__main__":
