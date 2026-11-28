@@ -92,7 +92,7 @@ test('web serves both entry points and preserves scoped authorization and bytes 
   const origin = await start(createWebServer({ upstream, directory: new URL('../public/', import.meta.url) }), context);
   const home = await fetch(origin);
   assert.equal(home.status, 200);
-  assert.match(await home.text(), /The execution layer/);
+  assert.match((await home.text()).replace(/<[^>]+>/g, ''), /The execution layer for mobile intelligence/);
   const consoleResponse = await fetch(`${origin}/console.html`);
   assert.equal(consoleResponse.status, 200);
   assert.match(consoleResponse.headers.get('content-security-policy'), /img-src 'self' blob:/);

@@ -41,6 +41,15 @@ function theater() {
           <div><span class="replay-record" aria-hidden="true"></span><strong>Recorded execution</strong></div>
           <span>Wallet transfer <span class="replay-id">/ ${e(replay.run)}</span></span>
         </figcaption>
+        <div class="replay-controls" hidden>
+          <button type="button" class="replay-toggle" data-replay-toggle><span aria-hidden="true"></span><span data-replay-toggle-label>Play replay</span></button>
+          <div class="replay-rail">
+            <div class="replay-progress" aria-hidden="true"><i></i></div>
+            <div class="replay-chapters" aria-label="Replay chapters">
+              ${replay.chapters.map((chapter, index) => `<button type="button" data-step="${index}" aria-pressed="${index === 0}" data-state="${e(chapter.state)}" data-detail="${e(chapter.detail)}" data-evidence="${e(chapter.evidence)}" data-value="${e(chapter.value)}"${index === 0 ? ` data-full-value="${e(replay.build)}"` : index === 3 ? ` data-full-value="${e(replay.digest)}"` : ''}>${e(chapter.name)}</button>`).join('')}
+            </div>
+          </div>
+        </div>
         <div class="replay-stage">
           <div class="replay-terminal">
             <div class="replay-label"><span>Terminal</span><span>AGUS CLI</span></div>
@@ -72,15 +81,6 @@ function theater() {
               <dd><code data-replay-value title="${e(replay.build)}">${e(first.value)}</code></dd>
             </dl>
             <a data-replay-chain href="${e(replay.explorer)}" hidden>Open Devnet attestation ${arrow}</a>
-          </div>
-        </div>
-        <div class="replay-controls" hidden>
-          <button type="button" class="replay-toggle" data-replay-toggle><span aria-hidden="true"></span><span data-replay-toggle-label>Play replay</span></button>
-          <div class="replay-rail">
-            <div class="replay-progress" aria-hidden="true"><i></i></div>
-            <div class="replay-chapters" aria-label="Replay chapters">
-              ${replay.chapters.map((chapter, index) => `<button type="button" data-step="${index}" aria-pressed="${index === 0}" data-state="${e(chapter.state)}" data-detail="${e(chapter.detail)}" data-evidence="${e(chapter.evidence)}" data-value="${e(chapter.value)}"${index === 0 ? ` data-full-value="${e(replay.build)}"` : index === 3 ? ` data-full-value="${e(replay.digest)}"` : ''}>${e(chapter.name)}</button>`).join('')}
-            </div>
           </div>
         </div>
         <div class="replay-foot">

@@ -46,21 +46,23 @@ try {
     await page.evaluate(() => document.fonts.ready);
     await checkViewport(page, String(width));
     assert.equal(await page.getByRole('heading', { level: 1 }).count(), 1);
-    assert.ok((await page.locator('.seeker-flight').boundingBox()).y < height);
+    assert.ok((await page.locator('.orbital-scene img').boundingBox()).y < height);
     await shot(page, 'home-' + width);
 
-    const stages = page.locator('.theater [data-step]');
+    const stages = page.locator('[data-replay] [data-step]');
     await stages.nth(0).click();
     assert.equal(await stages.nth(0).getAttribute('aria-pressed'), 'true');
-    if (width === 1440) await shot(page.locator('.theater'), 'stage-register');
+    if (width === 1440) await shot(page.locator('[data-replay]'), 'stage-register');
     await stages.nth(0).press('ArrowRight');
-    await page.getByText('observation.recorded', { exact: true }).waitFor();
-    if (width === 1440) await shot(page.locator('.theater'), 'stage-execute');
+    await page.getByText('Runner allocated', { exact: true }).first().waitFor();
     await stages.nth(2).click();
-    assert.equal(await stages.nth(2).getAttribute('aria-pressed'), 'true');
-    await page.getByText('report.sealed', { exact: true }).waitFor();
-    assert.match(await page.locator('[data-trace-row][aria-current]').innerText(), /Receipt sealed/);
-    if (width === 1440 || width === 390) await shot(page.locator('.theater'), 'stage-verify-' + width);
+    await page.getByText('Wallet callback received', { exact: true }).first().waitFor();
+    if (width === 1440) await shot(page.locator('[data-replay]'), 'stage-execute');
+    await stages.nth(4).click();
+    assert.equal(await stages.nth(4).getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('[data-replay-state]').innerText(), 'Receipt verified');
+    assert.equal(await page.locator('[data-replay-value]').innerText(), '527,148,291');
+    if (width === 1440 || width === 390) await shot(page.locator('[data-replay]'), 'stage-verify-' + width);
 
     if (width === 390 || width === 1440) {
       await page.evaluate(() => window.scrollTo(0, 0));

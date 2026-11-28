@@ -320,3 +320,46 @@ fieldset, .empty, .email-auth form { border-color: var(--ui-strong); }
 
 input[type="checkbox"] { accent-color: var(--ui-primary); }
 .digest-copy { margin-top: 4px; }
+
+.console-header { background-color: var(--bg); box-shadow: 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
+.console-nav { gap: 1.35rem; }
+.console-nav a { min-height: 37px; transition: color 140ms var(--ease), background-color 140ms var(--ease), box-shadow 140ms var(--ease); }
+.console-nav a[aria-current] { box-shadow: inset 2px 0 var(--ui-focus), inset 0 0 0 1px color-mix(in srgb, var(--ink) 9%, transparent); }
+.page-title { gap: 4px; }
+.page-title h1 { letter-spacing: -.038em; }
+.panel { box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent); }
+.table-scroll :is(th,td) { vertical-align: middle; }
+.table-scroll thead th { background: color-mix(in srgb, var(--ink) 4%, var(--surface)); }
+.table-scroll :is(th,td):first-child { padding-inline-start: 9px; }
+.table-scroll tbody tr { transition: background-color 130ms var(--ease); }
+.table-scroll tbody tr:focus-within, .table-scroll tbody tr:hover { background: color-mix(in srgb, var(--ink) 5%, var(--surface)); }
+.button, .field :is(input,select,textarea) { transition: border-color 140ms var(--ease), background-color 140ms var(--ease), color 140ms var(--ease), transform 140ms var(--ease); }
+.button:active:not(:disabled) { transform: scale(.98); }
+.button[data-copied] { color: var(--ui-success); border-color: currentColor; }
+.digest-copy { display: flex; min-width: 100px; }
+.inline-status { border-inline-start-width: 3px; }
+.receipt-panel { box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 5%, transparent), inset 0 1px var(--ui-strong); }
+.timeline-panel .data-list li { position: relative; margin-inline-start: 4px; border-left-width: 1px; }
+.timeline-panel .data-list li::before { content: ""; position: absolute; top: 18px; left: -3px; width: 5px; height: 5px; border-radius: 50%; background: var(--ui-muted); }
+.timeline-panel .data-heading time { color: var(--ui-muted); font: 11px/1.45 var(--mono); }
+.workspace-loading { max-width: 620px; color: var(--muted); }
+.workspace-skeleton { display: grid; gap: 12px; padding: 16px; margin-top: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); }
+.workspace-skeleton i { display: block; height: 15px; border-radius: 3px; background: var(--raised); }
+.workspace-skeleton i:nth-child(2) { width: 76%; }
+.workspace-skeleton i:nth-child(3) { width: 58%; }
+@media (max-width: 767px) {
+  .console-nav a { min-height: 44px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .workspace-skeleton { animation: workspace-loading-in 180ms 140ms var(--ease) both; }
+  .inline-status, .evidence-preview, .auth-panel details[open] > form { animation: workspace-feedback 140ms var(--ease) both; }
+  @keyframes workspace-loading-in { from { opacity: 0; } }
+  @keyframes workspace-feedback { from { opacity: .55; transform: translateY(-3px); } }
+  @media (max-width: 767px) {
+    [data-mode="member"][data-navigation="open"] .console-nav { animation: console-drawer-in 190ms cubic-bezier(.17,.73,.27,1) both; }
+    @keyframes console-drawer-in { from { transform: translateX(-100%); } }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .button, .field :is(input,select,textarea), .console-nav a, .table-scroll tbody tr { transition: none; }
+}
