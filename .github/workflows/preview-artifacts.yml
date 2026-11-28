@@ -3,7 +3,7 @@ name: AGUS AI preview artifacts
 on:
   workflow_dispatch:
   push:
-    branches: [feature/phase-2-3-product]
+    branches: [feature/phase-2-3-product, release/hackathon-integrated]
     paths: ['.github/workflows/preview-artifacts.yml', 'scripts/product-preview/package.sh', 'apps/android/app/**', 'apps/android/native-preview/**', 'deploy/**']
 
 permissions:
