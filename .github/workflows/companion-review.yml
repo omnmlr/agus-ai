@@ -1,0 +1,40 @@
+name: Companion review APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/final-hackathon-experience]
+    paths: ['apps/android/**', 'scripts/android/companion-review*', '.github/workflows/companion-review.yml']
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build and verify Companion
+        run: |
+          set -euo pipefail
+          cd apps/android
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          ./gradlew --no-daemon assembleDebug assembleRelease testDebugUnitTest lintDebug
+          out="$RUNNER_TEMP/companion-review"
+          mkdir -p "$out"
+          cp app/build/outputs/apk/debug/app-debug.apk "$out/agus-companion-review.apk"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "$out/agus-companion-release-unsigned.apk"
+          cp app/build/reports/lint-results-debug.html "$out/"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$out/agus-companion-review.apk" > "$out/ANDROID-SIGNER.txt"
+          git rev-parse HEAD > "$out/REVISION.txt"
+          (cd "$out" && sha256sum ./*.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: agus-companion-review
+          path: ${{ runner.temp }}/companion-review/
+          if-no-files-found: error
+          retention-days: 30
