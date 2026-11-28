@@ -4,7 +4,7 @@
  */
 export default {
   origin: 'https://agusai.grindcity.app',
-  launchMode: 'demo', // demo | waitlist | available
+  launchMode: 'demo', // demo | waitlist | general
   waitlistUrl: '',
   contactUrl: '',
   privacyContactUrl: '',

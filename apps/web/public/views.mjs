@@ -48,7 +48,7 @@ export function account(user) {
 }
 
 const menu = {
-  workspace: ['◫', 'Overview'], builds: ['▤', 'Builds'], runs: ['▷', 'Test runs'],
+  workspace: ['◫', 'Overview'], projects: ['▱', 'Projects'], reports: ['▤', 'Reports and evidence'], funding: ['≋', 'Funding and settlement'], builds: ['▤', 'Builds'], runs: ['▷', 'Executions'],
   campaigns: ['◈', 'Campaigns'], devices: ['▯', 'Devices'], requests: ['↗', 'Private access'],
   inbox: ['◎', 'Inbox'], settings: ['⚙', 'Settings'], integrations: ['⌘', 'Integrations'],
 };
@@ -56,9 +56,9 @@ const menu = {
 export function navigation(page, user) {
   if (!user) return '';
   const groups = [
-    ['Workspace', ['workspace', 'builds', 'runs', 'campaigns']],
-    ['Access', ['devices', 'requests']],
-    ['Account', ['inbox', 'settings', 'integrations']],
+    ['Workspace', ['workspace', 'projects', 'builds', 'campaigns', 'runs']],
+    ['Results', ['reports']],
+    ['Manage', ['devices', 'requests', 'funding', 'inbox', 'settings', 'integrations']],
   ];
   return groups.map(([name, keys]) => `<div class="nav-group"><p>${name}</p>${keys.map(key => {
     const [icon, label] = menu[key];
@@ -67,12 +67,12 @@ export function navigation(page, user) {
 }
 
 export function authView(register, fromInvite = false) {
-  const heading = register ? 'Create an account' : 'Sign in';
+  const heading = register ? 'Create an account' : 'Sign in to AGUS AI';
   return `<div class="auth-layout">
     <div class="auth-intro">
-      <div class="auth-insignia" aria-hidden="true"><img src="/assets/mark.svg" width="52" height="52" alt=""></div>
+      <div class="auth-insignia" aria-hidden="true"><img src="/assets/orbital-ghost.webp" width="640" height="640" alt=""></div>
       <p>AGUS AI / DEVELOPER CONSOLE</p>
-      <h1>From build to evidence.</h1>
+      <h1>From build<br>to evidence.</h1>
       <p>Register your Android builds, commission testing, and review the execution record in one workspace.</p>
       <a href="/docs/quickstart">Read the quickstart <span aria-hidden="true">↗</span></a>
     </div>
@@ -88,7 +88,7 @@ export function authView(register, fromInvite = false) {
         <label class="field">Email<input name="email" type="email" required maxlength="254" autocomplete="email" spellcheck="false"></label>
         <label class="field">Password<input name="password" type="password" required minlength="12" maxlength="128" autocomplete="${register ? 'new-password' : 'current-password'}">${register ? '<small>Choose at least 12 characters.</small>' : ''}</label>
         ${register ? '<label class="field">Registration token<input name="registrationToken" maxlength="512" autocomplete="off" spellcheck="false"><small>Enter the token supplied by your preview coordinator if required.</small></label>' : ''}
-        <button type="submit" class="button button-primary">${heading}</button>
+        <button type="submit" class="button button-primary">${register ? 'Create an account' : 'Sign in'}</button>
       </form>
       <details class="email-auth">
         <summary>Use a one-time email code</summary>
@@ -116,9 +116,9 @@ function resourceTable(headings, rows) {
   </table></div>`;
 }
 
-export function workspaceView({ projects, builds }, buildsOnly = false) {
+export function workspaceView({ projects, builds, runs = [], campaigns = [], campaignsUnavailable }, buildsOnly = false) {
   const projectRows = projects.length ? resourceTable(['Project', 'Builds', 'Created'], projects.map(item =>
-    [escape(item.name), builds.filter(build => build.projectId === item.id).length, date(item.createdAt)]))
+    [`<a href="#projects/${encodeURIComponent(item.id)}">${escape(item.name)}</a>`, builds.filter(build => build.projectId === item.id).length, date(item.createdAt)]))
     : empty('Your projects will appear here.');
   const buildRows = builds.length ? resourceTable(['Build', 'Android package', 'SHA-256'], builds.map(item => [
     `${escape(item.name)}<small>${escape(projects.find(project => project.id === item.projectId)?.name ?? 'Project')}</small>`,
@@ -134,12 +134,44 @@ export function workspaceView({ projects, builds }, buildsOnly = false) {
   </form>` : '<p class="empty">Create a project in the <a href="#workspace">workspace overview</a> before uploading an APK.</p>';
   if (buildsOnly) return `${title('Builds', 'Register and inspect exact Android application builds.')}
     <div class="console-grid"><div>${panel('Registered APKs', buildRows)}</div><div>${panel('Upload an APK', buildForm)}</div></div>`;
-  const onboarding = !builds.length ? `<div class="onboarding"><div><h2>${projects.length ? 'Register your first APK' : 'Set up your first test'}</h2>
-    <p>${projects.length ? 'Choose an authorized Android build and enter its package name.' : 'Create a project to group APKs and the work you run against them.'}</p></div>
+  const onboarding = !builds.length ? `<div class="onboarding"><div><h2>${projects.length ? 'Register a build to start testing.' : 'Create your first project.'}</h2>
+    <p>${projects.length ? 'Choose an authorized Android build and enter its package name.' : 'Projects organize the application builds, tests, and campaigns you commission.'}</p></div>
     <a class="button button-outline" href="/docs/quickstart">Read the quickstart ↗</a></div>` : '';
   return `${title('Workspace overview', 'Manage projects and Android builds for your team’s test work.')}${onboarding}
-    <div class="console-grid"><div>${panel('Projects', projectRows)}${builds.length ? panel('Registered APKs', buildRows) : ''}</div>
+    <div class="console-grid"><div>${panel('Projects', projectRows)}${builds.length ? panel('Registered APKs', buildRows) : ''}
+    ${runs.length ? panel('Recent executions', runHistory(runs.slice(0,4))) : ''}
+    ${!campaignsUnavailable && campaigns.length ? panel('Recent campaigns', campaignListing(campaigns.slice(0,4))) : ''}</div>
     <div>${panel('Create a project', createProject)}${projects.length ? panel('Upload an APK', buildForm) : ''}</div></div>`;
+}
+
+function campaignListing(campaigns) {
+  return dataList(campaigns, campaign => `<li><div class="data-heading"><a href="#campaigns/${encodeURIComponent(campaign.id)}">${escape(campaign.revisions.at(-1).title)}</a>${badge(campaign.state)}</div></li>`, 'Campaigns appear here after you create a draft.');
+}
+
+export function projectsView({ projects, builds, runs }, selected) {
+  if (!selected) return `${title('Projects', 'Find the Android builds and execution records for each project.')}
+    ${projects.length ? panel('Owned projects', resourceTable(['Project','Builds', 'Executions'], projects.map(project => [
+      `<a href="#projects/${encodeURIComponent(project.id)}">${escape(project.name)}</a>`,
+      builds.filter(build => build.projectId === project.id).length, runs.filter(run => run.projectId === project.id).length,
+    ]))) : empty('Create your first project from the workspace overview.')}
+    <p><a class="button button-primary" href="#workspace">Create a project</a></p>`;
+  const project = projects.find(item => item.id === selected);
+  if (!project) return `${title('Project unavailable', 'This project could not be opened.')}<a href="#projects">Back to projects</a>`;
+  const ownedBuilds = builds.filter(build => build.projectId === project.id);
+  return `<a class="back-link" href="#projects">← Projects</a>${title(project.name, 'Application builds and execution history.')}
+    <div class="actions project-actions"><a class="button button-primary" href="#builds">Upload a build</a><a class="button button-outline" href="#runs">New execution</a></div>
+    ${panel('Application builds', dataList(ownedBuilds, build => `<li><strong>${escape(build.name)}</strong><p>${escape(build.packageName)}</p><code class="break-all">${escape(build.sha256)}</code></li>`, 'Register a build to use this project.'))}
+    ${panel('Executions', runHistory(runs.filter(run => run.projectId === project.id)))}`;
+}
+
+export function resultsView({ runs, campaigns, campaignsUnavailable }, funding = false) {
+  if (funding) return `${title('Funding and settlement', 'Open a funded campaign or eligible run to review its payment state.')}
+    ${panel('Campaign funding', campaignsUnavailable ? empty('Campaign funding is unavailable for this account or environment.') :
+      campaignListing(campaigns.filter(campaign => campaign.fundingState || campaign.revisions.at(-1).fundingAmountAtoms)))}
+    ${panel('Devnet executions', runHistory(runs.filter(run => run.paymentTerms?.kind === 'devnet')))}`;
+  return `${title('Reports and evidence', 'Review campaign findings or inspect evidence in an execution record.')}
+    ${panel('Campaign reports', campaignsUnavailable ? empty('Campaign reports are unavailable for this account or environment.') : campaignListing(campaigns))}
+    ${panel('Executions with a receipt', runHistory(runs.filter(run => run.receipt)))}`;
 }
 
 export function settingsView({ user, preferences }) {
@@ -153,7 +185,7 @@ export function settingsView({ user, preferences }) {
       <label><input type="checkbox" name="completedRuns"${preferences.completedRuns ? ' checked' : ''}> Completed test runs</label>
       <label><input type="checkbox" name="campaignUpdates"${preferences.campaignUpdates ? ' checked' : ''}> Campaign updates</label>
       <button class="button button-primary" type="submit">Save preferences</button>
-    </form>`)}${panel('Privacy', '<p>Review training consent on eligible campaign assignments. See the <a href="/privacy">Privacy Policy</a> for account data requests.</p>')}</div></div>`;
+    </form>`)}${panel('Privacy', '<p>Review training consent on eligible executions and campaign assignments. See the <a href="/privacy">Privacy Policy</a> for account data requests.</p>')}</div></div>`;
 }
 
 export function inboxView(notifications) {
@@ -194,7 +226,7 @@ function transactionFields(visible = false) {
 }
 
 function evidenceFields(note) {
-  return `<fieldset><legend>Requested evidence</legend><label><input type="checkbox" name="screenshots"> Workload screenshots</label><label><input type="checkbox" name="logs"> Workload logs</label><small class="subtle">${escape(note)}</small></fieldset>`;
+  return `<fieldset><legend>Requested evidence</legend><label><input type="checkbox" name="screenshots"> Workload screenshots</label><label><input type="checkbox" name="logs"> Workload logs</label><label hidden><input type="checkbox" name="trajectory" disabled> Allow collection of a scoped action trajectory</label><small class="subtle">${escape(note)}</small></fieldset>`;
 }
 
 export function runHistory(runs, selected, { query = '', status = '' } = {}) {
@@ -237,7 +269,7 @@ const signatureReference = (signature, network) => {
   return `<a href="https://explorer.solana.com/tx/${encodeURIComponent(signature)}?cluster=devnet" target="_blank" rel="noopener noreferrer">View Devnet transaction</a>`;
 };
 
-export function runDetail(run, events, runActions = []) {
+export function runDetail(run, events, runActions = [], consent) {
   const receipt = run.receipt;
   const verification = run.verification;
   const evidence = receipt?.evidence || receipt?.report?.evidence;
@@ -269,10 +301,22 @@ export function runDetail(run, events, runActions = []) {
     return `<li><div class="data-heading"><strong>${escape(name)}</strong>${canDownload ? `<div class="actions">${previewLabel ? `<button type="button" class="button button-outline" data-action="preview-evidence" data-sha="${hash}" data-kind="${previewLabel}" data-filename="${escape(filename)}">View ${previewLabel}</button>` : ''}<button type="button" class="button button-outline" data-action="download-evidence" data-sha="${hash}" data-filename="${escape(filename)}">Download</button></div>` : ''}</div><p class="mono break-all">${escape(hash || 'Digest unavailable')}</p></li>`;
   }, 'No evidence files are attached to the receipt yet.');
   const eventRows = dataList(events, (event) => `<li><div class="data-heading"><strong>${escape(label(event.type))}</strong><time datetime="${escape(event.at)}">${date(event.at)}</time></div>${event.data && Object.keys(event.data).length ? detail('Event details', event.data) : ''}</li>`, 'No events received yet.');
-  const agent = run.mode === 'agent' ? panel('Agent actions', dataList(runActions, action => `
+  const canAct = run.mode === 'agent' && run.state === 'running' && !run.receipt && runActions.length < 80
+    && !runActions.some(action => action.state === 'queued' || (action.type === 'finish' && action.state === 'completed'));
+  const targets = (runActions.at(-1)?.observation?.actions ?? []).filter(action => action.type === 'tap' && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(action.args?.target));
+  const tools = canAct ? `<div class="actions agent-tools">
+    <button class="button button-outline" type="button" data-action="agent-step" data-type="describe">Describe approved controls</button>
+    ${targets.map(action => `<button class="button button-outline" type="button" data-action="agent-step" data-type="tap" data-target="${escape(action.args.target)}">Tap ${escape(action.args.target)}</button>`).join('')}
+    <button class="button button-outline" type="button" data-action="agent-step" data-type="finish">Finish evaluation</button></div>` : '';
+  const agent = run.mode === 'agent' ? panel('Agent actions', tools + dataList(runActions, action => `
     <li><div class="data-heading"><strong>${escape(action.type)}</strong>${badge(action.state ?? action.status)}</div>
+    ${action.selectedBy ? `<p>Selected by ${escape(action.selectedBy)}</p>` : ''}
     ${detail('Action record', action)}</li>`, 'No recorded actions for this run.'), 'timeline-panel') : '';
-  return `<section class="panel">${result}</section>${agent}${signedReceipt}${panel('Evidence files', evidenceRows)}${panel('Execution timeline', eventRows, 'timeline-panel')}`;
+  const training = consent ? panel('Training consent', `<p>Exporting the redacted trajectory requires a separate grant from each participant.</p>
+    <dl class="data-pairs run-summary">${pair('Developer', consent.developer ? 'Granted' : 'Pending')}${pair('Provider', consent.provider ? 'Granted' : 'Pending')}</dl>
+    <div class="actions"><button type="button" class="button button-outline" data-action="${consent.developer ? 'run-training-withdraw' : 'run-training-grant'}">${consent.developer ? 'Withdraw training consent' : 'Grant training consent'}</button>
+    ${consent.developer && consent.provider ? '<button class="button button-outline" type="button" data-action="run-training-export">Download redacted trajectory</button>' : ''}</div>`) : '';
+  return `<section class="panel">${result}</section>${agent}${signedReceipt}${training}${panel('Evidence files', evidenceRows)}${panel('Execution timeline', eventRows, 'timeline-panel')}`;
 }
 
 const duration = (milliseconds) => Number.isFinite(milliseconds) ? `${(milliseconds / 1_000).toFixed(2)} s` : 'Unavailable';
@@ -283,14 +327,29 @@ export function runComparison(runs, selectedRun) {
   return panel('Compare agent runs', peers.length > 1 ? dataList(peers, (run) => `<li><div class="data-heading"><a href="#runs/${encodeURIComponent(run.id)}">${date(run.createdAt)}</a>${badge(run.state)}</div><p>${duration(run.verification.durationMs)} · ${escape(run.verification.actionMetrics.actionCount)} actions · ${escape(run.verification.actionMetrics.invalidActions)} invalid</p></li>`, '') : empty('Complete at least two agent-driven runs for this build and scenario to compare outcomes.'));
 }
 
+export function decimalAtoms(value, decimals) {
+  const atoms = String(value ?? '');
+  if (!/^\d+$/.test(atoms) || !Number.isInteger(decimals) || decimals < 0 || decimals > 20) return null;
+  if (decimals === 0) return atoms;
+  const padded = atoms.padStart(decimals + 1, '0');
+  const fraction = padded.slice(-decimals).replace(/0+$/, '');
+  return padded.slice(0, -decimals) + (fraction ? '.' + fraction : '');
+}
+
 export function paymentView(payment, unavailable, run) {
-  if (!payment && ['private', 'marketplace'].includes(run?.allocation)) return panel('Payout terms', empty('This workload has unpaid preview terms.'), 'payment-panel');
+  if (!payment && (run?.allocation === 'private' || run?.paymentTerms?.kind === 'unpaid'
+    || (run?.allocation === 'marketplace' && !run.paymentTerms))) {
+    return panel('Payout terms', empty('This workload has unpaid preview terms.'), 'payment-panel');
+  }
   if (unavailable) return panel('Devnet settlement', empty(unavailable), 'payment-panel');
+  if (!payment && run?.paymentTerms?.kind === 'devnet' && run.allocation === 'marketplace') {
+    return panel('Devnet settlement', empty('Funding state is unavailable. Refresh the run to check again.'), 'payment-panel');
+  }
   const state = payment?.state;
   const quote = payment?.quote;
   const quoteForm = `<form id="quote-form" class="form-stack"><label class="field">Developer Devnet wallet<input name="developerWallet" required maxlength="44" autocomplete="off"></label><button type="submit" class="button button-primary">Request quote</button></form>`;
   const fundingForm = `<form id="funding-form" class="form-stack"><label class="field">Devnet funding signature<input name="signature" required maxlength="90" autocomplete="off"><small>Submit the finalized transaction signature after funding from the quoted wallet.</small></label><button type="submit" class="button button-primary">Verify funding</button></form>`;
-  const quoteSummary = quote ? `<dl class="data-pairs run-summary">${pair('Asset mint', quote.mint)}${pair('Amount', `${quote.amountAtoms} atomic units · ${quote.asset}`)}${pair('Token decimals', quote.decimals)}${pair('Deposit wallet', quote.deposit?.wallet)}${pair('Deposit token account', quote.deposit?.tokenAccount)}${pair('Funding memo', quote.funding?.memo)}${pair('Expires', formattedDate(quote.expiresAt))}</dl>` : '';
+  const quoteSummary = quote ? `<dl class="data-pairs run-summary">${pair('Asset mint', quote.mint)}${pair('Amount', `${decimalAtoms(quote.amountAtoms, quote.decimals) ?? 'Unavailable'} ${quote.asset} · ${quote.amountAtoms} atoms`)}${pair('Token decimals', quote.decimals)}${pair('Deposit wallet', quote.deposit?.wallet)}${pair('Deposit token account', quote.deposit?.tokenAccount)}${pair('Funding memo', quote.funding?.memo)}${pair('Expires', formattedDate(quote.expiresAt))}</dl>` : '';
   const link = (name, signature) => `<p class="check-line">${name} · ${signatureReference(signature, 'devnet')}</p>`;
   const funding = payment?.funding?.signature ? link('Funding receipt', payment.funding.signature) : '';
   const settlement = payment?.settlement?.signature ? link('Settlement transaction', payment.settlement.signature) : '';

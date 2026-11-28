@@ -107,6 +107,11 @@ try {
   await cdp('Page.navigate', { url: origin + '/console.html' });
   await wait("document.querySelector('#auth-form')");
   await capture('auth-desktop');
+  await cdp('Page.navigate', { url: origin + '/invite/' + 'a'.repeat(43) });
+  await wait("location.hash.startsWith('#invite/') && document.querySelector('#auth-form')");
+  assert.equal(await run("document.body.innerText.includes('received this private invitation')"), true);
+  await cdp('Page.navigate', { url: origin + '/console.html' });
+  await wait("document.querySelector('#auth-form') && !location.hash");
   await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: false });
   await capture('auth-mobile');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 940, deviceScaleFactor: 1, mobile: false });
@@ -137,8 +142,14 @@ try {
   evidence.push('Unavailable Google entry, denied uninvited signup, invited registration, project creation and APK upload passed');
   await capture('console-overview');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: false });
-  assert.equal(await run('document.documentElement.scrollWidth'), 390);
+  assert.equal(await run('document.documentElement.scrollWidth - document.documentElement.clientWidth'), 0);
   await capture('console-mobile');
+  await click('#console-menu');
+  assert.equal(await run("document.querySelector('#console-menu').getAttribute('aria-expanded')"), 'true');
+  await capture('console-drawer');
+  await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+  await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape' });
+  await wait("document.querySelector('#console-menu').getAttribute('aria-expanded') === 'false'");
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 940, deviceScaleFactor: 1, mobile: false });
   await click('a[href="#campaigns"]');
   await wait("document.querySelector('#campaign-form')");
@@ -156,7 +167,13 @@ try {
   await fill('[data-campaign-task]:last-child [name=instructions]', 'Open the approved release build.');
   await click('#campaign-form button[type=submit]');
   await wait("document.querySelector('[data-operation=launch]')");
+  await fill('#campaign-form [name=objective]', 'Reproduce onboarding behavior and review structured findings');
+  await click('#campaign-form button[type=submit]');
+  await wait("document.body.innerText.includes('Revision 2')");
   await capture('campaign-draft');
+  await run("const theme = document.querySelector('[data-theme-control]'); theme.value = 'dark'; theme.dispatchEvent(new Event('change', { bubbles: true }))");
+  await capture('campaign-draft-dark');
+  await run("const themeReset = document.querySelector('[data-theme-control]'); themeReset.value = 'light'; themeReset.dispatchEvent(new Event('change', { bubbles: true }))");
   await click('[data-operation=launch]');
   await wait("document.querySelector('[data-operation=pause]')");
   assert.equal(await run("document.body.innerText.includes('0/1 measured')"), true);
@@ -165,14 +182,39 @@ try {
   await wait("document.querySelector('[data-operation=resume]')");
   await click('[data-operation=resume]');
   await wait("document.querySelector('[data-operation=pause]')");
-  evidence.push('Mixed campaign draft, publish, coverage, dedicated link, pause and resume passed');
+  evidence.push('Mixed campaign draft, saved revision, publish, coverage, dedicated link, pause and resume passed');
   const campaignHash = await run('location.hash');
   await click('a[href="#runs"]');
   await wait("document.querySelector('#run-form')");
   await wait("document.querySelector('#run-form [name=buildId]')?.options.length > 1");
   await run("document.querySelector('#run-form [name=buildId]').selectedIndex = 1");
+  const countRuns = () => run("fetch('/api/v1/runs',{headers:{Authorization:'Bearer '+JSON.parse(sessionStorage.getItem('agus-console-session')).token}}).then(response=>response.json()).then(result=>result.runs.length)");
+  const startingRuns = await countRuns();
+  let droppedResponse = false;
+  const dropOnce = async ({ data }) => {
+    const { method, params } = JSON.parse(data);
+    if (method !== 'Fetch.requestPaused') return;
+    try {
+      if (!droppedResponse && params.request.method === 'POST' && params.responseStatusCode === 201) {
+        droppedResponse = true;
+        await cdp('Fetch.failRequest', { requestId: params.requestId, errorReason: 'Failed' });
+      } else {
+        await cdp('Fetch.continueRequest', { requestId: params.requestId });
+      }
+    } catch { /* A disabled interception detaches any paused request. */ }
+  };
+  socket.addEventListener('message', dropOnce);
+  await cdp('Fetch.enable', { patterns: [{ urlPattern: '*/api/v1/runs', requestStage: 'Response' }] });
+  await click('#run-form button[type=submit]');
+  await wait("document.querySelector('#notice [role=alert]')?.textContent.includes('result is unknown')");
+  await cdp('Fetch.disable');
+  socket.removeEventListener('message', dropOnce);
+  assert.equal(droppedResponse, true);
+  assert.equal(await countRuns(), startingRuns + 1);
   await click('#run-form button[type=submit]');
   await wait("document.querySelector('#run-detail')?.innerText.includes('Queued')");
+  assert.equal(await countRuns(), startingRuns + 1);
+  evidence.push('Retry after a dropped successful create response reused its idempotency key and kept one run');
   await wait("document.querySelector('#payment-detail')?.innerText.includes('unpaid preview terms')");
   const queuedHash = await run('location.hash');
   await capture('test-run-detail');
@@ -243,6 +285,10 @@ try {
   assert.equal(verified.buildSha256, digest(artifact));
   assert.equal(verified.cleanupConfirmed, true);
   evidence.push('Downloaded receipt verified independently with the pinned manifest key');
+  await click('[data-action=download-campaign-report]');
+  const report = await until(async () => JSON.parse(await readFile(join(directory, 'agus-campaign-report.json'), 'utf8')),
+    'Browser did not download the campaign report');
+  assert.equal(report.acceptedTestUnits, 5);
   // The separate test account is authorized as the independent quote reviewer.
   const buyer = JSON.parse(await run("sessionStorage.getItem('agus-console-session')"));
   control.config.pilot.reviewerIds.add(contributor.user.id);
@@ -289,7 +335,14 @@ try {
   await click('#preferences-form button[type=submit]');
   await wait("document.querySelector('#notice')?.innerText.includes('Notification preferences saved')");
   assert.equal((await request('GET', '/me/notifications/preferences', { credential: rotatedToken })).preferences.campaignUpdates, false);
-  await capture('settings');
+  await run("const theme = document.querySelector('[data-theme-control]'); theme.value = 'dark'; theme.dispatchEvent(new Event('change', { bubbles: true }))");
+  await wait("document.documentElement.dataset.theme === 'dark'");
+  await capture('settings-dark');
+  await cdp('Page.reload');
+  await wait("document.documentElement.dataset.theme === 'dark' && document.querySelector('#preferences-form')");
+  await run("const lightTheme = document.querySelector('[data-theme-control]'); lightTheme.value = 'light'; lightTheme.dispatchEvent(new Event('change', { bubbles: true }))");
+  await wait("document.documentElement.dataset.theme === 'light'");
+  await capture('settings-light');
   await click('a[href="#inbox"]');
   await wait("document.querySelector('#screen h1')?.textContent === 'Inbox'");
   evidence.push('Tenant isolation, session rotation and invalidation, profile and inbox preferences passed');

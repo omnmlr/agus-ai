@@ -80,13 +80,21 @@ console.log(data.projects);`, 'JavaScript')}
     ${snippet('node packages/developer-client/src/cli.mjs verify-native-receipt receipt.json manifest.public.b64')}
     <p>Compare the resulting assignment ID, attempt ID and build digest with the intended session. Receipt verification authenticates scoped claims and cleanup evidence when present.</p></section>
     <section><h2>Check Solana outcomes</h2><p>For supported wallet scenarios, compare the independent RPC judgment with the expected network and transaction effect. Campaign funding, dedicated settlement, and SAS issuance use distinct workflows. Treat a pending or unknown signature as unresolved.</p></section>`],
-  '/404': ['Page not found', 'This page is out of scope.', 'The address may have changed. Return home, open the documentation, or go to your console.', `<div class="page-actions"><a class="site-button primary" href="/">Return home</a><a class="site-button secondary" href="/docs">Open documentation</a></div>`],
+  '/404': ['Page not found', 'This page couldn’t be found.', 'The address may have changed. Return home, open the documentation, or go to your console.', `<div class="page-actions"><a class="site-button primary" href="/">Return home</a><a class="site-button secondary" href="/docs">Open documentation</a></div>`],
 };
 
 export function publicArticles(config) {
   const { contributorDownloadUrl, contactUrl, privacyContactUrl } = config;
   const pages = { ...articles };
+  if (config.launchMode === 'general') {
+    pages['/pricing'] = [...articles['/pricing']];
+    pages['/pricing'][2] = 'Contact AGUS AI for current product and campaign options.';
+  }
   pages['/contributors'] = [...articles['/contributors']];
+  if (config.launchMode === 'waitlist') {
+    pages['/contributors'][2] = 'See how Android testing and scoped contributor work will be available as access expands.';
+    pages['/contributors'][3] += '<section><h2>Availability</h2><p><a href="/availability">Check launch updates</a> for the current access options.</p></section>';
+  }
   pages['/contributors'][3] += `<section><h2>Android companion</h2>${contributorDownloadUrl
     ? `<p><a class="site-button primary" href="${escapeHtml(contributorDownloadUrl)}">Download the Android companion</a></p>`
     : `<p>Ask your preview coordinator for an approved APK and checksum. Follow the <a href="${repository.replace("/tree/", "/blob/")}/docs/phase-2-3/artifact-installation.md">preview installation guide</a> with that artifact.</p>`}</section>`;

@@ -1,4 +1,4 @@
-import { escape } from './views.mjs';
+import { decimalAtoms, escape } from './views.mjs';
 
 const e = escape;
 const options = (values, selected) => values.map(([value, title]) =>
@@ -122,7 +122,11 @@ const transition = (action, label) => `<button type="button" class="button butto
   data-action="campaign-transition" data-operation="${action}">${label}</button>`;
 
 const assetLabel = network => network.cluster === 'devnet' ? 'Devnet test USDC' : 'Localnet test SPL';
-const transfer = (value, network) => `<p>${e(value.amountAtoms)} atoms · ${e(assetLabel(network))} · ${e(value.state.replaceAll('_', ' '))}</p>
+const amount = (atoms, network) => {
+  const decimal = decimalAtoms(atoms, network.decimals);
+  return decimal === null ? `${atoms} atoms · ${assetLabel(network)}` : `${decimal} ${assetLabel(network)} · ${atoms} atoms`;
+};
+const transfer = (value, network) => `<p>${e(amount(value.amountAtoms, network))} · ${e(value.state.replaceAll('_', ' '))}</p>
   ${value.signature ? `<p>Signature <code>${e(value.signature)}</code></p>` : ''}
   ${value.reason ? `<p>${e(value.reason.replaceAll('_', ' '))}</p>` : ''}`;
 
@@ -133,7 +137,7 @@ function fundingPanel(campaign, escrow, fundingNetwork) {
   const network = quote?.network ?? fundingNetwork;
   const canRequest = campaign.state === 'draft' && !quote && fundingNetwork;
   return `<section class="panel"><h2>Campaign funding</h2>
-    ${network ? `<p>${e(revision.fundingAmountAtoms)} atoms · ${e(assetLabel(network))}</p>` : ''}
+    ${network ? `<p>${e(amount(revision.fundingAmountAtoms, network))}</p>` : ''}
     ${canRequest ? `<p>Verify the developer’s account wallet in the companion before requesting the quote. Quoting locks the revision.</p>
       <button class="button button-outline" type="button" data-action="campaign-funding-quote">Quote and lock this revision</button>` : ''}
     ${quote ? `<p>Revision <code>${e(quote.revisionSha256)}</code></p><p>Funding wallet <code>${e(quote.funder)}</code></p>
@@ -208,7 +212,8 @@ export function campaignsView({ campaigns, projects = [], builds = [], report, u
       ${campaign.state === 'active' ? transition('pause', 'Pause new allocations') : campaign.state === 'paused' ? transition('resume', 'Resume allocations') : ''}
       ${['active', 'paused'].includes(campaign.state) ? transition('complete', 'Complete campaign') : ''}
       ${!['cancelled', 'completed'].includes(campaign.state) ? transition('cancel', 'Cancel campaign') : ''}
-      <button type="button" class="button button-outline" data-action="retry">Refresh report</button></div>
+      <button type="button" class="button button-outline" data-action="retry">Refresh report</button>
+      <button type="button" class="button button-outline" data-action="download-campaign-report">Download report</button></div>
       <h3>Coverage by task</h3><ul class="data-list">${report.cells.map(cell =>
         `<li>${e(campaign.revisions.at(-1).tasks[cell.taskIndex].title)} · ${cell.measured}/${cell.planned} measured,
           ${cell.accepted} accepted, ${cell.failed} failed, ${cell.blocked} blocked, ${cell.unverified} unverified, ${cell.missing} missing</li>`).join('')}</ul>

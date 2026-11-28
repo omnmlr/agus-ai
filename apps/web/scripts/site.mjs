@@ -3,18 +3,25 @@ import settings from '../site.config.mjs';
 import { escapeHtml as e, publicArticles, repository, source } from './content.mjs';
 import { home } from './home.mjs';
 
-const sections = [
-  ['Product', '/product'], ['Developers', '/developers'], ['Documentation', '/docs'], ['Contributors', '/contributors'],
+const products = [
+  ['Mobile testing', '/#mobile-testing'], ['Agent evaluation', '/#agent-evaluation'],
+  ['Human intelligence', '/#human-intelligence'], ['Verifiable execution', '/#verification'],
 ];
+const developerLinks = [
+  ['Documentation', '/docs'], ['Quickstart', '/docs/quickstart'],
+  ['API reference', '/docs/api'], ['SDK and integrations', '/docs/integrations'],
+];
+const sections = [['Documentation', '/docs'], ['Contributors', '/contributors'], ['Pricing', '/pricing']];
 const guides = [
   ['Documentation home', '/docs'], ['Quickstart', '/docs/quickstart'], ['Campaigns', '/docs/campaigns'],
   ['Integrations and SDK', '/docs/integrations'], ['Evidence verification', '/docs/evidence'], ['API reference', '/docs/api'],
 ];
 const footerLinks = [
-  ['Product', [['Android testing', '/product#android'], ['Agent evaluation', '/product#agents'], ['Human testing', '/product#humans'], ['Solana assurance', '/product#solana']]],
-  ['Developers', [['Documentation', '/docs'], ['Quickstart', '/docs/quickstart'], ['API reference', '/docs/api'], ['Developer console', '/console.html']]],
-  ['Company', [['About', '/about'], ['Contact', '/contact'], ['Pricing', '/pricing'], ['Help', '/help']]],
-  ['Network', [['Contributors', '/contributors'], ['GitHub', source]]],
+  ['Product', products],
+  ['Developers', [['Quickstart', '/docs/quickstart'], ['API reference', '/docs/api'], ['SDK', '/docs/integrations'], ['Console', '/console.html']]],
+  ['Contributors', [['How it works', '/contributors']]],
+  ['Company', [['About', '/about'], ['Contact', '/contact'], ['Pricing', '/pricing'], ['Help', '/help'], ['GitHub', source]]],
+  ['Legal', [['Privacy Policy', '/privacy'], ['Terms of Service', '/terms']]],
 ];
 
 function optionalUrl(key, protocols) {
@@ -32,43 +39,51 @@ const config = {
   contributorDownloadUrl: optionalUrl('contributorDownloadUrl', ['https:']),
   waitlistUrl: optionalUrl('waitlistUrl', ['https:']),
 };
-if (!['demo', 'waitlist', 'available'].includes(config.launchMode)) throw new Error('Invalid public launch mode');
+if (!['demo', 'waitlist', 'general'].includes(config.launchMode)) throw new Error('Invalid public launch mode');
 const action = config.launchMode === 'waitlist'
   ? config.waitlistUrl ? ['Join the waitlist', config.waitlistUrl] : ['View launch updates', '/availability']
-  : ['Open console', '/console.html'];
-const cta = `<a class="site-button primary" href="${e(action[1])}">${action[0]} <span aria-hidden="true">↗</span></a>`;
+  : ['Start building', '/console.html'];
+const cta = `<a class="site-button primary" href="${e(action[1])}">${action[0]} <span class="action-arrow" aria-hidden="true"></span></a>`;
 
-const brand = `<a class="site-brand" href="/" aria-label="AGUS AI home"><img src="/assets/mark.svg" width="32" height="32" alt="">AGUS <span>AI</span></a>`;
+const darkLockup = '<img class="brand-dark" src="/assets/brand-lockup-dark.svg" width="145" height="34" alt="AGUS AI">';
+const lightLockup = '<img class="brand-light" src="/assets/brand-lockup-light.svg" width="145" height="34" alt="AGUS AI">';
+const brand = `<a class="site-brand" href="/" aria-label="AGUS AI home">${darkLockup}${lightLockup}</a>`;
+const themeControl = '<label class="workspace-theme"><span>Theme</span><select aria-label="Color theme" data-theme-control><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>';
 
 function links(items, path) {
   return items.map(([label, href]) => `<a href="${e(href)}"${href === path ? ' aria-current="page"' : ''}>${e(label)}</a>`).join('');
 }
 
-function header(path) {
+function header(path, workspace) {
+  const menu = (name, linksList) => `<details class="nav-menu"><summary>${name}</summary><div>${links(linksList, path)}</div></details>`;
+  const navItems = `${menu('Product', products)}${menu('Developers', developerLinks)}${links(sections, path)}`;
+  const actions = `<a href="/console.html">Sign in</a>${workspace ? themeControl : cta}`;
   return `<header class="site-header"><div class="shell site-nav">${brand}
-    <nav class="desktop-nav" aria-label="Primary">${links(sections, path)}</nav>
-    <div class="nav-actions"><a href="/console.html">Sign in</a>${cta}</div>
+    <nav class="desktop-nav" aria-label="Primary">${navItems}</nav>
+    <div class="nav-actions">${actions}</div>
     <details class="mobile-menu"><summary aria-label="Open navigation"><span></span><span></span></summary>
-      <nav aria-label="Mobile navigation">${links(sections, path)}<a href="/console.html">Sign in</a>${cta}</nav>
+      <nav aria-label="Mobile navigation">${navItems}${actions}</nav>
     </details>
   </div></header>`;
 }
 
 const footer = `<footer class="site-footer"><div class="shell">
-  <div class="footer-content"><div>${brand}<p>Android testing, agent evaluation,<br>and evidence for release teams.</p></div>
+  <div class="footer-content"><div>${brand}<p>Mobile intelligence infrastructure.</p></div>
     ${footerLinks.map(([label, items]) => `<div class="footer-links"><h2>${label}</h2>${links(items)}</div>`).join('')}
   </div>
+  <div class="footer-mark" aria-hidden="true"><img src="/assets/brand-wordmark-dark.svg" width="460" height="85" alt=""></div>
   <div class="footer-end"><span>© AGUS AI</span><div>${links([['Privacy Policy', '/privacy'], ['Terms of Service', '/terms']])}</div></div>
 </div></footer>`;
 
 function page({ path, title, description, content, className = '' }) {
+  const workspace = path === '/docs' || path.startsWith('/docs/');
   const canonical = config.origin + (path === '/' ? '/' : path);
   return `<!doctype html>
-<html lang="en">
+<html lang="en"${workspace ? ' data-workspace' : ''}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#121511">
+<meta name="theme-color" content="#080809">
 <title>${e(title)}</title>
 <meta name="description" content="${e(description)}">
 ${path === '/404' ? '<meta name="robots" content="noindex, follow">' : `<link rel="canonical" href="${e(canonical)}">`}
@@ -82,14 +97,15 @@ ${path === '/404' ? '<meta name="robots" content="noindex, follow">' : `<link re
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="AGUS AI. Android testing infrastructure for release teams.">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
-<link rel="preload" href="/assets/instrument-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="/assets/agus-orbital-mark.png" type="image/png">
+<link rel="preload" href="/assets/geist.woff2" as="font" type="font/woff2" crossorigin>
+${workspace ? '<script src="/theme.js"></script><link rel="stylesheet" href="/theme.css">' : ''}
 <link rel="stylesheet" href="/site.css">
 <script type="module" src="/site.mjs"></script>
 </head>
 <body class="${className}">
 <a class="skip" href="#main">Skip to content</a>
-${header(path)}
+${header(path, workspace)}
 <main id="main" tabindex="-1">${content}</main>
 ${footer}
 </body>
@@ -147,7 +163,7 @@ export function generatedAssets() {
   files.set('/index.html', page({
     path: '/', title: 'AGUS AI · Android testing and execution evidence',
     description: 'Test Android apps, evaluate agents, and bring human feedback into the same workflow. Inspect signed execution evidence and supported Solana outcomes.',
-    content: home(cta, config.launchMode), className: 'home-page',
+    content: home(cta), className: 'home-page',
   }));
   for (const [path, body] of Object.entries(articles)) files.set(path + '.html', article(path, body));
   files.set('/robots.txt', `User-agent: *\nDisallow: /console.html\nDisallow: /api/\nDisallow: /invite\nSitemap: ${config.origin}/sitemap.xml\n`);
