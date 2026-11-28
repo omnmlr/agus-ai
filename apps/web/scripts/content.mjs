@@ -1,0 +1,116 @@
+export const source = 'https://github.com/omnmlr/agus-ai';
+export const repository = source + '/tree/feature/phase-2-3-product';
+
+export const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+})[char]);
+
+export function snippet(code, language = 'Shell') {
+  return `<div class="snippet"><div><span>${escapeHtml(language)}</span><button type="button" data-copy>Copy</button></div><pre><code>${escapeHtml(code)}</code></pre></div>`;
+}
+
+const docsLink = (fragment, label) => `<a href="/docs/${fragment}">${label}</a>`;
+const repo = (path, label) => `<a href="${repository}/${path}">${label}</a>`;
+const articles = {
+  '/product': ['Product', 'Android testing, from execution to evidence.', 'Scope the work, follow the execution, and inspect the evidence before deciding what to ship.', `
+    <section id="android"><h2>Android testing</h2><p>Register the exact APK and choose a supported scenario, such as app launch or wallet authorization. A dedicated runner checks the local build approval and device lease before it starts. Use an eligible listed environment or a private invitation to a specific device.</p></section>
+    <section id="agents"><h2>Agent evaluation</h2><p>Compare observed outcomes from scripted scenarios and bounded agent actions. Inspect the event stream and, where available, model provenance. A campaign can reference a sealed agent run for an authorized human correction.</p></section>
+    <section id="humans"><h2>Human testing and corrections</h2><p>Specify objectives, approved builds, instructions and coverage in a campaign. Review structured findings from qualified contributors and request revisions when needed. Training exports require a separate grant from each party for the exact assignment.</p></section>
+    <section id="solana"><h2>Solana application assurance</h2><p>Exercise wallet connection or a scoped transfer using disposable test identities. Inspect independently checked chain effects for supported scenarios and download the signed report. Eligible funded campaigns can reconcile test-chain amounts separately from nontransferable test units.</p></section>
+    <section id="infrastructure"><h2>Developer infrastructure</h2><p>Use the console, API, CLI, or bounded MCP tools to integrate supported tasks into your release workflow. Start with the ${docsLink('quickstart', 'developer quickstart')}.</p></section>`],
+  '/developers': ['Developers', 'Build AGUS AI into your release workflow.', 'Use the web console to manage the work, or use the API and developer client to integrate it.', `
+    <section><h2>Start a run</h2><p>Set up a project, register an APK, then run a supported scenario on an authorized device.</p><a href="/docs/quickstart">Follow the quickstart</a></section>
+    <section><h2>Integrate</h2><p>Use scoped bearer sessions from the HTTP API, the typed client, the CLI, or the scenario-scoped MCP toolset.</p><a href="/docs/integrations">Read the integration guide</a></section>
+    <section><h2>Review results</h2><p>Read execution and evaluation states separately. Check which observations and evidence the test produced.</p><a href="/docs/evidence">Inspect evidence</a></section>`],
+  '/contributors': ['Contributors', 'Help teams see how their apps behave.', 'Take part in approved Android testing, structured issue reproduction, or scoped agent corrections.', `
+    <section><h2>How to participate</h2><ol><li>Get the AGUS AI Android companion from your preview coordinator.</li><li>Sign in with your approved account and follow the device or qualification setup for your role.</li><li>Review the scope, device requirements, and compensation terms before accepting work.</li><li>Follow the test instructions and submit the evidence requested for that assignment.</li></ol></section>
+    <section><h2>Device and participation controls</h2><p>Work can require a supported Android environment, an active availability window, explicit consent and an approved build. You can decline eligible offers. The work session exposes stop controls and reports cleanup separately.</p></section>
+    <section><h2>Compensation</h2><p>Review the terms of each offer. Preview work can be unpaid, use nontransferable test units, or use configured test-chain settlement. Check the assignment and payment state for the amount actually reviewed or finalized.</p></section>`],
+  '/about': ['About', 'Software assurance grounded in execution.', 'AGUS AI brings Android environments, automated agents and human contributors into one developer workflow.', `
+    <section><h2>What we are building</h2><p>Release teams need to know which build was exercised, what a test observed, and whether the result can be reproduced. AGUS AI connects those questions to scoped execution and reviewable evidence.</p></section>
+    <section><h2>Who it is for</h2><p>Mobile engineering and QA teams, developers of Solana applications, teams evaluating AI agents, and contributors who want to help test software.</p><a href="/product">Explore the product</a></section>`],
+  '/pricing': ['Pricing', 'Pricing is coming soon.', 'Access during the private preview is arranged with the preview team.', `
+    <section><h2>Campaign compensation</h2><p>Compensation terms belong to the individual campaign and appear before work is accepted. Configured test-chain amounts and nontransferable test units are tracked separately.</p><a href="/contact">See contact options</a></section>`],
+  '/help': ['Help', 'Answers for the first test.', 'Find help with accounts, builds, device access, and evidence.', `
+    <section><h2>How do I access the preview?</h2><p>Use your approved account. If registration requires a token, enter the token issued by your preview coordinator. Available sign-in methods depend on the environment.</p></section>
+    <section><h2>Why can’t I run my APK?</h2><p>Check the assigned project and package, the exact SHA-256, device eligibility and runner approval. An uploaded build can still require approval for the intended workload.</p></section>
+    <section><h2>What does a signed receipt show?</h2><p>It authenticates specific claims and evidence from a particular runner or installation. Solana transaction verification, when applicable, is separate. Read the ${docsLink('evidence', 'evidence guide')}.</p></section>
+    <section><h2>Why is my job waiting?</h2><p>Check device readiness, the requested wallet network, and the allocation state. A queue entry can wait for a compatible device to reserve it. If a write times out, refresh the resource before retrying.</p></section>`],
+  '/terms': ['Terms of Service', 'Terms of Service', 'These terms govern use of the AGUS AI preview and related developer and contributor tools.', `
+    <section><h2>Accounts and access</h2><p>Use the service only with authorization and keep account credentials, invitations and session tokens private. Preview access is subject to account and environment eligibility.</p></section>
+    <section><h2>Authorized testing</h2><p>Upload and test only applications and accounts you are authorized to use. Submit accurate package, task and scope information. Respect consent, device controls and the stated evidence boundaries. Use disposable wallet identities for test transactions.</p></section>
+    <section><h2>Evidence and contributor work</h2><p>Use evidence and findings only within the permissions that apply to the assignment. Training use is subject to separate grants. Review the evidence and its limitations before relying on a result. Test assets and nontransferable units have the terms shown for the relevant workflow.</p></section>
+    <section><h2>Preview availability</h2><p>Availability and eligible workflows can change during the preview. A submitted run or campaign may wait for device access, participant eligibility, or required test funding. Contact the preview coordinator about your access or use the <a href="/contact">contact options</a>.</p></section>`],
+  '/docs': ['Documentation', 'Developer documentation', 'Register a build, run a scoped test, and verify what happened.', `
+    <section><h2>Start here</h2><p>Use the ${docsLink('quickstart', 'quickstart')} to go from your first project to the run detail. Use the ${docsLink('api', 'API reference')} to look up request fields and routes.</p></section>
+    <section><h2>Choose your path</h2><ul><li>${docsLink('campaigns', 'Design a testing or evaluation campaign')}</li><li>${docsLink('integrations', 'Integrate with the developer client, CLI, MCP, or cooperative Android SDK')}</li><li>${docsLink('evidence', 'Interpret and independently verify execution evidence')}</li></ul></section>`],
+  '/docs/quickstart': ['Quickstart', 'From APK to test run', 'Start in the console with an eligible account and an Android build you are authorized to test.', `
+    <section><h2>1. Create a project and upload an APK</h2><p>In the <a href="/console.html">developer console</a>, create a project. In Builds, select that project, enter the Android application ID and upload the APK. The browser computes SHA-256 and the server checks the digest. The runner validates the exact package and build approval separately.</p></section>
+    <section><h2>2. Queue a supported scenario</h2><p>Open Test runs, select the project and build, choose App launch with scripted execution, specify the evidence you need, and create a run. A compatible authorized device must reserve the job before execution proceeds. Use Private access if the device owner supplied a private device ID.</p></section>
+    <section><h2>3. Review the result</h2><p>Open the run to inspect its state, events and outcome. Download permitted evidence as it becomes available. Read the ${docsLink('evidence', 'verification guide')} before relying on a receipt.</p></section>
+    <section><h2>Make your first API request</h2><p>Set <code>AGUS_API_URL</code> to your selected origin and <code>AGUS_API_TOKEN_FILE</code> to a private file containing your bearer token. Use the ${docsLink('integrations', 'CLI sign-in instructions')} to create that file. The CLI can list your projects without copying the token into a command line.</p>
+    ${snippet('node packages/developer-client/src/cli.mjs projects')}
+    </section>`],
+  '/docs/campaigns': ['Campaigns', 'Plan coverage and review findings', 'Campaigns commission scoped human or automated work against an exact build.', `
+    <section><h2>Draft the work</h2><p>Choose a project and build, then define the objective, coverage slots, instructions, execution lanes, duration, visibility and review conditions supported by the deployment. Human corrections reference an eligible sealed run. The campaign stores immutable revisions.</p></section>
+    <section><h2>Publish and monitor</h2><p>Review the saved revision before publishing. If the selected test-chain terms require funding, request a quote and verify the finalized transfer before publication. Publishing can create coverage slots and runs that still need eligible allocations.</p></section>
+    <section><h2>Review and export</h2><p>Read findings with observed and expected behavior. Review the exact attempt and version. Test-unit awards and test-chain transfers have their own states. When both parties grant rights for eligible work, download a redacted training export and regenerate it after consent changes.</p></section>`],
+  '/docs/integrations': ['Integrations', 'Integrate with your lab', 'Use the developer client, CLI and MCP for authorized workflows. Use the cooperative SDK for a reviewed test variant.', `
+    <section><h2>CLI</h2><p>From the repository root, use Node 24. Set <code>AGUS_API_URL</code> to your authorized origin and <code>AGUS_API_TOKEN_FILE</code> to an absolute private file path outside the repository. Set <code>AGUS_API_PASSWORD</code> through an approved local secret input before login and clear it afterward.</p>
+    ${snippet('node packages/developer-client/src/cli.mjs login developer@example.invalid\nnode packages/developer-client/src/cli.mjs projects\nnode packages/developer-client/src/cli.mjs --help')}
+    </section><section><h2>Typed client and MCP</h2><p>The ${repo('packages/developer-client', 'developer client')} exposes the same control-plane contract. Run <code>npm ci</code> from the repository root first. With the API origin and token file configured as above, this script lists projects through the typed client.</p>
+    ${snippet(`import { readFile } from 'node:fs/promises';
+import { createAgusClient } from '@agus/developer-client';
+
+const client = createAgusClient({
+  baseUrl: process.env.AGUS_API_URL,
+  getToken: async () => (await readFile(
+    process.env.AGUS_API_TOKEN_FILE, 'utf8',
+  )).trim(),
+});
+
+const { data, error } = await client.GET('/api/v1/projects');
+if (error) throw new Error(error.error.message);
+console.log(data.projects);`, 'JavaScript')}
+    <p>For MCP, configure a stdio client to run <code>node</code> with the absolute path to <code>packages/developer-client/src/cli.mjs</code> and the argument <code>mcp</code>. Supply the same API origin and private token file using the client’s environment configuration. The tools follow the authorized device, scenario and action scope.</p></section>
+    <section><h2>Cooperative Android SDK</h2><p>Use a distinct approved test application ID and a single reviewed Activity. Bind the test-only variant to the signed <code>cooperative-v1</code> workload contract, pin the approved manifest key, and verify the exact APK and signer with your operator.</p><p>${repo('packages/cooperative-android', 'Cooperative Android SDK guide and sample')}</p></section>`],
+  '/docs/evidence': ['Evidence', 'Read and verify execution evidence', 'Use the build digest, issuer identity and evidence references to understand exactly what a result covers.', `
+    <section><h2>Read a dedicated run</h2><p>Distinguish run execution state, evaluation outcome, cleanup, and any independent transaction verification. Download the receipt or individual authorized artifacts from the run detail. Compare the APK digest with the input and verify the signature with a key established through runner enrollment.</p></section>
+    <section><h2>Verify a campaign receipt</h2><p>Download the assignment receipt and obtain the pinned manifest public key separately from your trusted operator. Save the key as <code>manifest.public.b64</code> and verify from the repository root.</p>
+    ${snippet('node packages/developer-client/src/cli.mjs verify-native-receipt receipt.json manifest.public.b64')}
+    <p>Compare the resulting assignment ID, attempt ID and build digest with the intended session. Receipt verification authenticates scoped claims and cleanup evidence when present.</p></section>
+    <section><h2>Check Solana outcomes</h2><p>For supported wallet scenarios, compare the independent RPC judgment with the expected network and transaction effect. Campaign funding, dedicated settlement, and SAS issuance use distinct workflows. Treat a pending or unknown signature as unresolved.</p></section>`],
+  '/404': ['Page not found', 'This page couldn’t be found.', 'The address may have changed. Return home, open the documentation, or go to your console.', `<div class="page-actions"><a class="site-button primary" href="/">Return home</a><a class="site-button secondary" href="/docs">Open documentation</a></div>`],
+};
+
+export function publicArticles(config) {
+  const { contributorDownloadUrl, contactUrl, privacyContactUrl } = config;
+  const pages = { ...articles };
+  if (config.launchMode === 'general') {
+    pages['/pricing'] = [...articles['/pricing']];
+    pages['/pricing'][2] = 'Contact AGUS AI for current product and campaign options.';
+  }
+  pages['/contributors'] = [...articles['/contributors']];
+  if (config.launchMode === 'waitlist') {
+    pages['/contributors'][2] = 'See how Android testing and scoped contributor work will be available as access expands.';
+    pages['/contributors'][3] += '<section><h2>Availability</h2><p><a href="/availability">Check launch updates</a> for the current access options.</p></section>';
+  }
+  pages['/contributors'][3] += `<section><h2>Android companion</h2>${contributorDownloadUrl
+    ? `<p><a class="site-button primary" href="${escapeHtml(contributorDownloadUrl)}">Download the Android companion</a></p>`
+    : `<p>Ask your preview coordinator for an approved APK and checksum. Follow the <a href="${repository.replace("/tree/", "/blob/")}/docs/phase-2-3/artifact-installation.md">preview installation guide</a> with that artifact.</p>`}</section>`;
+  pages['/contact'] = ['Contact', 'Get in touch with AGUS AI.', 'Choose the channel that fits your request.', `
+    <section><h2>General product and technical questions</h2>${contactUrl
+      ? `<a class="site-button primary" href="${escapeHtml(contactUrl)}">Contact the team</a>`
+      : `<p>Use the public project issue tracker for non-sensitive questions or bugs. Keep APKs, credentials, customer evidence and personal information out of public issues.</p><a class="site-button primary" href="${source}/issues/new">Open a GitHub issue</a>`}</section>
+    <section><h2>Preview access and private matters</h2><p>${privacyContactUrl ? `<a href="${escapeHtml(privacyContactUrl)}">Contact the team privately</a>.` : 'Contact the AGUS AI preview coordinator who issued your invitation.'} See the <a href="/privacy">Privacy Policy</a> for data requests.</p></section>`];
+  pages['/privacy'] = ['Privacy Policy', 'Privacy Policy', 'How AGUS AI handles account, testing, contributor, and evidence data.', `
+    <section><h2>Account and sign-in data</h2><p>AGUS AI uses your email address and account identifier to identify your workspace and authorize access. Email code sign-in sends your address to the configured delivery provider to deliver the code. Password accounts store a password verifier. Account settings can include a display name and notification preferences.</p></section>
+    <section><h2>Google sign-in</h2><p>If you use Google sign-in, AGUS AI requests the OpenID Connect scopes <code>openid</code>, <code>email</code>, and <code>profile</code>. The service retrieves Google’s account information at sign-in, checks the verified email and email authority, and uses the email and Google account identifier to establish and link your AGUS AI identity. Google’s access token is used during sign-in to retrieve this identity information. The AGUS AI account can retain the linked Google identifier. AGUS AI uses Google identity data to authenticate your account. Google identity data is separate from testing and training exports.</p></section>
+    <section><h2>Application testing and evidence</h2><p>Developer accounts can submit project details, APKs, build metadata and test instructions. AGUS AI processes build hashes, scoped execution observations, findings, and permitted logs or screenshots to run tests and provide results. Authorized runners receive the approved build for the assigned task. Developers and contributors can access job information according to their role and authorization.</p></section>
+    <section><h2>Device and contributor information</h2><p>Device participation can provide enrollment, availability, capabilities and readiness signals. Contributors may submit qualification answers, assigned test findings, corrections and scoped observations. Device sessions may collect signed execution and cleanup evidence under the agreed task scope.</p></section>
+    <section><h2>Wallet and transaction information</h2><p>Wallet ownership proof can include a public address, a signed challenge and verification status. Supported settlement and transaction checks can involve public addresses, signatures, amounts and public chain records. The agreement for a campaign can bind an accepted destination for that work.</p></section>
+    <section><h2>Training data and retention</h2><p>Eligible assignments can be exported as redacted training data if the developer and contributor separately grant rights. Users can withdraw those grants for future access through the service. Downloads already delivered are subject to the applicable agreement. Evidence retention can depend on the campaign and its terms. Public chain records remain subject to the network’s operation.</p></section>
+    <section><h2>Providers and safeguards</h2><p>Depending on the deployment and workflow, AGUS AI uses providers for hosting, database operation, Google identity, email delivery, model execution, and blockchain RPC. The application scopes access by account, runner or lease and uses signed evidence where available. Preview users should use designated test accounts and keep personal or confidential content outside test workloads.</p></section>
+    <section><h2>Access, correction and deletion requests</h2><p>Update available profile and preference fields in the console. For access, correction or deletion requests, ${privacyContactUrl ? `<a href="${escapeHtml(privacyContactUrl)}">contact the team privately</a>` : 'contact the AGUS AI preview coordinator who issued your invitation'}. Share personal data only through a private channel.</p></section>`];
+  return pages;
+}

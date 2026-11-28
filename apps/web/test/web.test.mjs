@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { test } from 'node:test';
 import { createApi, MAX_APK_BYTES, readApk } from '../public/api.mjs';
-import { devicesView, invitationReview, paymentView, runDetail } from '../public/views.mjs';
+import { decimalAtoms, devicesView, invitationReview, paymentView, runDetail } from '../public/views.mjs';
 import { createWebServer } from '../scripts/serve.mjs';
 
 async function start(server, context) {
@@ -72,6 +72,13 @@ test('stopping and unpaid work remain separate from terminal cleanup and Devnet 
   assert.match(runDetail({ ...run, state: 'expired' }, []), /expired before stop and cleanup were confirmed/);
   assert.match(paymentView(null, null, run), /unpaid preview terms/);
   assert.doesNotMatch(paymentView(null, null, run), /Request quote/);
+  const unpaid = { allocation: 'marketplace' };
+  const paid = { ...unpaid, paymentTerms: { kind: 'devnet' } };
+  assert.match(paymentView(null, 'Unavailable', unpaid), /unpaid preview terms/);
+  assert.doesNotMatch(paymentView(null, 'Unavailable', paid), /unpaid preview terms/);
+  assert.match(paymentView(null, null, paid), /Funding state is unavailable/);
+  assert.equal(decimalAtoms('18446744073709551615', 6), '18446744073709.551615');
+  assert.equal(decimalAtoms('1', 6), '0.000001');
   assert.doesNotMatch(paymentView({ state: 'submitted_or_unknown', quote: {} }, null, run), /Request settlement/);
 });
 
@@ -85,7 +92,7 @@ test('web serves both entry points and preserves scoped authorization and bytes 
   const origin = await start(createWebServer({ upstream, directory: new URL('../public/', import.meta.url) }), context);
   const home = await fetch(origin);
   assert.equal(home.status, 200);
-  assert.match(await home.text(), /Mobile runs you can verify/);
+  assert.match(await home.text(), /The execution layer/);
   const consoleResponse = await fetch(`${origin}/console.html`);
   assert.equal(consoleResponse.status, 200);
   assert.match(consoleResponse.headers.get('content-security-policy'), /img-src 'self' blob:/);
@@ -100,5 +107,13 @@ test('web serves both entry points and preserves scoped authorization and bytes 
   assert.equal(share.status, 302);
   assert.equal(share.headers.get('location'), `/console.html#invite/${'a'.repeat(43)}`);
   assert.equal(share.headers.get('cache-control'), 'no-store');
-  assert.equal((await fetch(`${origin}/package.json`)).status, 404);
+  for (const [path, expected] of [['/privacy', 'Privacy Policy'], ['/terms', 'Terms of Service'],
+    ['/docs/quickstart', 'From APK to test run'], ['/docs/api', 'Control-plane API']]) {
+    const page = await fetch(origin + path);
+    assert.equal(page.status, 200);
+    assert.ok((await page.text()).includes(expected));
+  }
+  const missing = await fetch(`${origin}/package.json`);
+  assert.equal(missing.status, 404);
+  assert.match(await missing.text(), /This page couldn’t be found/);
 });

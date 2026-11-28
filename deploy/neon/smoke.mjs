@@ -30,6 +30,10 @@ async function json(path, options, status = 200) {
 try {
   assert.match(await (await call('/')).text(), /console\.html/);
   assert.match((await call('/console.html')).headers.get('content-type'), /text\/html/);
+  for (const path of ['/privacy', '/terms', '/docs', '/docs/api', '/robots.txt', '/sitemap.xml', '/assets/oauth-logo.png']) {
+    assert.equal((await call(path, { method: 'HEAD' })).status, 200, path);
+  }
+  assert.equal((await call('/not-a-page')).status, 404);
   assert.deepEqual(await json('/health'), { ok: true, persistence: 'postgres' });
   await json('/api/v1/projects', undefined, 401);
   const email = `smoke-${randomUUID()}@example.invalid`;

@@ -1,18 +1,12 @@
 import { once } from 'node:events';
 import { request as send } from 'node:http';
 import { Readable } from 'node:stream';
+import { assetPath, webPolicies } from '../../apps/web/scripts/asset-paths.mjs';
 
 const hopByHop = ['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
   'te', 'trailer', 'transfer-encoding', 'upgrade'];
 const proxyHeaders = ['host', 'forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto'];
 const emptyStatuses = [204, 205, 304];
-const policies = {
-  'Cache-Control': 'no-cache',
-  'Content-Security-Policy': "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
-  'Referrer-Policy': 'no-referrer',
-  'X-Content-Type-Options': 'nosniff',
-};
-
 function stripTransport(headers, extra = []) {
   const named = headers.get('connection')?.split(',').map(value => value.trim()) ?? [];
   for (const header of [...hopByHop, ...extra, ...named]) {
@@ -111,10 +105,12 @@ export function createNeonHandler({ assets, createService, maintenance = false, 
           Location: '/console.html', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
         } });
       }
-      const asset = assets.get(url.pathname === '/' ? '/index.html' : url.pathname);
-      if (!asset) return new Response('Page not found.', { status: 404 });
-      return new Response(request.method === 'HEAD' ? null : asset.bytes, {
-        headers: { ...policies, 'Content-Type': asset.type, 'Content-Length': String(asset.bytes.length) },
+      const asset = assets.get(assetPath(url.pathname));
+      const page = asset ?? assets.get('/404.html');
+      if (!page) return new Response('Page not found.', { status: 404 });
+      return new Response(request.method === 'HEAD' ? null : page.bytes, {
+        status: asset ? 200 : 404,
+        headers: { ...webPolicies, 'Content-Type': page.type, 'Content-Length': String(page.bytes.length) },
       });
     },
   };

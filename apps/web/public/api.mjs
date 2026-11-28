@@ -10,12 +10,13 @@ export class ApiError extends Error {
 }
 
 export function createApi(token, fetcher = fetch) {
-  async function request(path, { method = 'GET', body, responseType = 'json' } = {}) {
+  async function request(path, { method = 'GET', body, idempotencyKey, responseType = 'json' } = {}) {
     const endpoint = `/api/v1${path}`;
     const headers = new Headers({ Accept: responseType === 'json' ? 'application/json' : '*/*' });
     const bearer = token();
     if (bearer) headers.set('Authorization', `Bearer ${bearer}`);
     if (body !== undefined) headers.set('Content-Type', 'application/json');
+    if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey);
     let response;
     try {
       response = await fetcher(endpoint, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });
@@ -39,7 +40,7 @@ export function createApi(token, fetcher = fetch) {
     patch: (path, body) => request(path, { method: 'PATCH', body }),
     put: (path, body) => request(path, { method: 'PUT', body }),
     delete: path => request(path, { method: 'DELETE' }),
-    post: (path, body) => request(path, { method: 'POST', body }),
+    post: (path, body, idempotencyKey) => request(path, { method: 'POST', body, idempotencyKey }),
     download: (path) => request(path, { responseType: 'blob' }),
   };
 }
