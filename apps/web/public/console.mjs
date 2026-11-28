@@ -405,9 +405,10 @@ const forms = {
     notice('Project created.');
   },
   'build-form': async (data) => {
-    notice('Calculating the build hash and uploading the APK…');
+    notice('Calculating the APK fingerprint…');
     const apk = await readApk(data.get('apk'));
     const build = { ...apk, projectId: data.get('projectId'), name: data.get('name').trim(), packageName: data.get('packageName').trim() };
+    notice('Uploading the APK and its fingerprint…');
     await api.post('/builds', build);
     await navigate();
     notice('Build registered.');
@@ -528,6 +529,19 @@ function downloadJson(name, value) {
 }
 
 const actions = {
+  'copy-digest': async button => {
+    try {
+      await navigator.clipboard.writeText(button.dataset.digest);
+      notice('Build SHA-256 copied.');
+    } catch {
+      const range = document.createRange();
+      range.selectNodeContents(button.previousElementSibling);
+      const selection = getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      notice('Copy the selected SHA-256.');
+    }
+  },
   'agent-step': async button => {
     const path = '/runs/' + encodeURIComponent(state.selected) + '/actions';
     const type = button.dataset.type;
@@ -725,6 +739,12 @@ document.addEventListener('click', async (event) => {
 });
 
 document.addEventListener('change', ({ target }) => {
+  if (target.form?.id === 'build-form' && target.name === 'apk') {
+    const selected = target.files[0];
+    target.form.querySelector('[data-build-selection]').textContent = selected
+      ? new Intl.NumberFormat(undefined, { style: 'unit', unit: 'byte' }).format(selected.size)
+      : '';
+  }
   if (target.id === 'run-status') applyRunFilters();
   if (target.form?.id === 'campaign-form') {
     if (target.name === 'visibility') target.form.querySelector('[data-campaign-invites]').hidden = target.value !== 'invited';

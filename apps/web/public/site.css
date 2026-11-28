@@ -640,3 +640,6 @@ body { font-size: 16px; line-height: 1.6; }
   .hero h1 em { display: inline; }
   .hero h1 em span { white-space: nowrap; }
 }
+
+.product-split > * { min-width: 0; }
+.integration-preview pre { max-width: 100%; }

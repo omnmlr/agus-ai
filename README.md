@@ -6,6 +6,7 @@ Dedicated Android execution, Solana wallet assurance and measurable agent evalua
 
 - [Research dossier: market, Solana opportunity, economics and technical research](docs/research/README.md) (proposed expanded product direction and evidence boundaries)
 
+- [Public website and developer console handoff](docs/web-design/handoff.md)
 - [Product requirements](PRD.md) and [frontend integration](FRONTEND_CONTRACT.md)
 - [Architecture](ARCHITECTURE.md), [security](SECURITY.md) and [implementation ledger](PROGRESS.md)
 - [Deployment](DEPLOYMENT.md) and [demo](DEMO.md)

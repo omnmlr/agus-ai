@@ -48,9 +48,18 @@ export function account(user) {
 }
 
 const menu = {
-  workspace: ['◫', 'Overview'], projects: ['▱', 'Projects'], reports: ['▤', 'Reports and evidence'], funding: ['≋', 'Funding and settlement'], builds: ['▤', 'Builds'], runs: ['▷', 'Executions'],
-  campaigns: ['◈', 'Campaigns'], devices: ['▯', 'Devices'], requests: ['↗', 'Private access'],
-  inbox: ['◎', 'Inbox'], settings: ['⚙', 'Settings'], integrations: ['⌘', 'Integrations'],
+  workspace: ['M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z', 'Overview'],
+  projects: ['M3 7h6l2 2h10v10H3z', 'Projects'],
+  reports: ['M6 3h8l4 4v14H6zM9 11h6M9 15h6', 'Reports and evidence'],
+  funding: ['M3 7h18v10H3zM15 12h3M6 12h3', 'Funding and settlement'],
+  builds: ['M4 8l8-4 8 4-8 4zM4 12l8 4 8-4M4 16l8 4 8-4', 'Builds'],
+  runs: ['M8 5l12 7-12 7z', 'Executions'],
+  campaigns: ['M12 3l9 9-9 9-9-9zM8 12h8M12 8v8', 'Campaigns'],
+  devices: ['M7 3h10v18H7zM10 17h4', 'Devices'],
+  requests: ['M5 12h14M14 7l5 5-5 5', 'Private access'],
+  inbox: ['M4 4h16v16H4zM4 13h5l2 3h2l2-3h5', 'Inbox'],
+  settings: ['M4 7h16M4 17h16M9 4v6M15 14v6', 'Settings'],
+  integrations: ['M8 5L3 12l5 7M16 5l5 7-5 7', 'Integrations'],
 };
 
 export function navigation(page, user) {
@@ -62,7 +71,7 @@ export function navigation(page, user) {
   ];
   return groups.map(([name, keys]) => `<div class="nav-group"><p>${name}</p>${keys.map(key => {
     const [icon, label] = menu[key];
-    return `<a href="#${key}"${page === key ? ' aria-current="page"' : ''}><span aria-hidden="true">${icon}</span>${label}</a>`;
+    return `<a href="#${key}"${page === key ? ' aria-current="page"' : ''}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="${icon}"/></svg>${label}</a>`;
   }).join('')}</div>`).join('');
 }
 
@@ -74,7 +83,7 @@ export function authView(register, fromInvite = false) {
       <p>AGUS AI / DEVELOPER CONSOLE</p>
       <h1>From build<br>to evidence.</h1>
       <p>Register your Android builds, commission testing, and review the execution record in one workspace.</p>
-      <a href="/docs/quickstart">Read the quickstart <span aria-hidden="true">↗</span></a>
+      <a href="/docs/quickstart">Read the quickstart</a>
     </div>
     <section class="auth-panel" aria-labelledby="auth-title">
       <h2 id="auth-title">${heading}</h2>
@@ -122,21 +131,21 @@ export function workspaceView({ projects, builds, runs = [], campaigns = [], cam
     : empty('Your projects will appear here.');
   const buildRows = builds.length ? resourceTable(['Build', 'Android package', 'SHA-256'], builds.map(item => [
     `${escape(item.name)}<small>${escape(projects.find(project => project.id === item.projectId)?.name ?? 'Project')}</small>`,
-    escape(item.packageName || 'Unavailable'), `<code class="break-all">${escape(item.sha256)}</code>`,
+    escape(item.packageName || 'Unavailable'), `<code class="break-all">${escape(item.sha256)}</code><button class="button button-outline digest-copy" type="button" data-action="copy-digest" data-digest="${escape(item.sha256)}">Copy digest</button>`,
   ])) : empty('Uploaded APKs will appear here.');
   const createProject = `<form id="project-form" class="form-stack"><label class="field">Project name<input name="name" required maxlength="100" autocomplete="off"></label><button type="submit" class="button button-primary">Create project</button></form>`;
   const buildForm = projects.length ? `<form id="build-form" class="form-stack">
     <label class="field">Project<select name="projectId" required>${projects.map(item => selectOption(item.id, item.name)).join('')}</select></label>
     <label class="field">Build name<input name="name" required maxlength="100" autocomplete="off"></label>
     <label class="field">Android package name<input name="packageName" placeholder="com.example.test" maxlength="200" autocomplete="off" required spellcheck="false"></label>
-    <label class="field">APK file<input name="apk" type="file" accept=".apk,application/vnd.android.package-archive" required><small>Up to 25 MiB. AGUS AI checks the APK’s SHA-256 digest.</small></label>
+    <label class="field">APK file<input name="apk" type="file" accept=".apk,application/vnd.android.package-archive" required><small>Up to 25 MiB. AGUS AI checks the APK’s SHA-256 digest.</small><small data-build-selection aria-live="polite"></small></label>
     <button type="submit" class="button button-primary">Upload build</button>
   </form>` : '<p class="empty">Create a project in the <a href="#workspace">workspace overview</a> before uploading an APK.</p>';
   if (buildsOnly) return `${title('Builds', 'Register and inspect exact Android application builds.')}
     <div class="console-grid"><div>${panel('Registered APKs', buildRows)}</div><div>${panel('Upload an APK', buildForm)}</div></div>`;
   const onboarding = !builds.length ? `<div class="onboarding"><div><h2>${projects.length ? 'Register a build to start testing.' : 'Create your first project.'}</h2>
     <p>${projects.length ? 'Choose an authorized Android build and enter its package name.' : 'Projects organize the application builds, tests, and campaigns you commission.'}</p></div>
-    <a class="button button-outline" href="/docs/quickstart">Read the quickstart ↗</a></div>` : '';
+    <a class="button button-outline" href="/docs/quickstart">Read the quickstart</a></div>` : '';
   return `${title('Workspace overview', 'Manage projects and Android builds for your team’s test work.')}${onboarding}
     <div class="console-grid"><div>${panel('Projects', projectRows)}${builds.length ? panel('Registered APKs', buildRows) : ''}
     ${runs.length ? panel('Recent executions', runHistory(runs.slice(0,4))) : ''}
@@ -158,7 +167,7 @@ export function projectsView({ projects, builds, runs }, selected) {
   const project = projects.find(item => item.id === selected);
   if (!project) return `${title('Project unavailable', 'This project could not be opened.')}<a href="#projects">Back to projects</a>`;
   const ownedBuilds = builds.filter(build => build.projectId === project.id);
-  return `<a class="back-link" href="#projects">← Projects</a>${title(project.name, 'Application builds and execution history.')}
+  return `<a class="back-link" href="#projects">Back to projects</a>${title(project.name, 'Application builds and execution history.')}
     <div class="actions project-actions"><a class="button button-primary" href="#builds">Upload a build</a><a class="button button-outline" href="#runs">New execution</a></div>
     ${panel('Application builds', dataList(ownedBuilds, build => `<li><strong>${escape(build.name)}</strong><p>${escape(build.packageName)}</p><code class="break-all">${escape(build.sha256)}</code></li>`, 'Register a build to use this project.'))}
     ${panel('Executions', runHistory(runs.filter(run => run.projectId === project.id)))}`;
@@ -258,7 +267,7 @@ export function runsView({ projects, builds, devices, runs }, selected) {
     <label class="field">Execution state<select id="run-status">${selectOption('', 'All states')}${['queued', 'reserved', 'running', 'stopping', 'verifying', 'completed', 'failed', 'expired', 'cancelled'].map(state => selectOption(state, label(state))).join('')}</select></label></div>` : ''}
     <div id="run-history">${rows}</div></section>`;
   return selected ? `${title('Test run', 'Inspect execution, evaluation, and evidence.')}
-    <a class="back-link" href="#runs">← All test runs</a><div class="console-grid run-detail-layout"><div><div id="run-detail"><p class="empty">Loading selected run…</p></div>
+    <a class="back-link" href="#runs">Back to all executions</a><div class="console-grid run-detail-layout"><div><div id="run-detail"><p class="empty">Loading selected run…</p></div>
     <div id="run-comparison"></div></div><div>${history}<div id="payment-detail"></div></div></div>`
     : `${title('Test runs', 'Allocate a device, follow execution, and inspect verification and settlement.')}
     <div class="console-grid"><div>${history}</div><div>${panel('Offer a marketplace job', runForm)}</div></div>`;

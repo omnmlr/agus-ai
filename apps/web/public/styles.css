@@ -1,7 +1,7 @@
 @import url("/tokens.css");
 
 :root {
-  color-scheme: light;
+  color-scheme: var(--ui-scheme);
   --bg: #eeeef1;
   --sidebar: #161618;
   --surface: #fbfbfc;
@@ -60,7 +60,7 @@ h1, h2, h3 { line-height: 1.12; letter-spacing: -.035em; }
 .nav-group { display: grid; gap: .2rem; }
 .nav-group p { color: #b9b9b9; font-size: .76rem; font-weight: 620; padding-left: .62rem; margin-bottom: .23rem; }
 .console-nav a { display: flex; gap: .65rem; align-items: center; min-height: 40px; padding: .4rem .62rem; text-decoration: none; border-radius: .35rem; color: #d7d7d7; font-size: .91rem; font-weight: 580; }
-.console-nav a span { width: 1rem; text-align: center; color: #c4c4c4; font: .92rem var(--mono); }
+.console-nav a svg { width: 1rem; text-align: center; color: #c4c4c4; font: .92rem var(--mono); }
 .console-nav a:hover, .console-nav a[aria-current] { background: #373737; color: #f7f7f7; }
 .console-nav a[aria-current] { box-shadow: inset 2px 0 var(--accent); }
 .console-nav a[aria-current] span { color: var(--accent); }
@@ -243,7 +243,7 @@ pre { margin: .6rem 0 0; overflow: auto; max-height: 21rem; background: var(--bg
 #account button { border-color: var(--ui-strong); }
 .console-frame { min-height: calc(100vh - 64px); grid-template-columns: 240px minmax(0,1fr); }
 .console-nav { border-color: var(--line); background: var(--sidebar); }
-.nav-group p, .console-nav a span { color: var(--muted); }
+.nav-group p, .console-nav a svg { color: var(--muted); }
 .console-nav a { color: var(--muted); font-size: 14px; }
 .console-nav a:hover, .console-nav a[aria-current] { background: color-mix(in srgb, var(--ink) 8%, var(--sidebar)); color: var(--ink); }
 .console-nav a[aria-current] span { color: var(--ink); }
@@ -317,3 +317,6 @@ fieldset, .empty, .email-auth form { border-color: var(--ui-strong); }
 @media (max-width: 630px) {
   .auth-intro h1 { font-size: 36px; }
 }
+
+input[type="checkbox"] { accent-color: var(--ui-primary); }
+.digest-copy { margin-top: 4px; }

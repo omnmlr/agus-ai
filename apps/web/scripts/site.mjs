@@ -121,7 +121,7 @@ const methodNames = new Set(['get', 'post', 'patch', 'put', 'delete']);
 
 function apiOverview() {
   return `<section><h2>Authentication</h2><p>Send an eligible person bearer in the <code>Authorization</code> header. Use the ${links([['integration guide', '/docs/integrations']])} to obtain a session. Ownership and deployment policy determine which resources and operations are available.</p>
-    <p><a href="${repository.replace('/tree/', '/blob/')}/packages/developer-client/openapi.json">View the complete versioned OpenAPI schema ↗</a></p></section>
+    <p><a href="${repository.replace('/tree/', '/blob/')}/packages/developer-client/openapi.json">View the complete versioned OpenAPI schema</a></p></section>
     ${apiGroups.map(([title, ...paths]) => `<section><h2>${title}</h2><div class="api-operations">${paths.map(path => {
     const route = '/api/v1' + path;
     const operations = contract.paths[route];
