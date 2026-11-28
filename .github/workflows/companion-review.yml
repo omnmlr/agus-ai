@@ -9,7 +9,7 @@ permissions:
 jobs:
   apk:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -38,4 +38,45 @@ jobs:
           name: agus-companion-review
           path: ${{ runner.temp }}/companion-review/
           if-no-files-found: error
+          retention-days: 30
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Boot Android 15 and capture the Companion journeys
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/companion-visual"
+          mkdir -p "$out"
+          test -c /dev/kvm
+          sudo chown "$USER" /dev/kvm
+          "$AGUS_SDKMANAGER" 'platform-tools' 'emulator' 'system-images;android-35;default;x86_64'
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/companion-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          printf 'no\n' | "$(dirname "$AGUS_SDKMANAGER")/avdmanager" create avd -n agus_companion \
+            -p "$ANDROID_AVD_HOME/agus_companion.avd" -k 'system-images;android-35;default;x86_64' --force
+          printf 'avd.ini.encoding=UTF-8\npath=%s\ntarget=android-35\n' "$ANDROID_AVD_HOME/agus_companion.avd" > "$ANDROID_AVD_HOME/agus_companion.ini"
+          "$ANDROID_HOME/emulator/emulator" -avd agus_companion -port 5554 -no-window -noaudio \
+            -no-snapshot -no-boot-anim -no-metrics -gpu swiftshader -memory 3072 > "$out/emulator.log" 2>&1 &
+          emulator_pid=$!
+          trap 'kill "$emulator_pid" ${api_pid:-} 2>/dev/null || true' EXIT
+          npm ci --prefix services/control-plane --no-audit --no-fund
+          bash packages/mobile-test/lab/build-android.sh "$RUNNER_TEMP/companion-lab"
+          node scripts/android/companion-review-fixture.mjs serve "$RUNNER_TEMP/companion-api" > "$out/api.log" 2>&1 &
+          api_pid=$!
+          curl -sf --retry 8 --retry-delay 1 --retry-connrefused http://127.0.0.1:18768/health
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          timeout 250 bash -c 'adb -s emulator-5554 wait-for-device; until [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
+          AGUS_COMPANION_APK="$RUNNER_TEMP/companion-review/agus-companion-review.apk" \
+            AGUS_WORKLOAD_APK="$RUNNER_TEMP/companion-lab/agus-mwa-lab.apk" \
+            python3 scripts/android/companion-review.py "$out"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: agus-companion-visual-acceptance
+          path: |
+            ${{ runner.temp }}/companion-visual/*.png
+            ${{ runner.temp }}/companion-visual/visual-checks.json
+            ${{ runner.temp }}/companion-visual/emulator.log
+          if-no-files-found: ignore
           retention-days: 30

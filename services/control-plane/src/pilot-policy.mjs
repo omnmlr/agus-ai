@@ -39,10 +39,10 @@ export function pilotConfig(env) {
   const personIds = value => (value ?? '').split(',').map(id => id.trim()).filter(Boolean);
   const validPersonId = id => /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(id);
   const members = personIds(env.AGUS_PILOT_MEMBER_IDS);
-  if (hosted && (env.NODE_ENV !== 'production' || !env.AGUS_DATABASE_URL || !env.AGUS_REGISTRATION_TOKEN ||
+  if (hosted && (env.NODE_ENV !== 'production' || !env.AGUS_DATABASE_URL ||
     env.AGUS_PUBLIC_ORIGIN !== 'https://agusai.grindcity.app' || !members.length || members.length > 40 ||
     members.some(id => !validPersonId(id)))) {
-    throw new Error('AGUS_PRODUCT_PILOT private-preview requires production Postgres, the AGUS HTTPS origin, registration invites and an explicit person allowlist');
+    throw new Error('AGUS_PRODUCT_PILOT private-preview requires production Postgres, the AGUS HTTPS origin and an explicit person allowlist');
   }
 
   let key;

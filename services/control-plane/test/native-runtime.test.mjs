@@ -30,17 +30,19 @@ test('native pilot defaults off, runtime credentials are purpose-bound and enrol
 test('private preview restricts publishers, accounts and existing runtime credentials', async t => {
   const pilot = await startTestPilot(t);
   const member = await pilot.register('member');
-  const outsider = await pilot.register('outsider');
   const developmentRuntime = await enroll(pilot, member);
   const env = {
     NODE_ENV: 'production', AGUS_DATABASE_URL: 'postgresql://preview.invalid/agus_ai',
-    AGUS_REGISTRATION_TOKEN: 'fixture-private-registration-invite', AGUS_PUBLIC_ORIGIN: 'https://agusai.grindcity.app',
+    AGUS_PUBLIC_ORIGIN: 'https://agusai.grindcity.app',
     AGUS_PRODUCT_PILOT: 'private-preview', AGUS_PILOT_MEMBER_IDS: member.user.id,
     AGUS_NATIVE_MANIFEST_PKCS8: pilot.manifestKeys.privateKey.export({ type: 'pkcs8', format: 'der' }).toString('base64'),
   };
   assert.throws(() => pilotConfig({ ...env, AGUS_NATIVE_REVIEWED_BUILDS: JSON.stringify([review]) }));
   pilot.config.pilot = pilotConfig({ ...env, AGUS_NATIVE_REVIEWED_BUILDS: JSON.stringify([{ ...review, publisherId: member.user.id }]) });
   assert.ok(reviewedWorkload(pilot.config.pilot, review, member.user.id));
+  // The preview is live when this public account registers, but registration grants no runtime authority.
+  const outsider = await pilot.register('outsider');
+  assert.ok(outsider.token);
   assert.equal(reviewedWorkload(pilot.config.pilot, review, outsider.user.id), null);
   const denied = await pilot.request('GET', '/me/runtime-installations', { credential: outsider.token, status: 403 });
   assert.equal(denied.error.code, 'pilot_access_required');

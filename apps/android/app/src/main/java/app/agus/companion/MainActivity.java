@@ -91,6 +91,7 @@ public final class MainActivity extends Activity {
     String walletStatus;
     boolean walletInFlight;
     String pendingInvitationCode;
+    private URI pendingInvitationOrigin;
     AuthMethod authMethod = AuthMethod.CHOICE;
     String authEmail = "";
     boolean emailCodeSent;
@@ -128,6 +129,7 @@ public final class MainActivity extends Activity {
             selectedId = retained.selectedId;
             selectedDevice = retained.selectedDevice;
             pendingInvitationCode = retained.pendingInvitationCode;
+            pendingInvitationOrigin = retained.pendingInvitationOrigin;
             selectedInvitation = retained.selectedInvitation;
             selectedOffer = retained.selectedOffer;
             selectedOfferDeviceId = retained.selectedOfferDeviceId;
@@ -152,7 +154,10 @@ public final class MainActivity extends Activity {
                 }
             }
             JSONObject invite = authStorage.read("invitation");
-            if (invite != null) pendingInvitationCode = invite.optString("code", null);
+            if (invite != null) {
+                pendingInvitationCode = invite.optString("code", null);
+                if (invite.optBoolean("production")) pendingInvitationOrigin = GoogleSignIn.ORIGIN;
+            }
             if (session == null && (googlePending() != null || pendingInvitationCode != null)) screen = Screen.AUTH;
         }
         render(false);
@@ -173,6 +178,11 @@ public final class MainActivity extends Activity {
             return;
         }
         intent.setData(null);
+        if (session != null && !GoogleSignIn.ORIGIN.equals(session.origin)) {
+            statusError("This link belongs to agusai.grindcity.app. Sign out of the test server and reopen the invitation.");
+            return;
+        }
+        saveInvitation(code, GoogleSignIn.ORIGIN);
         reviewCode(code);
     }
 
@@ -323,9 +333,14 @@ public final class MainActivity extends Activity {
         getPreferences(MODE_PRIVATE).edit().putString(key, value).apply();
     }
 
+    boolean canUseTestServer() {
+        return BuildConfig.DEBUG && pendingInvitationOrigin == null;
+    }
+
     void changeAuth(AuthMethod method) {
         if (mutating) return;
         authMethod = method;
+        statusMessage = "";
         render(false);
     }
 
@@ -491,6 +506,7 @@ public final class MainActivity extends Activity {
     }
 
     private URI authOrigin(EditText field, boolean debug) {
+        if (pendingInvitationOrigin != null) return pendingInvitationOrigin;
         String entered = field == null ? preference("control_plane_origin") : field.getText().toString().trim();
         return entered.isEmpty() ? GoogleSignIn.ORIGIN : ApiOrigin.parse(entered, debug);
     }
@@ -507,6 +523,9 @@ public final class MainActivity extends Activity {
         remember("control_plane_origin", next.origin.toString());
         navigate(Screen.HOME, null);
         if (pendingInvitationCode != null) reviewCode(pendingInvitationCode);
+        authEmail = "";
+        emailCodeSent = false;
+        authMethod = AuthMethod.CHOICE;
     }
 
     private boolean saveSession(Session next) {
@@ -536,6 +555,10 @@ public final class MainActivity extends Activity {
         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             status("Enter a valid email address.", true);
             return;
+        }
+        if (getCurrentFocus() != null) {
+            getSystemService(InputMethodManager.class).hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+            getCurrentFocus().clearFocus();
         }
         authEmail = email;
         mutating = true;
@@ -805,17 +828,25 @@ public final class MainActivity extends Activity {
         Toast.makeText(this, "Copied " + label, Toast.LENGTH_SHORT).show();
     }
 
-    void reviewCode(String code) {
-        if (!code.equals(pendingInvitationCode)) {
-            pendingInvitationCode = code;
-            try {
-                authStorage.write("invitation", new JSONObject().put("code", code));
-            } catch (GeneralSecurityException | JSONException unavailable) {
-                // The current activity can still resume the link after sign-in.
-            }
+    private void saveInvitation(String code, URI origin) {
+        pendingInvitationCode = code;
+        pendingInvitationOrigin = origin;
+        try {
+            authStorage.write("invitation", new JSONObject().put("code", code).put("production", origin != null));
+        } catch (GeneralSecurityException | JSONException unavailable) {
+            // The current activity can still resume the link after sign-in.
         }
+    }
+
+    void reviewCode(String code) {
+        if (!code.equals(pendingInvitationCode)) saveInvitation(code, null);
         if (session == null) {
             navigate(Screen.AUTH, null);
+            return;
+        }
+        if (pendingInvitationOrigin != null && !pendingInvitationOrigin.equals(session.origin)) {
+            clearInvitation(code);
+            statusError("Sign in to agusai.grindcity.app and reopen the invitation.");
             return;
         }
         if (mutating) return;
@@ -832,6 +863,7 @@ public final class MainActivity extends Activity {
     private void clearInvitation(String code) {
         if (Objects.equals(pendingInvitationCode, code)) {
             pendingInvitationCode = null;
+            pendingInvitationOrigin = null;
             authStorage.clear("invitation");
         }
     }
@@ -1002,6 +1034,7 @@ public final class MainActivity extends Activity {
         final String selectedId;
         final String selectedDevice;
         final String pendingInvitationCode;
+        final URI pendingInvitationOrigin;
         final JSONObject selectedInvitation;
         final JSONObject selectedOffer;
         final String selectedOfferDeviceId;
@@ -1020,6 +1053,7 @@ public final class MainActivity extends Activity {
             selectedId = activity.selectedId;
             selectedDevice = activity.selectedDevice;
             pendingInvitationCode = activity.pendingInvitationCode;
+            pendingInvitationOrigin = activity.pendingInvitationOrigin;
             selectedInvitation = activity.selectedInvitation;
             selectedOffer = activity.selectedOffer;
             selectedOfferDeviceId = activity.selectedOfferDeviceId;

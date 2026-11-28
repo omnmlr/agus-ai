@@ -37,6 +37,15 @@ public final class CompanionBoundariesTest {
         assertThrows(IllegalArgumentException.class, () -> InvitationCode.parse("https://portal.example/invite/" + CODE, null));
     }
 
+    @Test public void onlyExactProductionAppLinksProduceAnInvitationCode() {
+        String origin = GoogleSignIn.ORIGIN.toString();
+        assertEquals(CODE, InvitationCode.appLink(origin + "/invite/" + CODE));
+        assertNull(InvitationCode.appLink("https://agusai.grindcity.app@other.example/invite/" + CODE));
+        assertNull(InvitationCode.appLink(origin + "/invite/" + CODE + "?redirect=https://other.example"));
+        assertNull(InvitationCode.appLink(origin + "/invite/" + CODE + "#fragment"));
+        assertNull(InvitationCode.appLink(origin + "/invite/" + CODE + "/extra"));
+    }
+
     @Test public void walletAddressRequiresAFullSolanaPublicKey() {
         assertEquals("11111111111111111111111111111111", SolanaAddress.encode(new byte[32]));
         byte[] bytes = new byte[32];

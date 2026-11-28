@@ -77,7 +77,7 @@ final class ProviderScreens {
                 view -> { if (awaiting) host.cancelGoogle(); else host.startGoogle(); });
             button(content, "Continue with email", R.id.auth_use_email, false,
                 view -> host.changeAuth(MainActivity.AuthMethod.EMAIL));
-            if (BuildConfig.DEBUG) {
+            if (host.canUseTestServer()) {
                 button(content, "Use a password or test server", R.id.auth_use_password, false,
                     view -> host.changeAuth(MainActivity.AuthMethod.PASSWORD));
             } else {
@@ -90,7 +90,7 @@ final class ProviderScreens {
         if (host.authMethod == MainActivity.AuthMethod.PASSWORD) {
             heading(content, "Use a password", "Sign in to an existing account or create one.");
             EditText origin = null;
-            if (BuildConfig.DEBUG) {
+            if (host.canUseTestServer()) {
                 origin = input(content, "Test server (optional)", GoogleSignIn.ORIGIN.toString(),
                     InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI, R.id.auth_origin);
                 origin.setText(host.preference("control_plane_origin"));
@@ -185,7 +185,7 @@ final class ProviderScreens {
         JSONObject active = activeRun();
         String readiness = string(device, "readiness");
         String connection = string(device, "connectivity");
-        String headline = active != null ? "Session in progress" : device == null
+        String headline = active != null ? ("queued".equals(string(active, "state")) ? "Session queued" : "Session in progress") : device == null
             ? (host.snapshot == null ? "Checking your workspace" : "Set up your first device")
             : "ready".equals(readiness) && "online".equals(connection) ? "Your device is ready"
             : "online".equals(connection) ? "Your device needs attention" : "Your device is offline";
@@ -245,7 +245,7 @@ final class ProviderScreens {
         if (runs != null) {
             for (int index = 0; index < runs.length(); index++) {
                 JSONObject run = runs.optJSONObject(index);
-                if (ProviderApi.active(run)) return run;
+                if (ProviderApi.active(run) || "queued".equals(string(run, "state"))) return run;
             }
         }
         return null;
@@ -286,29 +286,23 @@ final class ProviderScreens {
 
     private void deviceCard(LinearLayout content, JSONObject device) {
         LinearLayout card = ui.card(content);
-        ui.add(card, ui.heading(title(device, "label", "Dedicated device"), 18), 0);
-        named(card, "Connectivity", device, "connectivity");
-        named(card, "Readiness", device, "readiness");
+        JSONObject profile = device.optJSONObject("profile");
+        deviceLead(card, title(device, "label", "Dedicated device"),
+            status(string(device, "connectivity")) + " · " + status(string(device, "readiness")));
+        named(card, "Model", profile, "model");
+        named(card, "Android", profile, "androidVersion");
+        ui.rule(card, 14);
+        LinearLayout first = ui.row();
+        metric(first, "Available memory", bytes(profile, "memoryAvailableBytes"), 8);
+        metric(first, "Free storage", bytes(profile, "dataAvailableBytes"), 0);
+        ui.add(card, first, 10);
+        LinearLayout second = ui.row();
+        metric(second, "Battery charge", measured(profile, "batteryPercent", "%"), 8);
+        metric(second, "Network latency", measured(profile, "networkLatencyMs", " ms"), 0);
+        ui.add(card, second, 8);
         named(card, "Last heartbeat", device, "lastSeenAt");
         named(card, "Revoked", device, "revokedAt");
-        JSONObject profile = device.optJSONObject("profile");
-        if (profile != null) {
-            ui.add(card, ui.heading("Capabilities", 16), 11);
-            named(card, "Environment", profile, "kind");
-            named(card, "Source", profile, "source");
-            named(card, "Measured", profile, "measuredAt");
-            named(card, "Manufacturer", profile, "manufacturer");
-            named(card, "Model", profile, "model");
-            named(card, "Android", profile, "androidVersion");
-            named(card, "Available memory (bytes)", profile, "memoryAvailableBytes");
-            named(card, "Free storage (bytes)", profile, "dataAvailableBytes");
-            named(card, "Total storage (bytes)", profile, "dataTotalBytes");
-            named(card, "Battery charge (%)", profile, "batteryPercent");
-            named(card, "Battery temperature (°C)", profile, "batteryTemperatureC");
-            named(card, "Network latency (ms)", profile, "networkLatencyMs");
-            named(card, "Hardware attested", profile, "hardwareAttested");
-            named(card, "Seeker verified", profile, "seekerVerified");
-        }
+        if (profile != null) button(card, "Device capabilities", 0, false, view -> capabilities(profile));
         String id = string(device, "id");
         button(card, "Run diagnostics", R.id.device_diagnostics, false, view ->
             host.perform("Checking last runner profile…", api -> api.post(ProviderApi.item(MY_DEVICES, id) + "/diagnostics", new JSONObject()),
@@ -329,6 +323,39 @@ final class ProviderScreens {
                 menu.show();
             });
         }
+    }
+
+    private void metric(LinearLayout row, String label, String value, int gap) {
+        LinearLayout cell = ui.column();
+        cell.setPadding(ui.dp(10), ui.dp(8), ui.dp(10), ui.dp(8));
+        cell.setBackground(ui.surface(CompanionViews.RAISED, CompanionViews.BORDER, 13));
+        ui.add(cell, ui.text(value, 16, TEXT, true), 0);
+        ui.add(cell, ui.text(label, 12, MUTED, false), 2);
+        ui.weighted(row, cell, gap);
+    }
+
+    private String bytes(JSONObject data, String name) {
+        long value = data == null ? -1 : data.optLong(name, -1);
+        return value < 0 ? "Unavailable" : android.text.format.Formatter.formatShortFileSize(host, value);
+    }
+
+    private static String measured(JSONObject data, String name, String unit) {
+        String value = string(data, name);
+        return value.isEmpty() ? "Unavailable" : value + unit;
+    }
+
+    private void capabilities(JSONObject profile) {
+        String message = String.join("\n",
+            "Environment · " + status(string(profile, "kind")),
+            "Source · " + status(string(profile, "source")),
+            "Measured · " + measured(profile, "measuredAt", ""),
+            "Total storage · " + bytes(profile, "dataTotalBytes"),
+            "Battery temperature · " + measured(profile, "batteryTemperatureC", " °C"),
+            "Thermal status · " + status(string(profile, "thermalStatus")),
+            "Wallet network · " + status(string(profile, "walletNetwork")),
+            "Seeker verification · " + (profile.optBoolean("seekerVerified") ? "Verified" : "Unverified"));
+        new android.app.AlertDialog.Builder(host).setTitle("Device capabilities").setMessage(message)
+            .setPositiveButton("Done", null).show();
     }
 
     private void diagnostics(JSONObject diagnostics) {
@@ -689,6 +716,7 @@ final class ProviderScreens {
             named(summary, "Cluster", data, "cluster");
             plot(chart, data, 31, true);
         }
+        wallet(content);
         section(content, "Payout history");
         JSONArray payouts = data == null ? null : data.optJSONArray("jobs");
         if (payouts == null || payouts.length() == 0) {
@@ -723,7 +751,6 @@ final class ProviderScreens {
                 detail(card, "Under review · " + amount(network, row, "reviewAtoms"), false);
             });
         }
-        wallet(content);
     }
 
     private JSONObject earningsData() {
@@ -814,28 +841,57 @@ final class ProviderScreens {
     }
 
     private void profile(LinearLayout content) {
-        heading(content, "Profile", host.email());
-        LinearLayout identity = ui.card(content);
-        ui.add(identity, ui.heading("Account", 18), 0);
+        heading(content, "Profile", "");
         JSONObject user = host.snapshot == null ? null : host.snapshot.user;
-        named(identity, "Display name", user, "displayName");
-        named(identity, "Account ID", user, "id");
-        named(identity, "Developer capability", user == null ? null : user.optJSONObject("capabilities"), "developer");
-        named(identity, "Provider capability", user == null ? null : user.optJSONObject("capabilities"), "provider");
+        String email = host.email();
+        String name = string(user, "displayName");
+        LinearLayout identity = ui.card(content);
+        LinearLayout row = ui.row();
+        TextView avatar = ui.text(email.isEmpty() ? "?" : email.substring(0, 1).toUpperCase(java.util.Locale.ROOT),
+            24, ACCENT, true);
+        avatar.setGravity(android.view.Gravity.CENTER);
+        avatar.setBackground(ui.surface(CompanionViews.RAISED, CompanionViews.BORDER, 24));
+        avatar.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        row.addView(avatar, new LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)));
+        LinearLayout copy = ui.column();
+        copy.setPadding(ui.dp(12), 0, 0, 0);
+        ui.add(copy, ui.heading(name.isEmpty() ? "Your account" : name, 19), 0);
+        detail(copy, email, false);
+        ui.weighted(row, copy, 0);
+        ui.add(identity, row, 0);
         if (!string(user, "id").isEmpty()) {
-            button(identity, "Copy account ID", 0, false, view -> host.copy("account ID", string(user, "id")));
             button(identity, "Edit display name", 0, false, view -> ProviderForms.displayName(host, user));
         }
-        button(identity, "Developer portal", R.id.developer_portal, false, view -> host.openPortal(false));
-        if (host.portal() != null) {
-            button(identity, "Change developer portal", 0, false, view -> host.openPortal(true));
-        }
-        LinearLayout privacy = ui.card(content);
-        ui.add(privacy, ui.heading("Privacy and consent", 18), 0);
-        detail(privacy, "Review workload scope and allowed evidence before approving each invitation. Use only dedicated environments and disposable accounts.", false);
+        section(content, "Account and preferences");
+        LinearLayout preferences = ui.card(content);
+        button(preferences, "My devices", R.id.open_my_device, false, view -> host.navigate(MainActivity.Screen.MY_DEVICE, null));
+        button(preferences, "Notification preferences", 0, false, view -> host.notificationPreferences());
+        button(preferences, "Privacy and consent", 0, false, view -> new android.app.AlertDialog.Builder(host)
+            .setTitle("Privacy and consent")
+            .setMessage("Review the test scope and evidence before accepting a workload. Only enroll dedicated test environments.")
+            .setPositiveButton("Privacy policy", (dialog, which) -> host.openPublicPage("/privacy"))
+            .setNegativeButton("Close", null).show());
         wallet(content);
-        button(content, "In-app notification preferences", 0, false, view -> host.notificationPreferences());
-        button(content, "Sign out", R.id.auth_sign_out, false, view -> host.signOut(true));
+        section(content, "Developer and support");
+        LinearLayout support = ui.card(content);
+        button(support, "Developer portal", R.id.developer_portal, false, view -> host.openPortal(false));
+        button(support, "Setup and help", 0, false, view -> host.openPublicPage("/docs/quickstart"));
+        button(support, "Advanced diagnostics", 0, false, view -> new android.app.AlertDialog.Builder(host)
+            .setTitle("Advanced diagnostics")
+            .setMessage("Companion " + BuildConfig.VERSION_NAME + "\nAndroid API " + android.os.Build.VERSION.SDK_INT
+                + "\nDeveloper portal " + host.portal().getHost())
+            .setPositiveButton("Done", null).setNeutralButton("Portal settings", (dialog, which) -> host.openPortal(true)).show());
+        legal(content);
+        button(content, "Sign out", R.id.auth_sign_out, false, view -> {
+            JSONObject running = activeRun();
+            if (running != null) {
+                host.confirm("A session is still open", "Review or stop it using the session screen or the desktop runner before signing out.",
+                    "Open session", () -> host.openRun(running));
+            } else {
+                host.confirm("Sign out?", "Sign in again to manage your devices.", "Sign out", () -> host.signOut(true));
+            }
+        });
+        detail(content, "Version " + BuildConfig.VERSION_NAME, false);
     }
 
     private void wallet(LinearLayout content) {
