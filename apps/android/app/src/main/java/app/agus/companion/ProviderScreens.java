@@ -154,6 +154,13 @@ final class ProviderScreens {
                     result -> {
                         host.pairing = result.optJSONObject("pairing");
                         host.render(true);
+                        String code = string(host.pairing, "code");
+                        if (!code.isEmpty() && host.screen == MainActivity.Screen.ENROLLMENT) {
+                            new android.app.AlertDialog.Builder(host).setTitle("Pairing code")
+                                .setMessage(code + "\n\nExpires " + string(host.pairing, "expiresAt"))
+                                .setPositiveButton("Copy pairing code", (dialog, which) -> host.copy("pairing code", code))
+                                .setNegativeButton("Close", null).show();
+                        }
                     }, host::statusError, false));
         } else {
             detail(content, host.snapshot == null ? "Checking enrollment access…" : "This server does not offer enrollment.", false);
@@ -216,6 +223,7 @@ final class ProviderScreens {
         ui.add(chart, ui.heading(data == null ? "—" : amount(data, data.optJSONObject("totals"), "settledAtoms"), 29), 2);
         detail(chart, "Devnet test tokens · total last 30 days", false);
         if (data != null) plot(chart, data, 7, false);
+        chart.setOnClickListener(view -> host.navigate(MainActivity.Screen.EARNINGS, null));
         button(chart, "View earnings", R.id.home_earnings_chart, false, view -> host.navigate(MainActivity.Screen.EARNINGS, null));
         if (device != null) {
             LinearLayout deviceInfo = ui.card(content);

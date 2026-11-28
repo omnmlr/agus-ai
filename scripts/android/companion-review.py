@@ -19,10 +19,13 @@ def ident(name):
 def screen(name, title):
     ui.until(lambda: any(node.get("resource-id") == ident("screen_title") and node.get("text") == title
                          for node in ui.tree().iter("node")), "Missing screen: " + title)
+    capture(name)
+    ui.record(title)
+
+def capture(name):
     # Capture through ADB rather than reconstructing the UI from fixture data.
     (out / (name + ".png")).write_bytes(subprocess.check_output(
         [ui.ADB, "-s", "emulator-5554", "exec-out", "screencap", "-p"], timeout=20))
-    ui.record(title)
 
 def back():
     ui.adb("shell", "input", "keyevent", "4")
@@ -49,8 +52,8 @@ def run():
     ui.tap(ident("open_enrollment"))
     screen("03-enrollment", "Set up your device")
     ui.tap(ident("generate_pairing"))
-    ui.until(lambda: any(node.get("text") == "Copy pairing code" for node in ui.tree().iter("node")),
-             "No server-issued pairing code")
+    ui.tap("Copy pairing code")
+    ui.record("Generated and copied a server-issued pairing code")
     subprocess.run(["node", str(fixture), "seed", str(out), os.environ["AGUS_WORKLOAD_APK"]], check=True)
     back()
     screen("04-home", "Your device is ready")
@@ -97,6 +100,11 @@ def run():
 
 try:
     run()
+except Exception:
+    capture("failure")
+    print("Visible app controls:", [(node.get("text"), node.get("resource-id"))
+        for node in ui.tree().iter("node") if node.get("package") == ui.APP], flush=True)
+    raise
 finally:
     (out / "visual-checks.json").write_text(json.dumps({
         "scope": "Android 15 emulator, real Companion, disposable local API and test workload metadata",
