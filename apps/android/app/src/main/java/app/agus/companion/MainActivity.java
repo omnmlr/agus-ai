@@ -383,13 +383,13 @@ public final class MainActivity extends Activity {
         long remaining = Math.max(0, resendAt - android.os.SystemClock.elapsedRealtime());
         if (remaining > 0) {
             button.setEnabled(false);
-            button.setText("Resend in " + ((remaining + 999) / 1000) + "s");
+            button.setText(getString(R.string.auth_resend_countdown, (remaining + 999) / 1000));
             handler.postDelayed(() -> {
                 if (button.isAttachedToWindow()) retryCode(button);
             }, Math.min(remaining, 1000));
         } else {
             button.setEnabled(true);
-            button.setText("Resend code");
+            button.setText(R.string.auth_resend);
         }
     }
 

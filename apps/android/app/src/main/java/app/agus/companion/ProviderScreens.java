@@ -778,7 +778,7 @@ final class ProviderScreens {
         EarningsChart graph = new EarningsChart(host, values, interactive ? index -> {
             selected[0] = index;
             JSONObject point = points.get(index);
-            pointLabel.setText(title(point, "start", "Period") + " · " + amount(data, point, "settledAtoms"));
+            pointLabel.setText(host.getString(R.string.earnings_point, title(point, "start", "Period"), amount(data, point, "settledAtoms")));
         } : null);
         LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(-1, ui.dp(interactive ? 118 : 53));
         layout.topMargin = ui.dp(10);
@@ -885,8 +885,11 @@ final class ProviderScreens {
         button(content, "Sign out", R.id.auth_sign_out, false, view -> {
             JSONObject running = activeRun();
             if (running != null) {
-                host.confirm("A session is still open", "Review or stop it using the session screen or the desktop runner before signing out.",
-                    "Open session", () -> host.openRun(running));
+                new android.app.AlertDialog.Builder(host).setTitle("A session is still open")
+                    .setMessage("Signing out leaves the session running. You can stop it from the session screen or the desktop runner.")
+                    .setPositiveButton("Open session", (dialog, which) -> host.openRun(running))
+                    .setNeutralButton("Sign out anyway", (dialog, which) -> host.signOut(true))
+                    .setNegativeButton("Back", null).show();
             } else {
                 host.confirm("Sign out?", "Sign in again to manage your devices.", "Sign out", () -> host.signOut(true));
             }

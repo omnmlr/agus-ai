@@ -1,4 +1,7 @@
 <resources>
     <string name="developer_portal">Developer portal</string>
     <string name="invalid_form">Check the details and try again.</string>
+    <string name="auth_resend">Resend code</string>
+    <string name="auth_resend_countdown">Resend in %1$ds</string>
+    <string name="earnings_point">%1$s · %2$s</string>
 </resources>

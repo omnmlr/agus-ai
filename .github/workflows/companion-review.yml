@@ -10,6 +10,8 @@ jobs:
   apk:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    env:
+      AGUS_ANDROID_CENTRAL_MIRROR: '1'
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -61,14 +63,17 @@ jobs:
           emulator_pid=$!
           trap 'kill "$emulator_pid" ${api_pid:-} 2>/dev/null || true' EXIT
           npm ci --prefix services/control-plane --no-audit --no-fund
-          bash packages/mobile-test/lab/build-android.sh "$RUNNER_TEMP/companion-lab"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" link \
+            -I "$ANDROID_HOME/platforms/android-35/android.jar" \
+            --manifest packages/mobile-test/lab/android/AndroidManifest.xml \
+            --min-sdk-version 33 --target-sdk-version 35 -o "$RUNNER_TEMP/companion-metadata-fixture.apk"
           node scripts/android/companion-review-fixture.mjs serve "$RUNNER_TEMP/companion-api" > "$out/api.log" 2>&1 &
           api_pid=$!
           curl -sf --retry 8 --retry-delay 1 --retry-connrefused http://127.0.0.1:18768/health
           export PATH="$ANDROID_HOME/platform-tools:$PATH"
           timeout 250 bash -c 'adb -s emulator-5554 wait-for-device; until [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
           AGUS_COMPANION_APK="$RUNNER_TEMP/companion-review/agus-companion-review.apk" \
-            AGUS_WORKLOAD_APK="$RUNNER_TEMP/companion-lab/agus-mwa-lab.apk" \
+            AGUS_WORKLOAD_APK="$RUNNER_TEMP/companion-metadata-fixture.apk" \
             python3 scripts/android/companion-review.py "$out"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()

@@ -12,9 +12,13 @@ import java.math.BigInteger;
 import java.util.List;
 import java.util.function.IntConsumer;
 
+@android.annotation.SuppressLint("ViewConstructor") // Created with the actual earnings points, never inflated from layout XML.
 final class EarningsChart extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Path line = new Path();
+    private final Path fill = new Path();
     private final float[] fractions;
+    private LinearGradient shade;
     private final float inset;
     private final IntConsumer selection;
     private int selected = -1;
@@ -49,21 +53,26 @@ final class EarningsChart extends View {
         invalidate();
     }
 
+    @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
+        if (height <= 0) return;
+        float baseline = height - inset;
+        line.rewind();
+        line.moveTo(x(0), y(0));
+        for (int index = 1; index < fractions.length; index++) line.lineTo(x(index), y(index));
+        fill.set(line);
+        fill.lineTo(x(fractions.length - 1), baseline);
+        fill.lineTo(x(0), baseline);
+        fill.close();
+        shade = new LinearGradient(0, 0, 0, height, 0x56cdd5df, 0x05cdd5df, Shader.TileMode.CLAMP);
+    }
+
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         float baseline = getHeight() - inset;
         paint.setColor(CompanionViews.BORDER);
         paint.setStrokeWidth(1);
         canvas.drawLine(inset, baseline, getWidth() - inset, baseline, paint);
-
-        Path line = new Path();
-        line.moveTo(x(0), y(0));
-        for (int index = 1; index < fractions.length; index++) line.lineTo(x(index), y(index));
-        Path fill = new Path(line);
-        fill.lineTo(x(fractions.length - 1), baseline);
-        fill.lineTo(x(0), baseline);
-        fill.close();
-        paint.setShader(new LinearGradient(0, 0, 0, getHeight(), 0x56cdd5df, 0x05cdd5df, Shader.TileMode.CLAMP));
+        paint.setShader(shade);
         canvas.drawPath(fill, paint);
         paint.setShader(null);
 
@@ -73,7 +82,10 @@ final class EarningsChart extends View {
         paint.setStrokeJoin(Paint.Join.ROUND);
         canvas.drawPath(line, paint);
         paint.setStyle(Paint.Style.FILL);
-        if (selected >= 0) canvas.drawCircle(x(selected), y(selected), inset * .8f, paint);
+        if (selected >= 0 || fractions.length == 1) {
+            int index = Math.max(selected, 0);
+            canvas.drawCircle(x(index), y(index), inset * .8f, paint);
+        }
     }
 
     @Override public boolean onTouchEvent(MotionEvent event) {
