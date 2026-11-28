@@ -1,10 +1,10 @@
 // Bundle this entry beside the built site/ directory for a loopback-only review.
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { once } from 'node:events';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createWebServer } from '../../apps/web/scripts/serve.mjs';
+import { createWebServer } from '../../apps/web/scripts/web-server.mjs';
 import { createControlPlane } from '../../services/control-plane/src/server.mjs';
 
 const directory = await mkdtemp(join(tmpdir(), 'agus-orbital-review-'));
@@ -48,7 +48,12 @@ try {
     return response.json();
   }
   const { token } = await post('auth/register', { email, password, registrationToken });
-  await post('projects', { name: 'Orbital review workspace' }, token);
+  const { project } = await post('projects', { name: 'Orbital review workspace' }, token);
+  const sample = Buffer.from([80, 75, 3, 4, 1, 0, 0, 0]);
+  await post('builds', {
+    projectId: project.id, name: 'Synthetic review APK', packageName: 'app.agus.review.fixture',
+    sha256: createHash('sha256').update(sample).digest('hex'), apkBase64: sample.toString('base64'),
+  }, token);
 
   web = createWebServer({ upstream, directory: new URL('./site/', import.meta.url), pages: null });
   const origin = await listen(web);

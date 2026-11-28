@@ -28,10 +28,17 @@ async function json(path, options, status = 200) {
 }
 
 try {
-  assert.match(await (await call('/')).text(), /console\.html/);
+  const home = await (await call('/')).text();
+  assert.match(home, /console\.html/);
+  assert.match(home, /data-replay/);
   assert.match((await call('/console.html')).headers.get('content-type'), /text\/html/);
   for (const path of ['/privacy', '/terms', '/docs', '/docs/api', '/robots.txt', '/sitemap.xml', '/assets/oauth-logo.png']) {
     assert.equal((await call(path, { method: 'HEAD' })).status, 200, path);
+  }
+  for (const path of ['/orbital.css', '/orbital-motion.mjs', '/replay.mjs', '/assets/orbital-stage.webp', '/assets/orbital-stage-mobile.webp']) {
+    const response = await call(path);
+    assert.equal(response.status, 200, path);
+    assert.ok((await response.arrayBuffer()).byteLength > 1_000, path);
   }
   assert.equal((await call('/not-a-page')).status, 404);
   assert.deepEqual(await json('/health'), { ok: true, persistence: 'postgres' });

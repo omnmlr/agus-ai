@@ -5,6 +5,12 @@
 !packages/
 !packages/developer-client/
 !packages/developer-client/openapi.json
+!docs/
+!docs/phase-2-3/
+!docs/phase-2-3/evidence/
+!docs/phase-2-3/evidence/devnet-2026-11-28/
+!docs/phase-2-3/evidence/devnet-2026-11-28/receipt-private.json
+!docs/phase-2-3/evidence/devnet-2026-11-28/sas-attestation.json
 !services/
 !services/control-plane/
 !services/control-plane/**

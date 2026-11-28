@@ -135,8 +135,9 @@ try {
   const staticContext = await browser.newContext({ javaScriptEnabled: false });
   const staticPage = await staticContext.newPage();
   await staticPage.goto(origin);
-  await staticPage.getByText('Register an exact build, observe its execution').waitFor();
-  assert.equal(await staticPage.getByRole('button', { name: '01 Register' }).count(), 0);
+  await staticPage.getByText('Build registered', { exact: true }).first().waitFor();
+  assert.equal(await staticPage.getByRole('button', { name: 'Play replay' }).count(), 0);
+  assert.equal(await staticPage.getByRole('link', { name: 'Acceptance record' }).count(), 1);
   for (const href of destinations) {
     const url = new URL(href);
     const result = await staticPage.request.get(url.href);
@@ -145,16 +146,31 @@ try {
   }
   await staticContext.close();
 
-  const scrollPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const scrollPage = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'no-preference' });
+  monitor(scrollPage);
   await scrollPage.goto(origin);
-  await scrollPage.locator('#execution').evaluate(section => window.scrollTo(0, section.offsetTop + section.offsetHeight * .56));
-  await scrollPage.locator('.theater[data-stage="2"]').waitFor();
+  await scrollPage.mouse.move(1100, 310);
+  await scrollPage.waitForFunction(() => document.querySelector('[data-orbital-scene]').style.getPropertyValue('--orbit-x').length);
+  await scrollPage.evaluate(() => window.scrollTo(0, 300));
+  await scrollPage.waitForFunction(() => parseFloat(document.querySelector('[data-orbital-scene]').style.getPropertyValue('--scroll-shift')) > 20);
+  const play = scrollPage.getByRole('button', { name: 'Play replay' });
+  await play.click();
+  await scrollPage.getByText('Runner allocated', { exact: true }).first().waitFor();
+  await scrollPage.getByRole('button', { name: 'Pause replay' }).click();
+  const progress = scrollPage.locator('.replay-progress i');
+  const paused = await progress.getAttribute('style');
+  await scrollPage.waitForTimeout(270);
+  assert.equal(await progress.getAttribute('style'), paused);
+  await scrollPage.getByRole('button', { name: 'Resume replay' }).click();
+  await scrollPage.getByText('Android app launched', { exact: true }).first().waitFor();
+  await scrollPage.getByRole('button', { name: 'Verify', exact: true }).click();
+  assert.equal(await scrollPage.locator('[data-replay-state]').innerText(), 'Receipt verified');
   const missing = await fetch(origin + '/unavailable-web-page');
   assert.equal(missing.status, 404);
   assert.match(await missing.text(), /This page couldn’t be found/);
   assert.deepEqual(faults, []);
   console.log(paths.length + ' public routes and ' + destinations.size + ' local link destinations passed.');
-  console.log('Keyboard, mobile navigation, cross-page themes, clipboard, theater scroll and reduced motion, and JavaScript-disabled fallback passed.');
+  console.log('Keyboard, mobile navigation, cross-page themes, clipboard, hero pointer and scroll response, theater playback and reduced motion, and JavaScript-disabled fallback passed.');
 } finally {
   await browser.close();
 }
