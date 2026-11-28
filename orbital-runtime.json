@@ -1,0 +1,20 @@
+{
+  "desktop": {
+    "frames": 358,
+    "median": "16.7",
+    "p95": "16.8",
+    "overFifty": 0,
+    "longTasks": [
+      78
+    ],
+    "playback": "launch"
+  },
+  "mobile": {
+    "frames": 360,
+    "median": "16.7",
+    "p95": "16.8",
+    "overFifty": 0,
+    "longTasks": [],
+    "playback": "launch"
+  }
+}
