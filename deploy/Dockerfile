@@ -21,6 +21,7 @@ FROM node:22-bookworm-slim@sha256:be979e5523c76fa4d5ca4ebd3099078f220aa47ec39c48
 WORKDIR /src/apps/web
 COPY apps/web/ ./
 COPY packages/developer-client/openapi.json /src/packages/developer-client/openapi.json
+COPY docs/phase-2-3/evidence/devnet-2026-11-28/receipt-private.json docs/phase-2-3/evidence/devnet-2026-11-28/sas-attestation.json /src/docs/phase-2-3/evidence/devnet-2026-11-28/
 RUN npm run build
 
 FROM caddy:2.11.2-alpine@sha256:834468128c7696cec0ceea6172f7d692daf645ae51983ca76e39da54a97c570d AS web

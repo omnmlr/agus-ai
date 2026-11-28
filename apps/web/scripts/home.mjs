@@ -1,5 +1,5 @@
-import { steps } from '../public/tour-data.mjs';
-import { snippet } from './content.mjs';
+import { escapeHtml as e, snippet } from './content.mjs';
+import { replay } from './replay.mjs';
 
 const arrow = '<span class="action-arrow" aria-hidden="true"></span>';
 const link = (href, title) => `<a class="text-link" href="${href}">${title} ${arrow}</a>`;
@@ -8,76 +8,86 @@ const capabilities = [
   ['Human intelligence', 'human-intelligence'], ['Verifiable execution', 'verification'],
 ];
 
-function handset({ dynamic = false } = {}) {
-  const first = steps[0];
-  const bind = field => dynamic ? ` data-demo="${field}"` : '';
-  return `<div class="seeker" aria-hidden="true">
-    <div class="seeker-glass">
-      <span class="seeker-camera"></span>
-      <div class="seeker-top"><img src="/assets/brand-wordmark-dark.svg" width="48" height="10" alt=""></div>
-      <div class="seeker-screen-orbit"><span${bind('deviceNumber')}>${first.deviceNumber}</span></div>
-      <div class="seeker-details"><strong${bind('deviceTitle')}>${first.deviceTitle}</strong><span${bind('deviceDetail')}>${first.deviceDetail}</span></div>
-      <div class="seeker-home"></div>
-    </div>
-  </div>`;
-}
-
 function hero(primary) {
-  return `<section class="hero" aria-labelledby="hero-title">
+  return `<section class="hero orbital-hero" aria-labelledby="hero-title">
+    <div class="orbital-scene" data-orbital-scene>
+      <picture>
+        <source media="(max-width: 720px)" srcset="/assets/orbital-stage-mobile.webp">
+        <img src="/assets/orbital-stage.webp" alt="" width="1440" height="1060" fetchpriority="high">
+      </picture>
+    </div>
     <div class="shell hero-copy">
-      <h1 id="hero-title">The execution layer <em>for <span>mobile intelligence.</span></em></h1>
+      <h1 id="hero-title"><span>The execution</span> <span>layer <em>for mobile</em></span> <span><em>intelligence.</em></span></h1>
       <p class="hero-lede">Test mobile applications, evaluate AI agents, and collect structured human feedback. Inspect evidence tied to the work that ran.</p>
       <div class="hero-actions">${primary}<a class="site-button secondary" href="/docs">Read the docs</a></div>
     </div>
-    <div class="lab-visual">
-      <div class="stage-horizon" aria-hidden="true"></div>
-      <div class="stage-orbit" aria-hidden="true"></div>
-      <div class="stage-annotation stage-annotation-left"><strong>Build identity</strong><span>APK · SHA-256</span></div>
-      <div class="stage-annotation stage-annotation-right"><strong>Signed evidence</strong><span>Report · issuer</span></div>
-      <div class="ghost-flight">
-        <picture><source type="image/webp" srcset="/assets/orbital-ghost.webp"><img src="/assets/brand-symbol-dark.png" alt="" width="700" height="700" fetchpriority="high"></picture>
-      </div>
-      <div class="seeker-flight">${handset()}<span class="seeker-name">Solana Seeker</span></div>
+    <div class="shell hero-index">
+      <a class="hero-cue" href="#execution"><span aria-hidden="true">↓</span> Explore an execution</a>
+      <p>Orbital ghost <span aria-hidden="true">/</span> Solana Seeker</p>
     </div>
   </section>`;
 }
 
 function theater() {
-  const first = steps[0];
-  return `<section class="section execution" id="execution" aria-labelledby="execution-title">
+  const [first] = replay.chapters;
+  return `<section class="section execution orbital-execution" id="execution" aria-labelledby="execution-title">
     <div class="shell">
       <div class="section-heading">
         <h2 id="execution-title">From instruction<br>to evidence.</h2>
         <p>Register the exact build, run a scoped test, and inspect the result and the evidence behind it.</p>
       </div>
-      <figure class="theater" data-stage="0">
-        <figcaption class="theater-header"><span>Example execution</span><span class="example-id">RUN · AGUS-EXAMPLE</span></figcaption>
-        <div class="theater-body">
-          <div class="theater-terminal">
-            <div class="terminal-header"><span>Run events</span><code>JSON</code></div>
-            <div class="terminal-lines">
-              ${[1,2,3].map(i=>`<div class="log-row"><span>0${i}</span><div><code data-demo="event${i}">${first['event'+i]}</code><span data-demo="value${i}">${first['value'+i]}</span></div></div>`).join('')}
+      <figure class="replay" data-replay data-command="${e(replay.command)}" data-screen="build">
+        <figcaption class="replay-top">
+          <div><span class="replay-record" aria-hidden="true"></span><strong>Recorded execution</strong></div>
+          <span>Wallet transfer <span class="replay-id">/ ${e(replay.run)}</span></span>
+        </figcaption>
+        <div class="replay-controls" hidden>
+          <button type="button" class="replay-toggle" data-replay-toggle><span aria-hidden="true"></span><span data-replay-toggle-label>Play replay</span></button>
+          <div class="replay-rail">
+            <div class="replay-progress" aria-hidden="true"><i></i></div>
+            <div class="replay-chapters" aria-label="Replay chapters">
+              ${replay.chapters.map((chapter, index) => `<button type="button" data-step="${index}" aria-pressed="${index === 0}" data-state="${e(chapter.state)}" data-detail="${e(chapter.detail)}" data-evidence="${e(chapter.evidence)}" data-value="${e(chapter.value)}"${index === 0 ? ` data-full-value="${e(replay.build)}"` : index === 3 ? ` data-full-value="${e(replay.digest)}"` : ''}>${e(chapter.name)}</button>`).join('')}
             </div>
           </div>
-          <div class="theater-display">
-            <div class="theater-phone">${handset({ dynamic: true })}</div>
-            <ol class="theater-trace">
-              ${[
-                ['Build identity','Exact app package'],
-                ['Device execution','Scoped actions and observations'],
-                ['Signed evidence','Outcome and provenance'],
-              ].map(([label,description], i)=>`<li data-trace-row${i===0?' aria-current="step"':''}><strong data-original="${label}">${i===0?first.trace:label}</strong><small data-original="${description}">${i===0?first.traceDetail:description}</small></li>`).join('')}
+        </div>
+        <div class="replay-stage">
+          <div class="replay-terminal">
+            <div class="replay-label"><span>Terminal</span><span>AGUS CLI</span></div>
+            <div class="replay-command"><span aria-hidden="true">$</span> <code data-replay-command>${e(replay.command)}</code><span class="replay-caret" aria-hidden="true"></span></div>
+            <ol class="replay-log" aria-label="Execution events">
+              ${replay.events.map((event, index) => `<li data-event data-at="${event.at}" data-chapter="${event.chapter}" data-screen="${event.screen}"${index ? ' hidden' : ''}><span aria-hidden="true">${String(index + 1).padStart(2, '0')}</span><div><strong>${e(event.label)}</strong><small>${e(event.detail)}</small></div></li>`).join('')}
             </ol>
           </div>
-        </div>
-        <div class="lab-controls">
-          <p class="step-caption" data-tour-fallback>Register an exact build, observe its execution, and inspect the resulting evidence.</p>
-          <div class="step-controls" aria-label="Execution stages" hidden>
-            ${steps.map(({label}, i)=>`<button type="button" data-step="${i}" aria-pressed="${i===0}"><small>0${i+1}</small><span>${label}</span></button>`).join('')}
+          <div class="replay-device">
+            <span class="replay-label">Android runner</span>
+            <div class="replay-device-orbit" aria-hidden="true"></div>
+            <div class="replay-phone" aria-hidden="true">
+              <div class="replay-phone-glass">
+                <div class="replay-phone-camera"></div>
+                <img src="/assets/brand-wordmark-dark.svg" width="46" height="9" alt="">
+                <div class="replay-phone-figure"><i></i><i></i><i></i></div>
+                <div class="replay-phone-flow"><div><b></b><b></b></div><div><b></b><b></b></div><div><b></b><b></b></div></div>
+                <div class="replay-phone-message" data-replay-device>${e(replay.events[0].label)}</div>
+                <div class="replay-phone-indicator"></div>
+              </div>
+            </div>
           </div>
-          <p class="step-caption" hidden><strong data-demo="title">${first.title}</strong> <span data-demo="description">${first.description}</span></p>
-          <p class="visually-hidden" data-stage-announcement aria-live="polite"></p>
+          <div class="replay-evidence">
+            <span class="replay-label">Evidence</span>
+            <strong data-replay-state>${e(first.state)}</strong>
+            <p data-replay-detail>${e(first.detail)}</p>
+            <dl>
+              <dt data-replay-evidence>${e(first.evidence)}</dt>
+              <dd><code data-replay-value title="${e(replay.build)}">${e(first.value)}</code></dd>
+            </dl>
+            <a data-replay-chain href="${e(replay.explorer)}" hidden>Open Devnet attestation ${arrow}</a>
+          </div>
         </div>
+        <div class="replay-foot">
+          <span>Reconstructed runner UI · Localnet run · Devnet receipt attestation</span>
+          <a href="${e(replay.source)}">Acceptance record ${arrow}</a>
+        </div>
+        <p class="visually-hidden" data-replay-announcement role="status"></p>
       </figure>
     </div>
   </section>`;
@@ -91,7 +101,7 @@ export function home(primary) {
     </div></nav>
     ${theater()}
 
-    <section class="section paper" id="mobile-testing">
+    <div class="workflow-chapter"><section class="section paper" id="mobile-testing">
       <span id="platform"></span>
       <div class="shell split product-split">
         <div><h2>Test the exact<br>application build.</h2><p>Connect an Android APK to a defined test scope. See which package ran, what the test observed, and what happened next.</p>${link('/product#android','Explore mobile testing')}</div>
@@ -103,7 +113,7 @@ export function home(primary) {
       </div>
     </section>
 
-    <section class="section agent-section" id="agent-evaluation">
+    <section class="section paper agent-section" id="agent-evaluation">
       <div class="shell">
         <div class="section-heading"><h2>Understand<br>every action.</h2><p>Review a scripted scenario or follow a model’s bounded actions. When human judgment matters, commission a correction tied to the source run.</p></div>
         <ol class="agent-trace">
@@ -126,6 +136,8 @@ export function home(primary) {
         </div>
       </div>
     </section>
+
+    </div>
 
     <section class="section evidence-section" id="verification">
       <span id="evidence"></span>

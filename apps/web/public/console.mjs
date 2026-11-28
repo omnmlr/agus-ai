@@ -123,7 +123,9 @@ async function navigate() {
     elements.screen.innerHTML = invitationLinkView(true);
     return;
   }
-  elements.screen.innerHTML = '<p class="empty" aria-busy="true">Loading data from the control plane…</p>';
+  elements.screen.innerHTML = `<div class="workspace-loading" role="status" aria-busy="true">
+    <p>Loading workspace…</p><div class="workspace-skeleton" aria-hidden="true"><i></i><i></i><i></i></div>
+  </div>`;
   try {
     await refreshSessionIfDue();
     const data = await loadData(page, selected);
@@ -192,13 +194,48 @@ function refreshHistory(run) {
   applyRunFilters();
 }
 
+function refreshMarkup(region, html) {
+  const selector = 'a[href], button[data-action], summary';
+  const key = control => [
+    control.tagName, control.getAttribute('href'), JSON.stringify(control.dataset),
+    control.closest('[data-event-id]')?.dataset.eventId, control.textContent.trim(),
+  ].join('\n');
+  const focused = region.contains(document.activeElement) ? document.activeElement : null;
+  const byKey = controls => Map.groupBy(controls, key);
+  const previous = byKey([...region.querySelectorAll(selector)]);
+  const focusKey = focused?.matches(selector) ? key(focused) : null;
+  const ordinal = previous.get(focusKey)?.indexOf(focused);
+  const expanded = [...region.querySelectorAll('details[open] > summary')].map(control => {
+    const identifier = key(control);
+    return [identifier, previous.get(identifier).indexOf(control)];
+  });
+  const previews = [...region.querySelectorAll('.evidence-preview')].map(preview =>
+    [preview, preview.closest('li').querySelector('[data-action="preview-evidence"]')?.dataset.sha]);
+
+  region.innerHTML = html;
+  const updated = [...region.querySelectorAll(selector)];
+  for (const [preview, sha] of previews) {
+    const control = updated.find(item => item.dataset.action === 'preview-evidence' && item.dataset.sha === sha);
+    if (!control) continue;
+    control.closest('li').append(preview);
+    control.textContent = 'Hide ' + control.dataset.kind;
+    control.setAttribute('aria-expanded', 'true');
+  }
+  const next = byKey(updated);
+  for (const [identifier, index] of expanded) {
+    const control = next.get(identifier)?.[index];
+    if (control) control.parentElement.open = true;
+  }
+  next.get(focusKey)?.[ordinal]?.focus({ preventScroll: true });
+}
+
 function applyRunFilters() {
   const target = document.getElementById('run-history');
   if (!target) return;
-  target.innerHTML = runHistory(state.data.runs, state.selected, {
+  refreshMarkup(target, runHistory(state.data.runs, state.selected, {
     query: document.getElementById('run-search')?.value,
     status: document.getElementById('run-status')?.value,
-  });
+  }));
 }
 
 async function refreshRun({ silent = false } = {}) {
@@ -241,11 +278,7 @@ async function refreshRun({ silent = false } = {}) {
   state.runFingerprint = latest;
   refreshHistory(run);
   document.getElementById('run-comparison').innerHTML = runComparison(state.data.runs, run);
-  const expanded = new Set(Array.from(detail.querySelectorAll('details[open] summary'), (summary) => summary.textContent));
-  detail.innerHTML = runDetail(run, state.events, runActions, consent);
-  for (const summary of detail.querySelectorAll('details summary')) {
-    if (expanded.has(summary.textContent)) summary.parentElement.open = true;
-  }
+  refreshMarkup(detail, runDetail(run, state.events, runActions, consent));
   return true;
 }
 
@@ -485,6 +518,7 @@ async function previewEvidence(button) {
   if (previous) {
     previous.remove();
     button.textContent = `View ${button.dataset.kind}`;
+    button.setAttribute('aria-expanded', 'false');
     return;
   }
   const blob = await api.download(`/runs/${encodeURIComponent(state.selected)}/evidence/${button.dataset.sha}`);
@@ -497,6 +531,7 @@ async function previewEvidence(button) {
     if (blob.size > limit) log.append('\n\nPreview stops at 64 KiB. Download to inspect the full attachment.');
     row.append(log);
     button.textContent = 'Hide log';
+    button.setAttribute('aria-expanded', 'true');
     return;
   }
   const prefix = [...new Uint8Array(await blob.slice(0, 8).arrayBuffer())];
@@ -512,11 +547,13 @@ async function previewEvidence(button) {
     URL.revokeObjectURL(url);
     screenshot.remove();
     button.textContent = 'View screenshot';
+    button.setAttribute('aria-expanded', 'false');
     notice('Screenshot could not be displayed. Download it for inspection.', true);
   }, { once: true });
   screenshot.src = url;
   row.append(screenshot);
   button.textContent = 'Hide screenshot';
+  button.setAttribute('aria-expanded', 'true');
 }
 
 function downloadJson(name, value) {
@@ -528,10 +565,24 @@ function downloadJson(name, value) {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
+const copyTimers = new WeakMap();
+function showCopied(button) {
+  const original = button.dataset.copyLabel || button.textContent;
+  button.dataset.copyLabel = original;
+  button.textContent = 'Copied';
+  button.dataset.copied = 'true';
+  clearTimeout(copyTimers.get(button));
+  copyTimers.set(button, setTimeout(() => {
+    button.textContent = original;
+    delete button.dataset.copied;
+  }, 1400));
+}
+
 const actions = {
   'copy-digest': async button => {
     try {
       await navigator.clipboard.writeText(button.dataset.digest);
+      showCopied(button);
       notice('Build SHA-256 copied.');
     } catch {
       const range = document.createRange();
@@ -681,10 +732,11 @@ const actions = {
     else await navigate();
     notice(run?.state === 'stopping' ? 'Invitation revoked. Waiting for runner confirmation and cleanup.' : 'Invitation revoked.');
   },
-  'copy-share': async () => {
+  'copy-share': async (button) => {
     if (!state.share || state.share.id !== route().selected) return;
     try {
       await navigator.clipboard.writeText(state.share.url);
+      showCopied(button);
       notice('Invitation link copied.');
     } catch {
       const input = document.getElementById('private-share-url');
@@ -713,12 +765,14 @@ document.addEventListener('submit', async (event) => {
   const button = form.querySelector('button[type=submit]');
   if (button.disabled) return;
   button.disabled = true;
+  form.setAttribute('aria-busy', 'true');
   notice('');
   try {
     await handle(new FormData(form), form);
   } catch (error) {
     displayError(error, { authenticationAttempt: ['auth-form', 'otp-start-form', 'otp-verify-form', 'google-start-form'].includes(form.id) });
   } finally {
+    form.removeAttribute('aria-busy');
     button.disabled = false;
   }
 });
