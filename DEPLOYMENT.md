@@ -64,7 +64,9 @@ Confirm the new deployment is `completed` in the Neon console before checking th
 ```bash
 origin='https://agusai.grindcity.app'
 curl --fail --silent --show-error "$origin/health"
-curl --fail --silent --show-error --output /dev/null "$origin/console.html"
+for page in / /privacy /terms /docs /console.html; do
+  curl --fail --silent --show-error --output /dev/null "$origin$page"
+done
 curl --silent --show-error --output /dev/null --write-out '%{http_code}\n' "$origin/api/v1/projects"
 curl --fail --silent --show-error "$origin/.well-known/assetlinks.json" | jq .
 ```

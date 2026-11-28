@@ -1,0 +1,58 @@
+@font-face {
+  font-family: Geist;
+  src: url("/assets/geist.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/assets/ibm-plex-mono.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/assets/ibm-plex-mono-medium.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/assets/ibm-plex-mono-semibold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+:root {
+  --sans: Geist, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --void: #080809;
+  --obsidian: #151518;
+  --graphite: #29292e;
+  --stone: #3f3f46;
+  --silver: #a1a1aa;
+  --pearl: #f5f5f7;
+  --success: #22c55e;
+  --pending: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+  --field: var(--void);
+  --field-deep: var(--void);
+  --field-surface: var(--obsidian);
+  --field-raised: #202024;
+  --field-line: var(--graphite);
+  --control-outline: var(--stone);
+  --paper: var(--pearl);
+  --paper-line: #d5d5da;
+  --paper-ink: var(--obsidian);
+  --ink: var(--pearl);
+  --quiet: var(--silver);
+  --signal: var(--silver);
+  --white-action: var(--pearl);
+  --ease: cubic-bezier(.2,.8,.2,1);
+  font-synthesis: none;
+  font-kerning: normal;
+}

@@ -1,7 +1,7 @@
 import { ApiError, createApi, readApk } from './api.mjs';
-import { account, authView, buildOptions, deviceOptions, devicesView, escape, integrationsView, invitationLinkView, invitationReview, invitationRows, navigation, paymentView, requestsView, runComparison, runDetail, runHistory, runsView, workspaceView } from './views.mjs';
+import { account, authView, buildOptions, deviceOptions, devicesView, escape, inboxView, integrationsView, invitationLinkView, invitationReview, invitationRows, navigation, paymentView, projectsView, requestsView, resultsView, runComparison, runDetail, runHistory, runsView, settingsView, workspaceView } from './views.mjs';
 
-import { campaignDraft, campaignsView, campaignTask } from './campaigns.mjs';
+import { campaignDraft, campaignsView, campaignTask, updateCampaignTask } from './campaigns.mjs';
 
 const sessionKey = 'agus-console-session';
 const googleKey = 'agus-google-pkce';
@@ -35,8 +35,8 @@ function route() {
   const selected = /^[\da-z-]{1,80}$/i.test(detail || '') ? detail : null;
   if (section === 'integrations') return { page: section };
   if (section === 'invite' && /^[\da-z_-]{20,160}$/i.test(detail || '')) return { page: section, token: detail };
-  if (state.session && section === 'devices') return { page: section };
-  if (state.session && ['runs', 'requests', 'campaigns'].includes(section)) return { page: section, selected };
+  if (state.session && ['builds', 'devices', 'settings', 'inbox', 'reports', 'funding'].includes(section)) return { page: section };
+  if (state.session && ['runs', 'requests', 'campaigns', 'projects'].includes(section)) return { page: section, selected };
   return { page: 'workspace' };
 }
 
@@ -54,7 +54,18 @@ function displayError(error, { authenticationAttempt = false } = {}) {
   notice(error.message || 'Request failed. Try again.', true);
 }
 
+async function listCampaigns() {
+  try {
+    return await api.get('/campaigns');
+  } catch (error) {
+    if (['pilot_unavailable', 'pilot_access_required'].includes(error.code)) return { campaigns: [], campaignsUnavailable: true };
+    throw error;
+  }
+}
+
 async function loadData(page, selected) {
+  if (page === 'settings') return Object.assign({}, ...(await Promise.all([api.get('/auth/me'), api.get('/me/notifications/preferences')])));
+  if (page === 'inbox') return api.get('/me/notifications');
   if (page === 'campaigns') {
     try {
       return Object.assign({}, ...(await Promise.all([
@@ -74,6 +85,8 @@ async function loadData(page, selected) {
   const workspaceRequests = [api.get('/projects'), api.get('/builds')];
   const requests = [...workspaceRequests];
   if (page === 'runs') requests.push(api.get('/devices'), api.get('/runs'));
+  if (['workspace', 'projects', 'reports', 'funding'].includes(page)) requests.push(api.get('/runs'));
+  if (['workspace', 'reports', 'funding'].includes(page)) requests.push(listCampaigns());
   if (page === 'requests') requests.push(api.get('/invitations'));
   return Object.assign({}, ...(await Promise.all(requests)));
 }
@@ -94,6 +107,7 @@ async function navigate() {
   state.events = [];
   state.runFingerprint = null;
   state.paymentFingerprint = null;
+  document.body.dataset.mode = state.session ? 'member' : 'guest';
   elements.account.innerHTML = account(state.session?.user);
   elements.navigation.innerHTML = navigation(page, state.session?.user);
   notice('');
@@ -115,8 +129,15 @@ async function navigate() {
     const data = await loadData(page, selected);
     if (currentVersion !== state.routeVersion) return;
     state.data = data;
-    if (page === 'campaigns') elements.screen.innerHTML = campaignsView(data);
-    if (page === 'workspace') elements.screen.innerHTML = workspaceView(data);
+    if (page === 'campaigns') {
+      elements.screen.innerHTML = campaignsView(data);
+      for (const row of elements.screen.querySelectorAll('[data-campaign-task]')) updateCampaignTask(row);
+    }
+    if (page === 'workspace' || page === 'builds') elements.screen.innerHTML = workspaceView(data, page === 'builds');
+    if (page === 'projects') elements.screen.innerHTML = projectsView(data, selected);
+    if (['reports', 'funding'].includes(page)) elements.screen.innerHTML = resultsView(data, page === 'funding');
+    if (page === 'settings') elements.screen.innerHTML = settingsView(data);
+    if (page === 'inbox') elements.screen.innerHTML = inboxView(data.notifications);
     if (page === 'devices') elements.screen.innerHTML = devicesView(data.devices);
     if (page === 'requests') {
       const invitation = data.invitations.find(({ id }) => id === state.selected);
@@ -143,6 +164,11 @@ async function navigate() {
 
 function updateWorkloadFields(form, changed) {
   if (!form) return;
+  const trajectory = form.elements.trajectory;
+  if (trajectory && (!changed || changed === 'mode')) {
+    trajectory.disabled = form.elements.mode.value !== 'agent';
+    trajectory.closest('label').hidden = trajectory.disabled;
+  }
   if (!changed || changed === 'projectId') form.elements.buildId.innerHTML = buildOptions(state.data.builds, form.elements.projectId.value);
   if (!changed || changed === 'scenario' || changed === 'network') {
     if (form.id === 'run-form') {
@@ -163,8 +189,16 @@ function refreshHistory(run) {
   const index = state.data.runs.findIndex(({ id }) => id === run.id);
   if (index < 0) state.data.runs.unshift(run);
   else state.data.runs[index] = run;
+  applyRunFilters();
+}
+
+function applyRunFilters() {
   const target = document.getElementById('run-history');
-  if (target) target.innerHTML = runHistory(state.data.runs, state.selected);
+  if (!target) return;
+  target.innerHTML = runHistory(state.data.runs, state.selected, {
+    query: document.getElementById('run-search')?.value,
+    status: document.getElementById('run-status')?.value,
+  });
 }
 
 async function refreshRun({ silent = false } = {}) {
@@ -177,7 +211,11 @@ async function refreshRun({ silent = false } = {}) {
   const after = Number.isInteger(last) && last >= 0 ? `?after=${last}` : '';
   let result;
   try {
-    result = await Promise.all([api.get(base), api.get(`${base}/events${after}`)]);
+    const detailResult = await api.get(base);
+    result = [detailResult, ...(await Promise.all([
+      api.get(`${base}/events${after}`),
+      detailResult.run.mode === 'agent' ? api.get(base + '/actions') : { actions: [] },
+    ]))];
   } catch (error) {
     if (version !== state.routeVersion) return;
     if (!silent || error.status === 401) displayError(error);
@@ -185,16 +223,26 @@ async function refreshRun({ silent = false } = {}) {
     return;
   }
   if (version !== state.routeVersion) return;
-  const [{ run }, { events }] = result;
+  const [{ run }, { events }, { actions: runActions }] = result;
   const knownEvents = new Set(state.events.map(({ id }) => id));
   state.events.push(...events.filter(({ id }) => !knownEvents.has(id)));
-  const latest = JSON.stringify([run, state.events.length]);
+  let consent;
+  if (run.evidence?.trajectory && run.receipt?.evidence?.some(item => item.kind === 'trajectory' && item.url)) {
+    try {
+      ({ consent } = await api.get(base + '/training-consent'));
+    } catch (error) {
+      if (version !== state.routeVersion) return;
+      if (!['training_unavailable', 'not_found'].includes(error.code)) displayError(error);
+    }
+  }
+  if (version !== state.routeVersion) return;
+  const latest = JSON.stringify([run, state.events.length, runActions, consent]);
   if (latest === state.runFingerprint) return;
   state.runFingerprint = latest;
   refreshHistory(run);
   document.getElementById('run-comparison').innerHTML = runComparison(state.data.runs, run);
   const expanded = new Set(Array.from(detail.querySelectorAll('details[open] summary'), (summary) => summary.textContent));
-  detail.innerHTML = runDetail(run, state.events);
+  detail.innerHTML = runDetail(run, state.events, runActions, consent);
   for (const summary of detail.querySelectorAll('details summary')) {
     if (expanded.has(summary.textContent)) summary.parentElement.open = true;
   }
@@ -271,7 +319,38 @@ const optionalRegistration = data => {
 };
 
 const hex = bytes => [...bytes].map(value => value.toString(16).padStart(2, '0')).join('');
+const pendingCreates = new Map();
+
+async function createResource(path, body) {
+  const currentUser = state.session?.user.id;
+  const payload = JSON.stringify(body);
+  const scope = JSON.stringify([currentUser, path, payload]);
+  const last = pendingCreates.get(scope);
+  const key = last?.key ?? crypto.randomUUID();
+  pendingCreates.set(scope, { key });
+  try {
+    const result = await api.post(path, body, key);
+    pendingCreates.delete(scope);
+    return result;
+  } catch (error) {
+    if (error.status >= 400 && error.status < 500 && ![408, 425, 429].includes(error.status)) pendingCreates.delete(scope);
+    else throw new Error('The result is unknown. Refresh the list before retrying. Retrying the same request in this tab reuses its submission key.');
+    throw error;
+  }
+}
+
 const forms = {
+  'profile-form': async data => {
+    const { user } = await api.patch('/auth/me', { displayName: data.get('displayName').trim() });
+    if (state.session?.user.id === user.id) saveSession({ ...state.session, user });
+    await navigate();
+    notice('Profile saved.');
+  },
+  'preferences-form': async data => {
+    await api.patch('/me/notifications/preferences', { completedRuns: data.has('completedRuns'), campaignUpdates: data.has('campaignUpdates') });
+    await navigate();
+    notice('Notification preferences saved.');
+  },
   'otp-start-form': async data => {
     const email = data.get('email').trim();
     await api.post('/auth/email/start', { email, ...optionalRegistration(data) });
@@ -296,7 +375,7 @@ const forms = {
     const draft = campaignDraft(form, data);
     const previous = state.data.report?.campaign;
     const result = previous ? await api.patch('/campaigns/' + previous.id, { expectedRevision: previous.revision, draft })
-      : await api.post('/campaigns', draft);
+      : await createResource('/campaigns', draft);
     if (state.selected === result.campaign.id) await navigate();
     else location.hash = '#campaigns/' + result.campaign.id;
   },
@@ -326,9 +405,10 @@ const forms = {
     notice('Project created.');
   },
   'build-form': async (data) => {
-    notice('Calculating the build hash and uploading the APK…');
+    notice('Calculating the APK fingerprint…');
     const apk = await readApk(data.get('apk'));
     const build = { ...apk, projectId: data.get('projectId'), name: data.get('name').trim(), packageName: data.get('packageName').trim() };
+    notice('Uploading the APK and its fingerprint…');
     await api.post('/builds', build);
     await navigate();
     notice('Build registered.');
@@ -342,11 +422,11 @@ const forms = {
     if (data.get('deviceId')) body.deviceId = data.get('deviceId');
     const developerWallet = data.get('fundingWallet')?.trim();
     if (developerWallet) body.payment = { kind: 'devnet', developerWallet };
-    const { run } = await api.post('/runs', body);
+    const { run } = await createResource('/runs', body);
     beginRun(run);
   },
   'request-form': async (data) => {
-    const { invitation, token } = await api.post('/invitations', {
+    const { invitation, token } = await createResource('/invitations', {
       kind: 'developer_request', deviceId: data.get('deviceId').trim(), projectId: data.get('projectId'), buildId: data.get('buildId'),
       scenario: data.get('scenario'), mode: data.get('mode'), maximumDurationSeconds: Number(data.get('maximumDurationSeconds')),
       evidence: evidenceChoices(data), expectedTransaction: expectedTransaction(data),
@@ -378,7 +458,7 @@ const forms = {
   },
 };
 
-const evidenceChoices = (data) => ({ screenshots: data.has('screenshots'), logs: data.has('logs'), trajectory: false });
+const evidenceChoices = (data) => ({ screenshots: data.has('screenshots'), logs: data.has('logs'), trajectory: data.has('trajectory') });
 
 async function runPaymentAction(action, body) {
   if (!state.selected) return;
@@ -449,9 +529,66 @@ function downloadJson(name, value) {
 }
 
 const actions = {
+  'copy-digest': async button => {
+    try {
+      await navigator.clipboard.writeText(button.dataset.digest);
+      notice('Build SHA-256 copied.');
+    } catch {
+      const range = document.createRange();
+      range.selectNodeContents(button.previousElementSibling);
+      const selection = getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      notice('Copy the selected SHA-256.');
+    }
+  },
+  'agent-step': async button => {
+    const path = '/runs/' + encodeURIComponent(state.selected) + '/actions';
+    const type = button.dataset.type;
+    const args = type === 'tap' ? { target: button.dataset.target } : {};
+    try {
+      await api.post(path, { type, args });
+    } catch (error) {
+      await refreshRun();
+      if (error.status === 0 || error.status >= 500) throw new Error('Action status is unknown. Check the execution timeline before submitting another action.');
+      throw error;
+    }
+    await refreshRun();
+    notice('Agent action queued.');
+  },
+  'run-training-grant': async () => {
+    if (!confirm('Grant training consent for this run’s redacted trajectory?')) return;
+    await api.put('/runs/' + encodeURIComponent(state.selected) + '/training-consent', {});
+    await refreshRun();
+  },
+  'run-training-withdraw': async () => {
+    await api.delete('/runs/' + encodeURIComponent(state.selected) + '/training-consent');
+    await refreshRun();
+  },
+  'run-training-export': async () => {
+    const report = await api.get('/runs/' + encodeURIComponent(state.selected) + '/training-export');
+    downloadJson('agus-training-trajectory.json', report);
+  },
+  'read-notification': async button => {
+    await api.post('/me/notifications/' + encodeURIComponent(button.dataset.notification) + '/read', {});
+    await navigate();
+  },
+  'download-run-receipt': () => {
+    const receipt = state.data.runs.find(run => run.id === state.selected)?.receipt;
+    if (receipt) downloadJson('agus-run-receipt.json', receipt);
+  },
+  'verify-run': async () => {
+    await api.post('/runs/' + encodeURIComponent(state.selected) + '/verify', {});
+    await refreshRun();
+    notice('Verification updated. Review the result.');
+  },
   'add-campaign-task': () => {
     const area = document.getElementById('campaign-tasks');
-    if (area.children.length < 12) area.insertAdjacentHTML('beforeend', campaignTask(state.data.builds, {}, state.data.fundingNetwork));
+    if (area.children.length >= 12) return;
+    const projectId = document.getElementById('campaign-form').elements.projectId.value;
+    area.insertAdjacentHTML('beforeend', campaignTask(state.data.builds.filter(build => build.projectId === projectId), {}, state.data.fundingNetwork));
+    updateCampaignTask(area.lastElementChild);
+    area.lastElementChild.querySelector('[name=taskTitle]').focus();
   },
   'remove-campaign-task': button => {
     const row = button.closest('[data-campaign-task]');
@@ -462,6 +599,9 @@ const actions = {
     if (button.dataset.operation === 'cancel' && !confirm('Cancel future work and request stop for active assignments?')) return;
     await api.post('/campaigns/' + campaign.id + '/' + encodeURIComponent(button.dataset.operation), { expectedRevision: campaign.revision });
     await navigate();
+  },
+  'download-campaign-report': () => {
+    if (state.data.report) downloadJson('agus-campaign-report.json', state.data.report);
   },
   'campaign-receipt': async button => {
     const { receipt } = await api.get('/assignments/' + button.dataset.assignment + '/receipt');
@@ -511,6 +651,7 @@ const actions = {
       if (error.status !== 401) problem = error;
     }
     saveSession(null);
+    pendingCreates.clear();
     state.share = null;
     await navigate();
     if (problem) notice('Signed out of this tab. Server-side session revocation could not be confirmed.', true);
@@ -520,7 +661,7 @@ const actions = {
   'refresh-requests': navigate,
   retry: navigate,
   'cancel-run': async () => {
-    if (!state.selected) return;
+    if (!state.selected || !confirm('Cancel this queued run or request a stop for active work?')) return;
     const { run } = await api.post(`/runs/${encodeURIComponent(state.selected)}/cancel`, {});
     await refreshRun();
     notice(run.state === 'stopping' ? 'Stop requested. Waiting for runner confirmation and cleanup.' : 'Run cancelled.');
@@ -598,14 +739,66 @@ document.addEventListener('click', async (event) => {
 });
 
 document.addEventListener('change', ({ target }) => {
+  if (target.form?.id === 'build-form' && target.name === 'apk') {
+    const selected = target.files[0];
+    target.form.querySelector('[data-build-selection]').textContent = selected
+      ? new Intl.NumberFormat(undefined, { style: 'unit', unit: 'byte' }).format(selected.size)
+      : '';
+  }
+  if (target.id === 'run-status') applyRunFilters();
+  if (target.form?.id === 'campaign-form') {
+    if (target.name === 'visibility') target.form.querySelector('[data-campaign-invites]').hidden = target.value !== 'invited';
+    if (target.name === 'projectId') {
+      for (const select of target.form.querySelectorAll('[name=buildId]')) {
+        select.replaceChildren(...state.data.builds.filter(build => build.projectId === target.value).map(build =>
+          new Option(build.name + ' · ' + build.packageName + ' · ' + build.sha256.slice(0, 12), build.id)));
+      }
+    }
+    const row = target.closest('[data-campaign-task]');
+    if (row && ['lane', 'scenario'].includes(target.name)) updateCampaignTask(row);
+  }
   if (['run-form', 'request-form'].includes(target.form?.id)) updateWorkloadFields(target.form, target.name);
 });
 
+document.addEventListener('input', ({ target }) => {
+  if (target.id === 'run-search') applyRunFilters();
+});
 document.querySelector('.skip-link').addEventListener('click', (event) => {
   event.preventDefault();
   document.getElementById('main').focus();
 });
-window.addEventListener('hashchange', () => void navigate());
+const menuButton = document.getElementById('console-menu');
+const compactNavigation = matchMedia('(max-width: 767px)');
+function setNavigation(open, restore = true) {
+  document.body.dataset.navigation = open ? 'open' : 'closed';
+  menuButton.setAttribute('aria-expanded', String(open));
+  menuButton.setAttribute('aria-label', open ? 'Close console navigation' : 'Open console navigation');
+  if (open) (elements.navigation.querySelector('[aria-current]') ?? elements.navigation.querySelector('a'))?.focus();
+  else if (restore) menuButton.focus();
+}
+menuButton.addEventListener('click', () => setNavigation(menuButton.getAttribute('aria-expanded') !== 'true'));
+document.getElementById('console-menu-dismiss').addEventListener('click', () => setNavigation(false));
+compactNavigation.addEventListener('change', () => setNavigation(false, false));
+document.addEventListener('keydown', event => {
+  if (document.body.dataset.navigation !== 'open') return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    setNavigation(false);
+  }
+  if (event.key === 'Tab') {
+    const links = [...elements.navigation.querySelectorAll('a')];
+    const edge = event.shiftKey ? links[0] : links.at(-1);
+    if (document.activeElement === edge) {
+      event.preventDefault();
+      (event.shiftKey ? links.at(-1) : links[0]).focus();
+    }
+  }
+});
+window.addEventListener('hashchange', () => {
+  setNavigation(false, false);
+  document.getElementById('main').focus();
+  void navigate();
+});
 setInterval(async () => {
   if (polling || route().page !== 'runs' || !state.session || !state.selected || document.visibilityState === 'hidden') return;
   polling = true;

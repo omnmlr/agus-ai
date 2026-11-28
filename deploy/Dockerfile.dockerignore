@@ -2,6 +2,9 @@
 !apps/
 !apps/web/
 !apps/web/**
+!packages/
+!packages/developer-client/
+!packages/developer-client/openapi.json
 !services/
 !services/control-plane/
 !services/control-plane/**

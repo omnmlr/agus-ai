@@ -1,6 +1,8 @@
-# AGUS AI reference web surfaces
+# AGUS AI web platform
 
-The public site is served at `/`. The developer console is served at `/console.html`. The public example is illustrative. Console inventory, runs, evidence, and payment data are read from the control plane.
+The public site is served at `/`. The developer console is served at `/console.html`. Product illustrations on the public site explain the workflow. Console inventory, runs, evidence, and payment data are read from the control plane.
+
+See the [web platform handoff](../../docs/web-design/handoff.md) for launch settings, verification, and approved deployment steps.
 
 ## Local development
 
@@ -29,7 +31,7 @@ Serve `apps/web/dist` from the product's HTTPS origin and reverse-proxy `/api/v1
 
 ## Integration
 
-- The reference console uses email and password with a control-plane bearer session scoped to the current browser tab. Signing out revokes the server session when reachable. Optional Google and OTP integration use the backend identity contract. Cloud credentials and provider enrollment tokens never belong in the static build.
+- The console uses email and password with a control-plane bearer session scoped to the current browser tab. Signing out revokes the server session when reachable. Optional Google and OTP integration use the backend identity contract. Cloud credentials and provider enrollment tokens never belong in the static build.
 - APK upload hashes the selected file on the client and sends the binary as base64. The control plane independently checks the digest.
 - Developers can send an invitation to an exact private device ID and share `/console.html#invite/<token>`. The preview server also redirects `/invite/<token>` to the fragment. Opening a link preserves it through sign-in. Explicit review and acceptance are still required. If using a production path redirect, omit access logs for the opaque code.
 - Public marketplace offers use unpaid preview terms. A listed compatible device can reserve one separately. A developer can request a stop and follow the runner acknowledgement or lease expiry in the event feed.

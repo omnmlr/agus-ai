@@ -1,21 +1,32 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-workspace>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0c1516">
+  <meta name="theme-color" content="#080809">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="/assets/agus-orbital-mark.png" type="image/png">
   <title>Developer console · AGUS AI</title>
+  <script src="/theme.js"></script>
+  <link rel="stylesheet" href="/theme.css">
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./console.mjs"></script>
 </head>
-<body class="console-page">
+<body class="console-page" data-mode="guest">
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="console-header">
-    <a class="brand" href="./index.html" aria-label="AGUS AI home"><span class="brand-mark" aria-hidden="true"></span>AGUS<span class="brand-prefix">AI</span></a>
+    <button type="button" id="console-menu" class="button button-outline" aria-expanded="false" aria-controls="navigation" aria-label="Open console navigation">☰</button>
+    <a class="brand" href="/" aria-label="AGUS AI home">
+      <img class="brand-dark" src="/assets/brand-lockup-dark.svg" width="131" height="30" alt="AGUS AI">
+      <img class="brand-light" src="/assets/brand-lockup-light.svg" width="131" height="30" alt="AGUS AI">
+    </a>
     <p>Developer console</p>
+    <a class="console-docs" href="/docs">Documentation</a>
+    <label class="workspace-theme"><span>Theme</span><select aria-label="Color theme" data-theme-control><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
     <div id="account"></div>
   </header>
   <div class="console-frame">
+    <button type="button" tabindex="-1" id="console-menu-dismiss" aria-label="Close console navigation"></button>
     <nav class="console-nav" aria-label="Console" id="navigation"></nav>
     <main id="main" class="console-main" tabindex="-1">
       <div id="notice" role="status" aria-live="polite"></div>

@@ -10,17 +10,35 @@
 		X-Frame-Options DENY
 	}
 	@backend path /health /api/v1 /api/v1/* /.well-known/assetlinks.json /auth/android
-	@invite path /invite
+	@invite path /invite /invite/
+	@inviteToken path_regexp invite ^/invite/([A-Za-z0-9_-]{20,160})/?$
 	handle @invite {
 		header Cache-Control no-store
-		redir /console.html 302
+		redir * /console.html 302
+	}
+	handle @inviteToken {
+		header Cache-Control no-store
+		redir * /console.html#invite/{re.invite.1} 302
 	}
 	handle @backend {
 		reverse_proxy api:8080
 	}
 	handle {
 		root * /srv/agus-ai
+		header Content-Security-Policy "default-src 'self'; img-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
 		encode gzip
+		@trailing path_regexp trailing ^(/(?:[a-z0-9-]+/)*[a-z0-9-]+)/$
+		redir @trailing {re.trailing.1} 308
+		@home path /
+		rewrite @home /index.html
+		try_files {path}.html {path} =404
+		file_server {
+			disable_canonical_uris
+		}
+	}
+	handle_errors {
+		root * /srv/agus-ai
+		rewrite * /404.html
 		file_server
 	}
 }
