@@ -3,10 +3,9 @@ import { createServer, request as requestHttp } from 'node:http';
 import { request as requestHttps } from 'node:https';
 import { pathToFileURL } from 'node:url';
 
-const extensionTypes = new Map([
-  ['html', 'text/html; charset=utf-8'], ['css', 'text/css; charset=utf-8'], ['mjs', 'text/javascript; charset=utf-8'],
-]);
-const staticPaths = new Set(['index.html', 'console.html', 'styles.css', 'api.mjs', 'views.mjs', 'console.mjs', 'campaigns.mjs']);
+import { assetPath, contentType, webPolicies } from './asset-paths.mjs';
+import { generatedAssets } from './site.mjs';
+
 const hopByHop = ['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade'];
 
 function forwardHeaders(headers) {
@@ -40,7 +39,7 @@ function proxy(incoming, outgoing, upstream, path) {
   incoming.pipe(request);
 }
 
-export function createWebServer({ upstream, directory }) {
+export function createWebServer({ upstream, directory, pages = generatedAssets() }) {
   const controlPlane = new URL(upstream);
   if (!['http:', 'https:'].includes(controlPlane.protocol) || controlPlane.pathname !== '/' || controlPlane.username || controlPlane.password || controlPlane.search || controlPlane.hash) {
     throw new Error('CONTROL_PLANE_ORIGIN must be an HTTP or HTTPS origin.');
@@ -51,7 +50,7 @@ export function createWebServer({ upstream, directory }) {
       return;
     }
     const { pathname, search } = new URL(request.url, 'http://localhost');
-    if (pathname === '/api/v1' || pathname.startsWith('/api/v1/')) {
+    if (['/health', '/api/v1', '/.well-known/assetlinks.json', '/auth/android'].includes(pathname) || pathname.startsWith('/api/v1/')) {
       proxy(request, response, controlPlane, pathname + search);
       return;
     }
@@ -68,20 +67,29 @@ export function createWebServer({ upstream, directory }) {
       }).end();
       return;
     }
-    const file = pathname === '/' ? 'index.html' : pathname.slice(1);
-    if (!staticPaths.has(file)) {
-      response.writeHead(404).end('Page not found.');
-      return;
-    }
+    const file = assetPath(pathname);
+    const read = async path => {
+      if (pages?.has(path)) return Buffer.from(pages.get(path));
+      if (!path || !contentType(path)) return null;
+      try {
+        return await readFile(new URL(path.slice(1), directory));
+      } catch (error) {
+        if (error.code === 'ENOENT' || error.code === 'EISDIR') return null;
+        throw error;
+      }
+    };
     try {
-      const contents = await readFile(new URL(file, directory));
-      response.writeHead(200, {
-        'Content-Type': extensionTypes.get(file.split('.').at(-1)),
+      const asset = await read(file);
+      const contents = asset ?? await read('/404.html');
+      const status = asset ? 200 : 404;
+      if (!contents) {
+        response.writeHead(status).end('Page not found.');
+        return;
+      }
+      response.writeHead(status, {
+        ...webPolicies,
+        'Content-Type': contentType(asset ? file : '/404.html'),
         'Content-Length': contents.byteLength,
-        'Content-Security-Policy': "default-src 'self'; img-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
-        'Referrer-Policy': 'no-referrer',
-        'Cache-Control': 'no-cache',
-        'X-Content-Type-Options': 'nosniff',
       });
       response.end(request.method === 'HEAD' ? undefined : contents);
     } catch {
@@ -95,6 +103,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const host = process.env.WEB_HOST || '127.0.0.1';
   const port = Number(process.env.WEB_PORT || 4173);
   const upstream = process.env.CONTROL_PLANE_ORIGIN || 'http://127.0.0.1:8080';
-  const server = createWebServer({ upstream, directory });
+  const server = createWebServer({ upstream, directory, ...(process.argv.includes('--dist') && { pages: null }) });
   server.listen(port, host, () => console.log(`AGUS web listening on http://${host}:${server.address().port}`));
 }

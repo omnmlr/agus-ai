@@ -18,7 +18,7 @@ const statusNames = {
   awaiting_funding: 'Awaiting funding', submitted_or_unknown: 'Submitted or unknown', needs_review: 'Needs review',
   queued: 'Queued', running: 'Running', passed: 'Passed', failed: 'Failed', cancelled: 'Cancelled', expired: 'Expired',
   unverified: 'Unverified', available: 'Available', busy: 'Busy', offline: 'Offline', funded: 'Funded', settled: 'Settled',
-  pending: 'Pending review', reviewed: 'Reviewed', accepted: 'Accepted', declined: 'Declined', revoked: 'Revoked',
+  completed: 'Completed', pending: 'Pending review', reviewed: 'Reviewed', accepted: 'Accepted', declined: 'Declined', revoked: 'Revoked',
   reserved: 'Reserved', stopping: 'Stopping', verifying: 'Verifying', preparing: 'Preparing', awaiting_approval: 'Awaiting approval',
   'runner-signed-claims': 'Runner-signed claims', 'runner-claims-and-solana-rpc': 'Runner claims and independent Solana RPC',
 };
@@ -47,51 +47,119 @@ export function account(user) {
   return user ? `<span>${escape(user.email)}</span><button type="button" class="button button-outline" data-action="sign-out">Sign out</button>` : '';
 }
 
+const menu = {
+  workspace: ['◫', 'Overview'], builds: ['▤', 'Builds'], runs: ['▷', 'Test runs'],
+  campaigns: ['◈', 'Campaigns'], devices: ['▯', 'Devices'], requests: ['↗', 'Private access'],
+  inbox: ['◎', 'Inbox'], settings: ['⚙', 'Settings'], integrations: ['⌘', 'Integrations'],
+};
+
 export function navigation(page, user) {
-  const items = user ? { workspace: 'Workspace', devices: 'Devices', runs: 'Runs', campaigns: 'Campaigns', requests: 'Private requests', integrations: 'Integrations' } : { workspace: 'Sign in', integrations: 'Integrations' };
-  return Object.entries(items).map(([key, text]) => `<a href="#${key}"${page === key ? ' aria-current="page"' : ''}>${text}</a>`).join('');
+  if (!user) return '';
+  const groups = [
+    ['Workspace', ['workspace', 'builds', 'runs', 'campaigns']],
+    ['Access', ['devices', 'requests']],
+    ['Account', ['inbox', 'settings', 'integrations']],
+  ];
+  return groups.map(([name, keys]) => `<div class="nav-group"><p>${name}</p>${keys.map(key => {
+    const [icon, label] = menu[key];
+    return `<a href="#${key}"${page === key ? ' aria-current="page"' : ''}><span aria-hidden="true">${icon}</span>${label}</a>`;
+  }).join('')}</div>`).join('');
 }
 
 export function authView(register, fromInvite = false) {
   const heading = register ? 'Create an account' : 'Sign in';
-  return `${title(heading, fromInvite ? 'Sign in with the account this private invitation was sent to.' : 'Use your developer account to access projects, enrolled devices, and run evidence.')}
-    <section class="panel auth-panel"><form id="auth-form" class="form-stack">
-      <label class="field">Email<input name="email" type="email" required maxlength="254" autocomplete="email"></label>
-      <label class="field">Password<input name="password" type="password" required minlength="12" maxlength="128" autocomplete="${register ? 'new-password' : 'current-password'}">${register ? '<small>Choose at least 12 characters.</small>' : ''}</label>
-      ${register ? '<label class="field">Registration token<input name="registrationToken" maxlength="512" autocomplete="off"><small>Enter a token if your deployment requires one.</small></label>' : ''}
-      <button type="submit" class="button button-primary">${heading}</button>
-    </form>
-    <button type="button" class="button button-outline" data-action="toggle-auth">${register ? 'Use an existing account' : 'Create an account'}</button></section>
-    <section class="panel auth-panel"><h2>Email code</h2>
-      <form id="otp-start-form" class="form-stack">
-        <label class="field">Email<input name="email" type="email" required autocomplete="email"></label>
-        <label class="field">Registration token if needed<input name="registrationToken" maxlength="512"></label>
-        <button type="submit" class="button button-outline">Send email code</button>
+  return `<div class="auth-layout">
+    <div class="auth-intro">
+      <div class="auth-insignia" aria-hidden="true"><img src="/assets/mark.svg" width="52" height="52" alt=""></div>
+      <p>AGUS AI / DEVELOPER CONSOLE</p>
+      <h1>From build to evidence.</h1>
+      <p>Register your Android builds, commission testing, and review the execution record in one workspace.</p>
+      <a href="/docs/quickstart">Read the quickstart <span aria-hidden="true">↗</span></a>
+    </div>
+    <section class="auth-panel" aria-labelledby="auth-title">
+      <h2 id="auth-title">${heading}</h2>
+      <p>${fromInvite ? 'Use the account that received this private invitation.' : 'Access your developer workspace.'}</p>
+      <form id="google-start-form" class="form-stack">
+        <button type="submit" class="button button-outline google-button"><span aria-hidden="true">G</span> Continue with Google</button>
+        <details class="auth-invite"><summary>Have a registration token?</summary><label class="field">Registration token<input name="registrationToken" maxlength="512" autocomplete="off" spellcheck="false"></label></details>
       </form>
-      <form id="otp-verify-form" class="form-stack">
-        <label class="field">Email<input name="email" type="email" required autocomplete="email"></label>
-        <label class="field">Email code<input name="code" required inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code"></label>
-        <button type="submit" class="button button-outline">Verify email code</button>
-      </form></section>
-    <section class="panel auth-panel"><h2>Google sign-in</h2><form id="google-start-form" class="form-stack">
-      <label class="field">Registration token if needed<input name="registrationToken" maxlength="512"></label>
-      <button type="submit" class="button button-outline">Continue with Google</button>
-    </form></section>`;
+      <div class="auth-divider"><span>or use your email</span></div>
+      <form id="auth-form" class="form-stack">
+        <label class="field">Email<input name="email" type="email" required maxlength="254" autocomplete="email" spellcheck="false"></label>
+        <label class="field">Password<input name="password" type="password" required minlength="12" maxlength="128" autocomplete="${register ? 'new-password' : 'current-password'}">${register ? '<small>Choose at least 12 characters.</small>' : ''}</label>
+        ${register ? '<label class="field">Registration token<input name="registrationToken" maxlength="512" autocomplete="off" spellcheck="false"><small>Enter the token supplied by your preview coordinator if required.</small></label>' : ''}
+        <button type="submit" class="button button-primary">${heading}</button>
+      </form>
+      <details class="email-auth">
+        <summary>Use a one-time email code</summary>
+        <form id="otp-start-form" class="form-stack">
+          <label class="field">Email<input name="email" type="email" required autocomplete="email" spellcheck="false"></label>
+          <label class="field">Registration token if needed<input name="registrationToken" maxlength="512" spellcheck="false"></label>
+          <button type="submit" class="button button-outline">Send email code</button>
+        </form>
+        <form id="otp-verify-form" class="form-stack">
+          <label class="field">Email<input name="email" type="email" required autocomplete="email" spellcheck="false"></label>
+          <label class="field">Email code<input name="code" required inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code"></label>
+          <button type="submit" class="button button-outline">Verify email code</button>
+        </form>
+      </details>
+      <button type="button" class="auth-toggle" data-action="toggle-auth">${register ? 'Use an existing account' : 'Create an account'}</button>
+      <p class="auth-legal"><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Service</a></p>
+    </section>
+  </div>`;
 }
 
-export function workspaceView({ projects, builds }) {
-  const projectRows = dataList(projects, (item) => `<li><strong>${escape(item.name)}</strong><p>Created ${date(item.createdAt)}</p></li>`, 'No projects yet. Create your first project to register a build.');
-  const buildRows = dataList(builds, (item) => `<li><strong>${escape(item.name)}</strong><p>${escape(projects.find(({ id }) => id === item.projectId)?.name || 'Project')} · ${escape(item.packageName || 'Package not declared')}</p><p class="mono break-all">${escape(item.sha256)}</p></li>`, 'No builds registered. Upload an APK after creating a project.');
+function resourceTable(headings, rows) {
+  return `<div class="table-scroll" tabindex="0" aria-label="${escape(headings[0])} table"><table>
+    <thead><tr>${headings.map(heading => `<th scope="col">${escape(heading)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(([name, ...values]) => `<tr><th scope="row">${name}</th>${values.map(value => `<td>${value}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+export function workspaceView({ projects, builds }, buildsOnly = false) {
+  const projectRows = projects.length ? resourceTable(['Project', 'Builds', 'Created'], projects.map(item =>
+    [escape(item.name), builds.filter(build => build.projectId === item.id).length, date(item.createdAt)]))
+    : empty('Your projects will appear here.');
+  const buildRows = builds.length ? resourceTable(['Build', 'Android package', 'SHA-256'], builds.map(item => [
+    `${escape(item.name)}<small>${escape(projects.find(project => project.id === item.projectId)?.name ?? 'Project')}</small>`,
+    escape(item.packageName || 'Unavailable'), `<code class="break-all">${escape(item.sha256)}</code>`,
+  ])) : empty('Uploaded APKs will appear here.');
   const createProject = `<form id="project-form" class="form-stack"><label class="field">Project name<input name="name" required maxlength="100" autocomplete="off"></label><button type="submit" class="button button-primary">Create project</button></form>`;
   const buildForm = projects.length ? `<form id="build-form" class="form-stack">
-    <label class="field">Project<select name="projectId" required>${projects.map((item) => selectOption(item.id, item.name)).join('')}</select></label>
+    <label class="field">Project<select name="projectId" required>${projects.map(item => selectOption(item.id, item.name)).join('')}</select></label>
     <label class="field">Build name<input name="name" required maxlength="100" autocomplete="off"></label>
-    <label class="field">Android package name<input name="packageName" placeholder="com.example.test" maxlength="200" autocomplete="off" required><small>Use the application ID from the authorized build.</small></label>
-    <label class="field">APK file<input name="apk" type="file" accept=".apk,application/vnd.android.package-archive" required><small>Maximum size 25 MiB. The console calculates SHA-256 before upload.</small></label>
+    <label class="field">Android package name<input name="packageName" placeholder="com.example.test" maxlength="200" autocomplete="off" required spellcheck="false"></label>
+    <label class="field">APK file<input name="apk" type="file" accept=".apk,application/vnd.android.package-archive" required><small>Up to 25 MiB. AGUS AI checks the APK’s SHA-256 digest.</small></label>
     <button type="submit" class="button button-primary">Upload build</button>
-  </form>` : empty('Create a project to upload a build.');
-  return `${title('Workspace', 'Organize authorized Android builds and prepare a run.')}
-    <div class="console-grid"><div>${panel('Projects', projectRows)}${panel('Builds', buildRows)}</div><div>${panel('Create a project', createProject)}${panel('Register a build', buildForm)}</div></div>`;
+  </form>` : '<p class="empty">Create a project in the <a href="#workspace">workspace overview</a> before uploading an APK.</p>';
+  if (buildsOnly) return `${title('Builds', 'Register and inspect exact Android application builds.')}
+    <div class="console-grid"><div>${panel('Registered APKs', buildRows)}</div><div>${panel('Upload an APK', buildForm)}</div></div>`;
+  const onboarding = !builds.length ? `<div class="onboarding"><div><h2>${projects.length ? 'Register your first APK' : 'Set up your first test'}</h2>
+    <p>${projects.length ? 'Choose an authorized Android build and enter its package name.' : 'Create a project to group APKs and the work you run against them.'}</p></div>
+    <a class="button button-outline" href="/docs/quickstart">Read the quickstart ↗</a></div>` : '';
+  return `${title('Workspace overview', 'Manage projects and Android builds for your team’s test work.')}${onboarding}
+    <div class="console-grid"><div>${panel('Projects', projectRows)}${builds.length ? panel('Registered APKs', buildRows) : ''}</div>
+    <div>${panel('Create a project', createProject)}${projects.length ? panel('Upload an APK', buildForm) : ''}</div></div>`;
+}
+
+export function settingsView({ user, preferences }) {
+  return `${title('Settings', 'Manage your developer profile and optional notifications.')}
+    <div class="console-grid"><div>${panel('Profile', `<form id="profile-form" class="form-stack">
+      <label class="field">Email<input readonly type="email" value="${escape(user.email)}"></label>
+      <label class="field">Display name<input required name="displayName" maxlength="80" autocomplete="name" value="${escape(user.displayName ?? '')}"></label>
+      <button class="button button-primary" type="submit">Save profile</button></form>`)}</div>
+    <div>${panel('Inbox preferences', `<form id="preferences-form" class="form-stack">
+      <p class="subtle">Required safety messages remain available.</p>
+      <label><input type="checkbox" name="completedRuns"${preferences.completedRuns ? ' checked' : ''}> Completed test runs</label>
+      <label><input type="checkbox" name="campaignUpdates"${preferences.campaignUpdates ? ' checked' : ''}> Campaign updates</label>
+      <button class="button button-primary" type="submit">Save preferences</button>
+    </form>`)}${panel('Privacy', '<p>Review training consent on eligible campaign assignments. See the <a href="/privacy">Privacy Policy</a> for account data requests.</p>')}</div></div>`;
+}
+
+export function inboxView(notifications) {
+  const rows = dataList(notifications, entry => `<li><div class="data-heading"><strong>${escape(label(entry.type).replaceAll('-', ' '))}</strong><time>${date(entry.createdAt)}</time></div>
+    ${entry.readAt ? '<p>Read</p>' : `<button type="button" class="button button-outline" data-action="read-notification" data-notification="${escape(entry.id)}">Mark as read</button>`}</li>`, 'Updates about your runs and work will appear here.');
+  return `${title('Inbox', 'Follow operational updates for your account.')}${panel('Notifications', rows)}`;
 }
 
 export function devicesView(devices) {
@@ -129,10 +197,14 @@ function evidenceFields(note) {
   return `<fieldset><legend>Requested evidence</legend><label><input type="checkbox" name="screenshots"> Workload screenshots</label><label><input type="checkbox" name="logs"> Workload logs</label><small class="subtle">${escape(note)}</small></fieldset>`;
 }
 
-export function runHistory(runs, selected) {
-  return dataList(runs, (item) => `<li><div class="data-heading">
-    <a href="#runs/${encodeURIComponent(item.id)}"${selected === item.id ? ' aria-current="true"' : ''}><strong>${escape(scenarios[item.scenario] || item.scenario)}</strong></a>${badge(item.state)}
-  </div><p>${escape(item.mode === 'agent' ? 'Agent-driven' : 'Scripted')} · ${item.allocation === 'marketplace' ? 'Marketplace · ' : ''}${date(item.createdAt)}</p></li>`, 'No runs yet. Queue a run using an authorized build.');
+export function runHistory(runs, selected, { query = '', status = '' } = {}) {
+  const search = query.trim().toLowerCase();
+  const filtered = runs.filter(run => (!status || [run.state, run.executionState].includes(status)) &&
+    [run.id, run.scenario, scenarios[run.scenario], run.mode, run.buildId].some(value => String(value ?? '').toLowerCase().includes(search)));
+  return filtered.length ? resourceTable(['Scenario', 'State', 'Created'], filtered.map(item => [
+    `<a href="#runs/${encodeURIComponent(item.id)}"${selected === item.id ? ' aria-current="true"' : ''}>${escape(scenarios[item.scenario] || item.scenario)}</a><small>${item.mode === 'agent' ? 'Agent-driven' : 'Scripted'}</small>`,
+    badge(item.state), date(item.createdAt),
+  ])) : empty(runs.length ? 'No runs match these filters.' : 'No runs yet. Queue a run using an authorized build.');
 }
 
 export function runsView({ projects, builds, devices, runs }, selected) {
@@ -141,21 +213,23 @@ export function runsView({ projects, builds, devices, runs }, selected) {
     <label class="field">Project<select name="projectId" required>${projects.filter((project) => builds.some((build) => build.projectId === project.id)).map((item) => selectOption(item.id, item.name)).join('')}</select></label>
     <label class="field">Build<select name="buildId" required>${selectOption('', 'Select a build')}</select></label>
     <label class="field">Scenario<select name="scenario" required>${Object.entries(scenarios).map(([key, name]) => selectOption(key, name)).join('')}</select></label>
-    <label class="field">Device<select name="deviceId">${deviceOptions(devices, 'app-launch')}</select><small>Use Private requests to propose a session on a particular unlisted device.</small></label>
+    <label class="field">Device<select name="deviceId">${deviceOptions(devices, 'app-launch')}</select><small>Use Private access to propose a session on a particular unlisted device.</small></label>
     <label class="field">Maximum duration in seconds<input name="maximumDurationSeconds" type="number" min="15" max="600" step="1" value="120" required><small>Unpaid marketplace offers require provider acceptance under the device's availability settings.</small></label>
     <label class="field">Execution mode<select name="mode">${selectOption('scripted', 'Scripted')}${selectOption('agent', 'Agent-driven')}</select></label>
     ${transactionFields()}
     <label class="field">Devnet USDC funding wallet (optional)<input name="fundingWallet" maxlength="44" autocomplete="off"><small>Paid Devnet work requires a specific provider device, test payer and verified payout wallet.</small></label>
     ${evidenceFields('Choose which workload attachments the provider may collect.')}
     <button type="submit" class="button button-primary">Post marketplace job</button>
-  </form>` : empty('Register a build in Workspace to start a run.');
-  return `${title('Runs', 'Allocate a device, follow execution, and inspect verification and settlement.')}
-    <div class="console-grid"><div>
-      <section class="panel"><div class="panel-heading"><h2>Run history</h2>${refresh('refresh-runs')}</div><div id="run-history">${rows}</div></section>
-      <div id="run-detail">${selected ? '<p class="empty">Loading selected run…</p>' : '<p class="empty">Select a run to see its evidence and events.</p>'}</div>
-      <div id="run-comparison"></div>
-      <div id="payment-detail"></div>
-    </div><div>${panel('Offer a marketplace job', runForm)}</div></div>`;
+  </form>` : empty('Register a build in Builds to start a run.');
+  const history = `<section class="panel"><div class="panel-heading"><h2>Run history</h2>${refresh('refresh-runs')}</div>
+    ${runs.length ? `<div class="run-filters"><label class="field">Search runs<input type="search" id="run-search" placeholder="Scenario or run ID" autocomplete="off"></label>
+    <label class="field">Execution state<select id="run-status">${selectOption('', 'All states')}${['queued', 'reserved', 'running', 'stopping', 'verifying', 'completed', 'failed', 'expired', 'cancelled'].map(state => selectOption(state, label(state))).join('')}</select></label></div>` : ''}
+    <div id="run-history">${rows}</div></section>`;
+  return selected ? `${title('Test run', 'Inspect execution, evaluation, and evidence.')}
+    <a class="back-link" href="#runs">← All test runs</a><div class="console-grid run-detail-layout"><div><div id="run-detail"><p class="empty">Loading selected run…</p></div>
+    <div id="run-comparison"></div></div><div>${history}<div id="payment-detail"></div></div></div>`
+    : `${title('Test runs', 'Allocate a device, follow execution, and inspect verification and settlement.')}
+    <div class="console-grid"><div>${history}</div><div>${panel('Offer a marketplace job', runForm)}</div></div>`;
 }
 
 const signatureReference = (signature, network) => {
@@ -163,7 +237,7 @@ const signatureReference = (signature, network) => {
   return `<a href="https://explorer.solana.com/tx/${encodeURIComponent(signature)}?cluster=devnet" target="_blank" rel="noopener noreferrer">View Devnet transaction</a>`;
 };
 
-export function runDetail(run, events) {
+export function runDetail(run, events, runActions = []) {
   const receipt = run.receipt;
   const verification = run.verification;
   const evidence = receipt?.evidence || receipt?.report?.evidence;
@@ -171,14 +245,20 @@ export function runDetail(run, events) {
   const stopping = run.state === 'stopping';
   const stopUnconfirmed = run.state === 'expired' && run.stop?.requestedAt && !run.stop?.acknowledgedAt;
   const verificationSummary = verification ? `<dl class="data-pairs run-summary">${pair('Verification scope', label(verification.scope))}${pair('Transaction', label(transaction?.status))}${pair('Duration', duration(verification.durationMs))}${verification.actionMetrics ? `${pair('Completed actions', verification.actionMetrics.actionCount)}${pair('Invalid actions', verification.actionMetrics.invalidActions)}` : ''}</dl>${transaction?.signature ? `<p>Transaction reference · ${signatureReference(transaction.signature, transaction.network)}</p>` : ''}` : '';
+  const report = receipt?.manifest;
+  const signedReceipt = receipt ? `<section class="panel receipt-panel"><div class="panel-heading"><h2>Signed runner receipt</h2>
+    <button type="button" class="button button-outline" data-action="download-run-receipt">Download JSON</button></div>
+    <dl class="data-pairs run-summary">${pair('Receipt ID', receipt.id)}${pair('Manifest SHA-256', receipt.manifestSha256)}
+    ${pair('Issuer runner', receipt.issuer)}${pair('Public key', receipt.publicKeyPem)}${pair('Build SHA-256', report?.buildSha256)}
+    ${report?.execution?.planner ? pair('Planner', report.execution.planner) : ''}${report?.execution?.modelId ? pair('Model', report.execution.modelId) : ''}</dl>${detail('Raw signed receipt', receipt)}</section>` : '';
   const result = `<div class="panel-heading"><h2>${escape(scenarios[run.scenario] || run.scenario)}</h2>${badge(run.state)}</div>
-    <dl class="data-pairs run-summary">${pair('Run ID', run.id)}${pair('Mode', run.mode === 'agent' ? 'Agent-driven' : 'Scripted')}${pair('Allocation', run.allocation === 'marketplace' ? 'Marketplace' : run.invitationId ? 'Private request' : 'Dedicated lab')}${pair('Device', run.deviceId || 'Awaiting allocation')}${pair('Lease', label(run.leaseState))}${pair('Updated', formattedDate(run.updatedAt))}${run.acceptedWork ? `${pair('Work accepted', formattedDate(run.acceptedWork.acceptedAt))}${pair('Accepted payout', run.acceptedWork.payout?.kind === 'unpaid' ? 'Unpaid' : 'See settlement')}` : ''}${run.stop?.requestedAt ? pair('Stop requested', formattedDate(run.stop.requestedAt)) : ''}${run.stop?.acknowledgedAt ? pair(run.leaseState === 'unallocated' ? 'Cancellation confirmed' : 'Stop acknowledged', formattedDate(run.stop.acknowledgedAt)) : ''}</dl>
+    <dl class="data-pairs run-summary">${pair('Run ID', run.id)}${pair('Project ID', run.projectId)}${pair('Build ID', run.buildId)}${pair('Execution', label(run.executionState))}${pair('Evaluation', label(run.evaluationOutcome))}${pair('Mode', run.mode === 'agent' ? 'Agent-driven' : 'Scripted')}${pair('Allocation', run.allocation === 'marketplace' ? 'Marketplace' : run.invitationId ? 'Private request' : 'Dedicated lab')}${pair('Device', run.deviceId || 'Awaiting allocation')}${pair('Lease', label(run.leaseState))}${pair('Updated', formattedDate(run.updatedAt))}${run.acceptedWork ? `${pair('Work accepted', formattedDate(run.acceptedWork.acceptedAt))}${pair('Accepted payout', run.acceptedWork.payout?.kind === 'unpaid' ? 'Unpaid' : 'See settlement')}` : ''}${run.stop?.requestedAt ? pair('Stop requested', formattedDate(run.stop.requestedAt)) : ''}${run.stop?.acknowledgedAt ? pair(run.leaseState === 'unallocated' ? 'Cancellation confirmed' : 'Stop acknowledged', formattedDate(run.stop.acknowledgedAt)) : ''}</dl>
     ${stoppableStates.has(run.state) ? `<button type="button" class="button button-danger" data-action="cancel-run">${run.state === 'queued' ? 'Cancel queued run' : 'Request stop'}</button>` : ''}
+    ${receipt && ['verifying', 'unverified'].includes(run.state) ? '<button type="button" class="button button-outline" data-action="verify-run">Retry verification</button>' : ''}
     ${stopping ? '<p class="subtle">Waiting for the runner to confirm stop and cleanup. The device may still be busy.</p>' : ''}
     ${stopUnconfirmed ? '<p class="subtle">Lease expired before stop and cleanup were confirmed. Check the device before using it again.</p>' : ''}
     ${verification ? verificationSummary + detail('Verification details', verification) : '<p class="subtle">Verification awaits a completed report.</p>'}
-    ${receipt ? '<p class="subtle">The signed receipt identifies the runner and its execution claims.</p>' + detail('Runner receipt', receipt) : ''}
-    ${run.evaluation ? detail('Deterministic evaluation', run.evaluation) : ''}`;
+    ${run.evaluation ? detail('Scenario evaluation', run.evaluation) : ''}`;
   const evidenceRows = dataList(Array.isArray(evidence) ? evidence : [], (item) => {
     const hash = item?.sha256 || item?.hash;
     const canDownload = /^[0-9a-fA-F]{64}$/.test(hash || '') && Boolean(item?.url || item?.available);
@@ -189,7 +269,10 @@ export function runDetail(run, events) {
     return `<li><div class="data-heading"><strong>${escape(name)}</strong>${canDownload ? `<div class="actions">${previewLabel ? `<button type="button" class="button button-outline" data-action="preview-evidence" data-sha="${hash}" data-kind="${previewLabel}" data-filename="${escape(filename)}">View ${previewLabel}</button>` : ''}<button type="button" class="button button-outline" data-action="download-evidence" data-sha="${hash}" data-filename="${escape(filename)}">Download</button></div>` : ''}</div><p class="mono break-all">${escape(hash || 'Digest unavailable')}</p></li>`;
   }, 'No evidence files are attached to the receipt yet.');
   const eventRows = dataList(events, (event) => `<li><div class="data-heading"><strong>${escape(label(event.type))}</strong><time datetime="${escape(event.at)}">${date(event.at)}</time></div>${event.data && Object.keys(event.data).length ? detail('Event details', event.data) : ''}</li>`, 'No events received yet.');
-  return `<section class="panel">${result}</section>${panel('Evidence files', evidenceRows)}${panel('Run events', eventRows)}`;
+  const agent = run.mode === 'agent' ? panel('Agent actions', dataList(runActions, action => `
+    <li><div class="data-heading"><strong>${escape(action.type)}</strong>${badge(action.state ?? action.status)}</div>
+    ${detail('Action record', action)}</li>`, 'No recorded actions for this run.'), 'timeline-panel') : '';
+  return `<section class="panel">${result}</section>${agent}${signedReceipt}${panel('Evidence files', evidenceRows)}${panel('Execution timeline', eventRows, 'timeline-panel')}`;
 }
 
 const duration = (milliseconds) => Number.isFinite(milliseconds) ? `${(milliseconds / 1_000).toFixed(2)} s` : 'Unavailable';
@@ -241,7 +324,7 @@ export function requestsView({ projects, builds, invitations }, user, shareUrl) 
     ${transactionFields()}
     ${evidenceFields('Private preview jobs are unpaid. The owner reviews the requested scope before accepting.')}
     <button type="submit" class="button button-primary">Send private request</button>
-  </form>` : empty('Register a build in Workspace to send a private request.');
+  </form>` : empty('Register a build in Builds to send a private request.');
   const share = shareUrl ? panel('Invitation link', `<p>Share this link only with the intended recipient. They must sign in and review the request before accepting.</p><label class="field">Link<input id="private-share-url" value="${escape(shareUrl)}" readonly></label><button type="button" class="button button-outline" data-action="copy-share">Copy link</button>`, 'share-panel') : '';
   const developerId = panel('Account ID', `<p class="subtle">A device provider can address a private share to this account ID.</p><p class="mono break-all">${escape(user.id)}</p>`);
   return `${title('Private requests', 'Review invitations for a particular dedicated device. Acceptance is separate from enrollment and allocation.')}

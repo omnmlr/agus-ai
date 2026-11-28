@@ -20,6 +20,7 @@ CMD ["sh", "-c", "node deploy/preflight-cli.mjs && exec node services/control-pl
 FROM node:22-bookworm-slim@sha256:be979e5523c76fa4d5ca4ebd3099078f220aa47ec39c48ad5b5df9314debd6eb AS web-build
 WORKDIR /src/apps/web
 COPY apps/web/ ./
+COPY packages/developer-client/openapi.json /src/packages/developer-client/openapi.json
 RUN npm run build
 
 FROM caddy:2.11.2-alpine@sha256:834468128c7696cec0ceea6172f7d692daf645ae51983ca76e39da54a97c570d AS web

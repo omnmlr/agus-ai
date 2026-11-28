@@ -85,7 +85,7 @@ test('web serves both entry points and preserves scoped authorization and bytes 
   const origin = await start(createWebServer({ upstream, directory: new URL('../public/', import.meta.url) }), context);
   const home = await fetch(origin);
   assert.equal(home.status, 200);
-  assert.match(await home.text(), /Mobile runs you can verify/);
+  assert.match(await home.text(), /Test on devices./);
   const consoleResponse = await fetch(`${origin}/console.html`);
   assert.equal(consoleResponse.status, 200);
   assert.match(consoleResponse.headers.get('content-security-policy'), /img-src 'self' blob:/);
@@ -100,5 +100,13 @@ test('web serves both entry points and preserves scoped authorization and bytes 
   assert.equal(share.status, 302);
   assert.equal(share.headers.get('location'), `/console.html#invite/${'a'.repeat(43)}`);
   assert.equal(share.headers.get('cache-control'), 'no-store');
-  assert.equal((await fetch(`${origin}/package.json`)).status, 404);
+  for (const [path, expected] of [['/privacy', 'Privacy Policy'], ['/terms', 'Terms of Service'],
+    ['/docs/quickstart', 'From APK to test run'], ['/docs/api', 'Control-plane API']]) {
+    const page = await fetch(origin + path);
+    assert.equal(page.status, 200);
+    assert.ok((await page.text()).includes(expected));
+  }
+  const missing = await fetch(`${origin}/package.json`);
+  assert.equal(missing.status, 404);
+  assert.match(await missing.text(), /This page is out of scope/);
 });

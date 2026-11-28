@@ -1,7 +1,7 @@
 import { ApiError, createApi, readApk } from './api.mjs';
-import { account, authView, buildOptions, deviceOptions, devicesView, escape, integrationsView, invitationLinkView, invitationReview, invitationRows, navigation, paymentView, requestsView, runComparison, runDetail, runHistory, runsView, workspaceView } from './views.mjs';
+import { account, authView, buildOptions, deviceOptions, devicesView, escape, inboxView, integrationsView, invitationLinkView, invitationReview, invitationRows, navigation, paymentView, requestsView, runComparison, runDetail, runHistory, runsView, settingsView, workspaceView } from './views.mjs';
 
-import { campaignDraft, campaignsView, campaignTask } from './campaigns.mjs';
+import { campaignDraft, campaignsView, campaignTask, updateCampaignTask } from './campaigns.mjs';
 
 const sessionKey = 'agus-console-session';
 const googleKey = 'agus-google-pkce';
@@ -35,7 +35,7 @@ function route() {
   const selected = /^[\da-z-]{1,80}$/i.test(detail || '') ? detail : null;
   if (section === 'integrations') return { page: section };
   if (section === 'invite' && /^[\da-z_-]{20,160}$/i.test(detail || '')) return { page: section, token: detail };
-  if (state.session && section === 'devices') return { page: section };
+  if (state.session && ['builds', 'devices', 'settings', 'inbox'].includes(section)) return { page: section };
   if (state.session && ['runs', 'requests', 'campaigns'].includes(section)) return { page: section, selected };
   return { page: 'workspace' };
 }
@@ -55,6 +55,8 @@ function displayError(error, { authenticationAttempt = false } = {}) {
 }
 
 async function loadData(page, selected) {
+  if (page === 'settings') return Object.assign({}, ...(await Promise.all([api.get('/auth/me'), api.get('/me/notifications/preferences')])));
+  if (page === 'inbox') return api.get('/me/notifications');
   if (page === 'campaigns') {
     try {
       return Object.assign({}, ...(await Promise.all([
@@ -94,6 +96,7 @@ async function navigate() {
   state.events = [];
   state.runFingerprint = null;
   state.paymentFingerprint = null;
+  document.body.dataset.mode = state.session ? 'member' : 'guest';
   elements.account.innerHTML = account(state.session?.user);
   elements.navigation.innerHTML = navigation(page, state.session?.user);
   notice('');
@@ -115,8 +118,13 @@ async function navigate() {
     const data = await loadData(page, selected);
     if (currentVersion !== state.routeVersion) return;
     state.data = data;
-    if (page === 'campaigns') elements.screen.innerHTML = campaignsView(data);
-    if (page === 'workspace') elements.screen.innerHTML = workspaceView(data);
+    if (page === 'campaigns') {
+      elements.screen.innerHTML = campaignsView(data);
+      for (const row of elements.screen.querySelectorAll('[data-campaign-task]')) updateCampaignTask(row);
+    }
+    if (page === 'workspace' || page === 'builds') elements.screen.innerHTML = workspaceView(data, page === 'builds');
+    if (page === 'settings') elements.screen.innerHTML = settingsView(data);
+    if (page === 'inbox') elements.screen.innerHTML = inboxView(data.notifications);
     if (page === 'devices') elements.screen.innerHTML = devicesView(data.devices);
     if (page === 'requests') {
       const invitation = data.invitations.find(({ id }) => id === state.selected);
@@ -163,8 +171,16 @@ function refreshHistory(run) {
   const index = state.data.runs.findIndex(({ id }) => id === run.id);
   if (index < 0) state.data.runs.unshift(run);
   else state.data.runs[index] = run;
+  applyRunFilters();
+}
+
+function applyRunFilters() {
   const target = document.getElementById('run-history');
-  if (target) target.innerHTML = runHistory(state.data.runs, state.selected);
+  if (!target) return;
+  target.innerHTML = runHistory(state.data.runs, state.selected, {
+    query: document.getElementById('run-search')?.value,
+    status: document.getElementById('run-status')?.value,
+  });
 }
 
 async function refreshRun({ silent = false } = {}) {
@@ -177,7 +193,11 @@ async function refreshRun({ silent = false } = {}) {
   const after = Number.isInteger(last) && last >= 0 ? `?after=${last}` : '';
   let result;
   try {
-    result = await Promise.all([api.get(base), api.get(`${base}/events${after}`)]);
+    const detailResult = await api.get(base);
+    result = [detailResult, ...(await Promise.all([
+      api.get(`${base}/events${after}`),
+      detailResult.run.mode === 'agent' ? api.get(base + '/actions') : { actions: [] },
+    ]))];
   } catch (error) {
     if (version !== state.routeVersion) return;
     if (!silent || error.status === 401) displayError(error);
@@ -185,16 +205,16 @@ async function refreshRun({ silent = false } = {}) {
     return;
   }
   if (version !== state.routeVersion) return;
-  const [{ run }, { events }] = result;
+  const [{ run }, { events }, { actions: runActions }] = result;
   const knownEvents = new Set(state.events.map(({ id }) => id));
   state.events.push(...events.filter(({ id }) => !knownEvents.has(id)));
-  const latest = JSON.stringify([run, state.events.length]);
+  const latest = JSON.stringify([run, state.events.length, runActions]);
   if (latest === state.runFingerprint) return;
   state.runFingerprint = latest;
   refreshHistory(run);
   document.getElementById('run-comparison').innerHTML = runComparison(state.data.runs, run);
   const expanded = new Set(Array.from(detail.querySelectorAll('details[open] summary'), (summary) => summary.textContent));
-  detail.innerHTML = runDetail(run, state.events);
+  detail.innerHTML = runDetail(run, state.events, runActions);
   for (const summary of detail.querySelectorAll('details summary')) {
     if (expanded.has(summary.textContent)) summary.parentElement.open = true;
   }
@@ -271,7 +291,38 @@ const optionalRegistration = data => {
 };
 
 const hex = bytes => [...bytes].map(value => value.toString(16).padStart(2, '0')).join('');
+const pendingCreates = new Map();
+
+async function createResource(path, body) {
+  const currentUser = state.session?.user.id;
+  const payload = JSON.stringify(body);
+  const scope = JSON.stringify([currentUser, path, payload]);
+  const last = pendingCreates.get(scope);
+  const key = last?.key ?? crypto.randomUUID();
+  pendingCreates.set(scope, { key });
+  try {
+    const result = await api.post(path, body, key);
+    pendingCreates.delete(scope);
+    return result;
+  } catch (error) {
+    if (error.status >= 400 && error.status < 500 && ![408, 425, 429].includes(error.status)) pendingCreates.delete(scope);
+    else throw new Error('The result is unknown. Refresh the list before retrying. Retrying the same request in this tab reuses its submission key.');
+    throw error;
+  }
+}
+
 const forms = {
+  'profile-form': async data => {
+    const { user } = await api.patch('/auth/me', { displayName: data.get('displayName').trim() });
+    if (state.session?.user.id === user.id) saveSession({ ...state.session, user });
+    await navigate();
+    notice('Profile saved.');
+  },
+  'preferences-form': async data => {
+    await api.patch('/me/notifications/preferences', { completedRuns: data.has('completedRuns'), campaignUpdates: data.has('campaignUpdates') });
+    await navigate();
+    notice('Notification preferences saved.');
+  },
   'otp-start-form': async data => {
     const email = data.get('email').trim();
     await api.post('/auth/email/start', { email, ...optionalRegistration(data) });
@@ -296,7 +347,7 @@ const forms = {
     const draft = campaignDraft(form, data);
     const previous = state.data.report?.campaign;
     const result = previous ? await api.patch('/campaigns/' + previous.id, { expectedRevision: previous.revision, draft })
-      : await api.post('/campaigns', draft);
+      : await createResource('/campaigns', draft);
     if (state.selected === result.campaign.id) await navigate();
     else location.hash = '#campaigns/' + result.campaign.id;
   },
@@ -342,11 +393,11 @@ const forms = {
     if (data.get('deviceId')) body.deviceId = data.get('deviceId');
     const developerWallet = data.get('fundingWallet')?.trim();
     if (developerWallet) body.payment = { kind: 'devnet', developerWallet };
-    const { run } = await api.post('/runs', body);
+    const { run } = await createResource('/runs', body);
     beginRun(run);
   },
   'request-form': async (data) => {
-    const { invitation, token } = await api.post('/invitations', {
+    const { invitation, token } = await createResource('/invitations', {
       kind: 'developer_request', deviceId: data.get('deviceId').trim(), projectId: data.get('projectId'), buildId: data.get('buildId'),
       scenario: data.get('scenario'), mode: data.get('mode'), maximumDurationSeconds: Number(data.get('maximumDurationSeconds')),
       evidence: evidenceChoices(data), expectedTransaction: expectedTransaction(data),
@@ -449,9 +500,26 @@ function downloadJson(name, value) {
 }
 
 const actions = {
+  'read-notification': async button => {
+    await api.post('/me/notifications/' + encodeURIComponent(button.dataset.notification) + '/read', {});
+    await navigate();
+  },
+  'download-run-receipt': () => {
+    const receipt = state.data.runs.find(run => run.id === state.selected)?.receipt;
+    if (receipt) downloadJson('agus-run-receipt.json', receipt);
+  },
+  'verify-run': async () => {
+    await api.post('/runs/' + encodeURIComponent(state.selected) + '/verify', {});
+    await refreshRun();
+    notice('Verification updated. Review the result.');
+  },
   'add-campaign-task': () => {
     const area = document.getElementById('campaign-tasks');
-    if (area.children.length < 12) area.insertAdjacentHTML('beforeend', campaignTask(state.data.builds, {}, state.data.fundingNetwork));
+    if (area.children.length >= 12) return;
+    const projectId = document.getElementById('campaign-form').elements.projectId.value;
+    area.insertAdjacentHTML('beforeend', campaignTask(state.data.builds.filter(build => build.projectId === projectId), {}, state.data.fundingNetwork));
+    updateCampaignTask(area.lastElementChild);
+    area.lastElementChild.querySelector('[name=taskTitle]').focus();
   },
   'remove-campaign-task': button => {
     const row = button.closest('[data-campaign-task]');
@@ -511,6 +579,7 @@ const actions = {
       if (error.status !== 401) problem = error;
     }
     saveSession(null);
+    pendingCreates.clear();
     state.share = null;
     await navigate();
     if (problem) notice('Signed out of this tab. Server-side session revocation could not be confirmed.', true);
@@ -520,7 +589,7 @@ const actions = {
   'refresh-requests': navigate,
   retry: navigate,
   'cancel-run': async () => {
-    if (!state.selected) return;
+    if (!state.selected || !confirm('Cancel this queued run or request a stop for active work?')) return;
     const { run } = await api.post(`/runs/${encodeURIComponent(state.selected)}/cancel`, {});
     await refreshRun();
     notice(run.state === 'stopping' ? 'Stop requested. Waiting for runner confirmation and cleanup.' : 'Run cancelled.');
@@ -598,14 +667,32 @@ document.addEventListener('click', async (event) => {
 });
 
 document.addEventListener('change', ({ target }) => {
+  if (target.id === 'run-status') applyRunFilters();
+  if (target.form?.id === 'campaign-form') {
+    if (target.name === 'visibility') target.form.querySelector('[data-campaign-invites]').hidden = target.value !== 'invited';
+    if (target.name === 'projectId') {
+      for (const select of target.form.querySelectorAll('[name=buildId]')) {
+        select.replaceChildren(...state.data.builds.filter(build => build.projectId === target.value).map(build =>
+          new Option(build.name + ' · ' + build.packageName + ' · ' + build.sha256.slice(0, 12), build.id)));
+      }
+    }
+    const row = target.closest('[data-campaign-task]');
+    if (row && ['lane', 'scenario'].includes(target.name)) updateCampaignTask(row);
+  }
   if (['run-form', 'request-form'].includes(target.form?.id)) updateWorkloadFields(target.form, target.name);
 });
 
+document.addEventListener('input', ({ target }) => {
+  if (target.id === 'run-search') applyRunFilters();
+});
 document.querySelector('.skip-link').addEventListener('click', (event) => {
   event.preventDefault();
   document.getElementById('main').focus();
 });
-window.addEventListener('hashchange', () => void navigate());
+window.addEventListener('hashchange', () => {
+  document.getElementById('main').focus();
+  void navigate();
+});
 setInterval(async () => {
   if (polling || route().page !== 'runs' || !state.session || !state.selected || document.visibilityState === 'hidden') return;
   polling = true;
