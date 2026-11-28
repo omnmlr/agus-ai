@@ -10,6 +10,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -56,6 +57,18 @@ final class CompanionViews {
         TextView heading = text(text, size, TEXT, true);
         heading.setAccessibilityHeading(true);
         return heading;
+    }
+
+    ImageView brandImage(int drawable, boolean decorative) {
+        ImageView image = new ImageView(context);
+        image.setImageResource(drawable);
+        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        if (decorative) {
+            image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        } else {
+            image.setContentDescription(context.getString(R.string.brand_name));
+        }
+        return image;
     }
 
     EditText input(String hint, int inputType) {

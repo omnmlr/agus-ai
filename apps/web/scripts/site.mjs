@@ -45,8 +45,8 @@ const action = config.launchMode === 'waitlist'
   : ['Start building', '/console.html'];
 const cta = `<a class="site-button primary" href="${e(action[1])}">${action[0]} <span class="action-arrow" aria-hidden="true"></span></a>`;
 
-const darkLockup = '<img class="brand-dark" src="/assets/brand-lockup-dark.svg" width="145" height="34" alt="AGUS AI">';
-const lightLockup = '<img class="brand-light" src="/assets/brand-lockup-light.svg" width="145" height="34" alt="AGUS AI">';
+const darkLockup = '<img class="brand-dark" src="/assets/brand-lockup-dark.svg" width="145" height="33" alt="AGUS AI">';
+const lightLockup = '<img class="brand-light" src="/assets/brand-lockup-light.svg" width="145" height="33" alt="AGUS AI">';
 const brand = `<a class="site-brand" href="/" aria-label="AGUS AI home">${darkLockup}${lightLockup}</a>`;
 const themeControl = '<label class="workspace-theme"><span>Theme</span><select aria-label="Color theme" data-theme-control><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>';
 

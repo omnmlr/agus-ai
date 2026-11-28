@@ -17,6 +17,7 @@ import android.text.InputType;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -47,6 +48,7 @@ public class RuntimeActivity extends Activity {
     private boolean fixtureUi;
 
     @Override public void onCreate(Bundle saved) {
+        setTheme(R.style.RuntimeTheme);
         super.onCreate(saved);
         getWindow().setDecorFitsSystemWindows(false);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
@@ -77,7 +79,13 @@ public class RuntimeActivity extends Activity {
         screenRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(screenRoot);
         screenRoot.requestApplyInsets();
-        label("AGUS Phone Preview");
+        var brand = new ImageView(this);
+        brand.setImageResource(R.drawable.brand_lockup_light);
+        brand.setContentDescription(getString(R.string.brand_name));
+        brand.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        float density = getResources().getDisplayMetrics().density;
+        layout.addView(brand, new LinearLayout.LayoutParams(Math.round(145 * density), Math.round(33 * density)));
+        label(getString(R.string.runtime_preview)).setAccessibilityHeading(true);
         message = label("");
         if (Build.VERSION.SDK_INT != 35 || !"ranchu".equals(Build.HARDWARE)
             || !Build.FINGERPRINT.startsWith("Android/sdk_phone64_x86_64/")) {

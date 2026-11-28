@@ -182,7 +182,7 @@ code, pre { font-family: var(--mono); }
 body { font-size: 16px; line-height: 1.6; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .site-nav { min-height: 76px; }
-.site-brand img { width: 145px; height: 34px; }
+.site-brand img { width: 145px; height: auto; }
 .site-button { min-height: 48px; border-radius: 8px; padding-inline: 20px; gap: 10px; font-size: 14px; font-weight: 600; }
 .nav-actions .site-button { min-height: 39px; padding-inline: 14px; }
 .site-button .action-arrow, .text-link .action-arrow { transition: transform 150ms var(--ease); }
@@ -284,7 +284,7 @@ body { font-size: 16px; line-height: 1.6; }
 }
 
 .site-brand .brand-light { display: none; }
-[data-workspace] .site-brand .brand-light { display: var(--ui-logo-light); }
+[data-workspace] .site-header .brand-light { display: var(--ui-logo-light); }
 
 .action-arrow {
   position: relative;

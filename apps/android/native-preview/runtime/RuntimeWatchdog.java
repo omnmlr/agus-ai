@@ -49,8 +49,8 @@ public class RuntimeWatchdog extends Service {
         manager.createNotificationChannel(new NotificationChannel("testing", "Authorized testing", NotificationManager.IMPORTANCE_LOW));
         var stop = PendingIntent.getService(this, 5, new Intent(this, RuntimeWatchdog.class).setAction("stop"),
             PendingIntent.FLAG_IMMUTABLE);
-        startForeground(735, new Notification.Builder(this, "testing").setSmallIcon(android.R.drawable.ic_media_pause)
-            .setContentTitle("AGUS testing window").setContentText("Stop immediately to reclaim your screen.")
+        startForeground(735, new Notification.Builder(this, "testing").setSmallIcon(R.drawable.brand_notification)
+            .setContentTitle("Work Runtime testing window").setContentText("Stop immediately to reclaim your screen.")
             .setOngoing(true).addAction(new Notification.Action.Builder(null, "Stop test", stop).build()).build(),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
         timer.removeCallbacks(check);

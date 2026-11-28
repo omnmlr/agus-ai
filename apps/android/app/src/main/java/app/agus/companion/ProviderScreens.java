@@ -52,6 +52,11 @@ final class ProviderScreens {
     }
 
     private void welcome(LinearLayout content) {
+        LinearLayout.LayoutParams mascot = new LinearLayout.LayoutParams(-1, ui.dp(108));
+        content.addView(ui.brandImage(R.drawable.brand_mascot, true), mascot);
+        LinearLayout.LayoutParams wordmark = new LinearLayout.LayoutParams(-1, ui.dp(29));
+        wordmark.topMargin = ui.dp(8);
+        content.addView(ui.brandImage(R.drawable.brand_wordmark_dark, false), wordmark);
         heading(content, "Welcome", "Contribute a dedicated Android device to authorized mobile testing.");
         detail(content, "The provider runner runs on a desktop and connects to the test phone over USB, or uses a controlled emulator.", false);
         button(content, "Get started", R.id.welcome_get_started, true, view -> host.navigate(MainActivity.Screen.AUTH, null));
@@ -85,8 +90,8 @@ final class ProviderScreens {
 
     private void enrollment(LinearLayout content) {
         heading(content, "Enrollment", "Choose an approved test environment.");
-        button(content, "Open phone-native preview", 0, false, view -> host.openPhonePreview());
-        detail(content, "The phone-native preview is for disposable Android test environments.", false);
+        button(content, "Open Work Runtime", 0, false, view -> host.openWorkRuntime());
+        detail(content, "The Work Runtime preview is for disposable Android test environments.", false);
         detail(content, "Use a clean test phone or emulator. Enable USB debugging only on the dedicated test device and authorize your own desktop.", false);
         detail(content, "Open the project’s provider runner setup on the desktop, select the device and approved builds, then enter the one-time pairing code.", false);
         JSONObject pairing = host.pairing;

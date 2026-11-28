@@ -12,6 +12,7 @@ on:
     branches: [feature/phase-2-3-product]
     paths:
       - 'apps/android/native-preview/**'
+      - 'apps/android/branding/**'
       - 'packages/cooperative-android/**'
       - 'scripts/product-preview/**'
       - 'services/control-plane/src/**'

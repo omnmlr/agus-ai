@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="runtime_name">AGUS AI Work Runtime</string>
+    <string name="runtime_preview">Work Runtime preview</string>
+    <style name="RuntimeTheme" parent="android:style/Theme.Material.Light.NoActionBar" />
+    <style name="RuntimeLaunchTheme" parent="RuntimeTheme">
+        <item name="android:windowSplashScreenBackground">@color/brand_void</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/brand_splash_icon</item>
+    </style>
+</resources>

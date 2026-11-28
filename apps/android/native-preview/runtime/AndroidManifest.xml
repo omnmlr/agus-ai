@@ -8,9 +8,10 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES"/>
     <!-- REVIEWED-WORKLOAD-PACKAGES -->
-    <application android:label="AGUS Phone Preview" android:allowBackup="false" android:usesCleartextTraffic="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
-        <activity android:name=".RuntimeActivity" android:exported="true">
+    <application android:label="@string/runtime_name" android:icon="@mipmap/brand_launcher"
+        android:roundIcon="@mipmap/brand_launcher" android:allowBackup="false" android:usesCleartextTraffic="true"
+        android:theme="@style/RuntimeTheme">
+        <activity android:name=".RuntimeActivity" android:exported="true" android:theme="@style/RuntimeLaunchTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

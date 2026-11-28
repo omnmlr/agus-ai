@@ -79,8 +79,8 @@ export function authView(register, fromInvite = false) {
   const heading = register ? 'Create an account' : 'Sign in to AGUS AI';
   return `<div class="auth-layout">
     <div class="auth-intro">
-      <div class="auth-insignia" aria-hidden="true"><img src="/assets/orbital-ghost.webp" width="640" height="640" alt=""></div>
-      <p>AGUS AI / DEVELOPER CONSOLE</p>
+      <div class="auth-insignia" aria-hidden="true"><img src="/assets/orbital-ghost.webp" width="700" height="700" alt=""></div>
+      <p class="auth-brand"><img src="/assets/brand-wordmark-dark.svg" width="74" height="14" alt="AGUS AI"> Developer console</p>
       <h1>From build<br>to evidence.</h1>
       <p>Register your Android builds, commission testing, and review the execution record in one workspace.</p>
       <a href="/docs/quickstart">Read the quickstart</a>

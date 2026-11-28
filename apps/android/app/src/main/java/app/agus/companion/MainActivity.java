@@ -1,6 +1,5 @@
 package app.agus.companion;
 
-import static app.agus.companion.CompanionViews.ACCENT;
 import static app.agus.companion.CompanionViews.BACKGROUND;
 import static app.agus.companion.CompanionViews.ERROR;
 import static app.agus.companion.CompanionViews.MUTED;
@@ -24,6 +23,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Space;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.IOException;
@@ -104,6 +104,7 @@ public final class MainActivity extends Activity {
     private boolean statusIsError;
 
     @Override public void onCreate(Bundle savedState) {
+        setTheme(R.style.AppTheme);
         super.onCreate(savedState);
         if (Build.VERSION.SDK_INT >= 30) {
             getWindow().setDecorFitsSystemWindows(false);
@@ -227,13 +228,16 @@ public final class MainActivity extends Activity {
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
 
-        LinearLayout brand = ui.row();
-        TextView label = ui.text("AGUS AI", 15, ACCENT, true);
-        ui.weighted(brand, label, 8);
-        if (session != null && screen != Screen.PROFILE) {
-            brand.addView(ui.button("Profile", false, view -> navigate(Screen.PROFILE, null)));
+        if (screen != Screen.WELCOME) {
+            LinearLayout brand = ui.row();
+            brand.addView(ui.brandImage(R.drawable.brand_lockup_dark, false),
+                new LinearLayout.LayoutParams(ui.dp(135), ui.dp(31)));
+            if (session != null && screen != Screen.PROFILE) {
+                brand.addView(new Space(this), new LinearLayout.LayoutParams(0, 0, 1));
+                brand.addView(ui.button("Profile", false, view -> navigate(Screen.PROFILE, null)));
+            }
+            ui.add(content, brand, 0);
         }
-        ui.add(content, brand, 0);
         statusView = ui.text("", 14, MUTED, false);
         statusView.setId(R.id.feedback);
         statusView.setAccessibilityLiveRegion(TextView.ACCESSIBILITY_LIVE_REGION_POLITE);
@@ -783,10 +787,10 @@ public final class MainActivity extends Activity {
         return walletVerifiedAt != null && Objects.equals(walletDisplayedRoute, walletRoute());
     }
 
-    void openPhonePreview() {
+    void openWorkRuntime() {
         Intent launch = getPackageManager().getLaunchIntentForPackage("app.agus.runtime.preview");
         if (launch != null) startActivity(launch);
-        else statusError("Phone-native testing requires the separate local preview on a disposable test device.");
+        else statusError("Install the Work Runtime preview on a disposable test device to use phone-native testing.");
     }
 
     void notificationPreferences() {

@@ -16,6 +16,8 @@ adb -s DEVICE_SERIAL install -r app/build/outputs/apk/debug/app-debug.apk
 
 The Windows equivalent uses `gradlew.bat` and `adb.exe`. The APK package is `app.agus.companion`, separate from the financial app and Android execution fixture. The debug signing key is for development. Configure a dedicated release signing identity before producing a distributable release.
 
+The Companion and Work Runtime share the Android resources in `branding/res`. `python apps/android/branding/render.py` regenerates the raster resources from `apps/web/public/assets` using Inkscape and Pillow. The APK builds use the checked-in resources directly.
+
 Run the control plane, web portal and desktop runner using the root setup. Enter the control plane **origin** as the app’s sign-in host and the **web** origin in Developer portal. Use HTTPS for shared preview or deployment. With the API's default port 8080, use `http://10.0.2.2:8080` from a local emulator. For a USB development device, use `adb -s DEVICE_SERIAL reverse tcp:8080 tcp:8080` and enter `http://127.0.0.1:8080`. Reverse the separate web port if you need a local developer portal on the same phone. Debug cleartext support is restricted to emulator and local ADB reverse addresses.
 
 ## Primary screens
