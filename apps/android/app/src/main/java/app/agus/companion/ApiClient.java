@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
+import okhttp3.ConnectionPool;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -21,6 +22,9 @@ final class ApiClient {
     private static final OkHttpClient TRANSPORT = new OkHttpClient.Builder()
         .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
         .connectTimeout(8, TimeUnit.SECONDS).callTimeout(15, TimeUnit.SECONDS).build();
+    // ADB reverse can close an idle HTTP socket while the Android pool still considers it reusable.
+    private static final OkHttpClient DEBUG_HTTP_TRANSPORT = TRANSPORT.newBuilder()
+        .connectionPool(new ConnectionPool(0, 1, TimeUnit.SECONDS)).build();
     private final URI origin;
     private final String token;
 
@@ -53,13 +57,19 @@ final class ApiClient {
             request.header("Authorization", "Bearer " + token);
         }
 
-        try (Response response = TRANSPORT.newCall(request.build()).execute()) {
+        OkHttpClient transport = BuildConfig.DEBUG && "http".equals(origin.getScheme()) ? DEBUG_HTTP_TRANSPORT : TRANSPORT;
+        try (Response response = transport.newCall(request.build()).execute()) {
             ResponseBody body = response.body();
             InputStream bytes = body == null ? null : body.byteStream();
             if (!response.isSuccessful()) {
                 throw readError(bytes, response.code());
             }
             return readObject(bytes);
+        } catch (IOException failure) {
+            if (BuildConfig.DEBUG && !(failure instanceof ApiError)) {
+                android.util.Log.w("AgusCompanion", "HTTP " + method + " failed with " + failure.getClass().getSimpleName());
+            }
+            throw failure;
         }
     }
 

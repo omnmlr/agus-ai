@@ -84,5 +84,6 @@ jobs:
             ${{ runner.temp }}/companion-visual/*.png
             ${{ runner.temp }}/companion-visual/visual-checks.json
             ${{ runner.temp }}/companion-visual/emulator.log
+            ${{ runner.temp }}/companion-visual/api.log
           if-no-files-found: ignore
           retention-days: 30

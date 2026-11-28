@@ -102,6 +102,7 @@ try:
     run()
 except Exception:
     capture("failure")
+    print(ui.adb("logcat", "-d", "-s", "AgusCompanion:W", "AndroidRuntime:E"), flush=True)
     print("Visible app controls:", [(node.get("text"), node.get("resource-id"))
         for node in ui.tree().iter("node") if node.get("package") == ui.APP], flush=True)
     raise

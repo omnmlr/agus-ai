@@ -42,6 +42,12 @@ if (mode === 'serve') {
       AGUS_EMAIL_OTP_SECRET: 'disposable-companion-review-otp-secret',
     },
   });
+  server.prependListener('request', (incoming, outgoing) => {
+    const path = new URL(incoming.url, origin).pathname;
+    if (['/api/v1/me/devices/pairings', '/api/v1/auth/email/start', '/api/v1/auth/email/verify'].includes(path)) {
+      outgoing.once('finish', () => console.log(incoming.method, path, outgoing.statusCode));
+    }
+  });
   server.listen(18768, '127.0.0.1');
 } else if (mode === 'register') {
   await request('/auth/register', null, { email, password });
