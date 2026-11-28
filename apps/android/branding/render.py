@@ -34,7 +34,6 @@ def main():
         subprocess.run(["inkscape", str(SOURCE / f"{name}.svg"), f"--export-width={width}",
                         f"--export-filename={target}"], check=True)
     shutil.copyfile(SOURCE / "orbital-ghost.webp", COMPANION / "drawable-nodpi" / "brand_mascot.webp")
-    shutil.copyfile(SOURCE / "agus-orbital-mark.png", SHARED / "mipmap-nodpi" / "brand_launcher.png")
     render_symbol(432, 208, SHARED / "drawable-nodpi" / "brand_launcher_foreground.png")
     render_symbol(96, 80, RUNTIME / "drawable-xxxhdpi" / "brand_notification.png")
 
