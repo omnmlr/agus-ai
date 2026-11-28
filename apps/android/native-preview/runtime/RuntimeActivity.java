@@ -17,6 +17,7 @@ import android.text.InputType;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -47,6 +48,7 @@ public class RuntimeActivity extends Activity {
     private boolean fixtureUi;
 
     @Override public void onCreate(Bundle saved) {
+        setTheme(R.style.RuntimeTheme);
         super.onCreate(saved);
         getWindow().setDecorFitsSystemWindows(false);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
@@ -72,13 +74,25 @@ public class RuntimeActivity extends Activity {
         var scroll = new ScrollView(this);
         layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(24, 28, 24, 24);
+        layout.setPadding(dp(22), dp(22), dp(22), dp(24));
+        scroll.setFillViewport(true);
         scroll.addView(layout);
         screenRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(screenRoot);
         screenRoot.requestApplyInsets();
-        label("AGUS Phone Preview");
+        var brand = new ImageView(this);
+        brand.setImageResource(R.drawable.brand_lockup_light);
+        brand.setContentDescription(getString(R.string.brand_name));
+        brand.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        layout.addView(brand, new LinearLayout.LayoutParams(dp(145), dp(33)));
+        TextView title = label(getString(R.string.runtime_preview));
+        title.setTextSize(28);
+        title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        title.setAccessibilityHeading(true);
+        title.setPadding(0, dp(14), 0, dp(6));
         message = label("");
+        message.setAccessibilityLiveRegion(android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        message.setVisibility(android.view.View.GONE);
         if (Build.VERSION.SDK_INT != 35 || !"ranchu".equals(Build.HARDWARE)
             || !Build.FINGERPRINT.startsWith("Android/sdk_phone64_x86_64/")) {
             label("This build is restricted to the disposable AOSP Android 15 preview image.");
@@ -573,9 +587,15 @@ public class RuntimeActivity extends Activity {
         return field;
     }
 
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
     private TextView label(String text) {
         var value = new TextView(this);
         value.setText(text);
+        value.setTextSize(15);
+        value.setPadding(0, dp(4), 0, dp(4));
         layout.addView(value);
         return value;
     }
@@ -585,6 +605,7 @@ public class RuntimeActivity extends Activity {
     private Button makeButton(String label, Click action) {
         var button = new Button(this);
         button.setAllCaps(false);
+        button.setMinHeight(dp(48));
         button.setText(label);
         button.setOnClickListener(view -> {
             if (busy) return;
@@ -594,7 +615,10 @@ public class RuntimeActivity extends Activity {
         return button;
     }
 
-    private void status(String detail) { message.setText(detail == null ? "Action unavailable." : detail); }
+    private void status(String detail) {
+        message.setText(detail == null ? "Action unavailable." : detail);
+        message.setVisibility(message.length() == 0 ? android.view.View.GONE : android.view.View.VISIBLE);
+    }
     private void run(Operation action) {
         busy = true;
         worker.execute(() -> {

@@ -225,7 +225,7 @@ final class ProviderForms {
             ? portal.resolve("/invite/" + code).toString() : code;
         new AlertDialog.Builder(host).setTitle("Invitation created")
             .setMessage("Send the link or code to the intended recipient.\n\n" + share)
-            .setPositiveButton("Copy", (dialog, button) -> host.copy("private invitation", share)).show();
+            .setPositiveButton("Copy", (dialog, button) -> host.copySensitive("private invitation", share)).show();
     }
 
     static void accept(MainActivity host, JSONObject invitation) {

@@ -42,6 +42,7 @@ def run():
     ui.adb("install", str(ui.OUT / "fakewallet.apk"))
     ui.adb("shell", "am", "start", "-n", ui.APP + "/.MainActivity")
     ui.tap("Get started")
+    ui.tap(ui.APP + ":id/auth_use_password")
     for field, value in (("origin", ORIGIN), ("email", PERSON["email"]), ("password", PERSON["password"])):
         ui.fill(ui.APP + ":id/auth_" + field, value)
     ui.tap(ui.APP + ":id/auth_sign_in")

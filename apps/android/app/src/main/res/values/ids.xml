@@ -5,6 +5,8 @@
     <item name="tab_activity" type="id" />
     <item name="tab_earnings" type="id" />
     <item name="welcome_get_started" type="id" />
+    <item name="auth_use_email" type="id" />
+    <item name="auth_use_password" type="id" />
     <item name="auth_origin" type="id" />
     <item name="auth_email" type="id" />
     <item name="auth_password" type="id" />

@@ -24,6 +24,10 @@ android {
         buildConfig true
     }
 
+    sourceSets {
+        main.res.srcDir '../branding/res'
+    }
+
     if (signing.every { it }) {
         signingConfigs {
             release {

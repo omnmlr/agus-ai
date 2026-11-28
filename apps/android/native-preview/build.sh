@@ -62,11 +62,13 @@ build() {
   shift
   if [[ "$name" == runtime ]]; then manifest="$out/runtime-AndroidManifest.xml"; fi
   if [[ "$name" == partner ]]; then keystore="$out/partner.keystore"; fi
-  mkdir -p "$target/classes" "$target/dex"
-  "$tools/aapt2" link -I "$jar" --manifest "$manifest" --min-sdk-version 35 \
+  mkdir -p "$target/classes" "$target/dex" "$target/generated"
+  "$tools/aapt2" link -I "$jar" --manifest "$manifest" --java "$target/generated" --min-sdk-version 35 \
     --target-sdk-version 35 -o "$target/base.apk" "$@"
+  local -a resources
+  mapfile -t resources < <(find "$target/generated" -name 'R.java')
   javac --release 17 -cp "$jar" -d "$target/classes" "$here/$name/"*.java \
-    "$root/packages/cooperative-android/src/"*.java "$out/$name-PreviewConfig.java"
+    "$root/packages/cooperative-android/src/"*.java "$out/$name-PreviewConfig.java" "${resources[@]}"
   local -a classes
   mapfile -t classes < <(find "$target/classes" -name '*.class')
   "$tools/d8" --min-api 35 --lib "$jar" --output "$target/dex" "${classes[@]}"
@@ -81,7 +83,8 @@ build() {
   "$tools/apksigner" verify "$out/$name.apk"
 }
 "$tools/aapt2" compile --dir "$here/runtime/res" -o "$out/resources.zip"
-build runtime "$out/resources.zip"
+"$tools/aapt2" compile --dir "$here/../branding/res" -o "$out/brand-resources.zip"
+build runtime "$out/resources.zip" "$out/brand-resources.zip"
 "$tools/apksigner" verify --print-certs "$out/runtime.apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' > "$out/runtime-signer.txt"
 if [[ ${AGUS_NATIVE_BUILD_TIER:-development} == private-preview ]]; then exit 0; fi
 build fixture

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_void">#080809</color>
+    <color name="brand_icon_background">#0D0D0F</color>
+    <string name="brand_name">AGUS AI</string>
+</resources>

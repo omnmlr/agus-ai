@@ -16,6 +16,8 @@ jobs:
   verify-wallet:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      AGUS_ANDROID_CENTRAL_MIRROR: '1'
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -27,15 +29,15 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - name: Verify ownership with the reference app and Fake Wallet
+      - name: Set up the Android SDK
+        run: bash scripts/android/companion-review-sdk.sh 'platform-tools' 'emulator' 'platforms;android-35' 'build-tools;35.0.0' 'system-images;android-35;default;x86_64'
+      - name: Verify ownership with the Companion and Fake Wallet
         shell: bash
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/agus-wallet-ownership"
           mkdir -p "$out"
           sudo chown "$USER" /dev/kvm
-          sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f -print -quit)"
-          "$sdkmanager" "platform-tools" "emulator" "platforms;android-35" "build-tools;35.0.0" "system-images;android-35;default;x86_64"
           npm ci --prefix services/control-plane --no-audit --no-fund
           npm ci --prefix services/settlement --no-audit --no-fund
           (cd apps/android && ./gradlew --no-daemon assembleDebug)
@@ -45,7 +47,9 @@ jobs:
           git rev-parse HEAD > "$out/revision.txt"
           export ANDROID_AVD_HOME="$out/avd"
           mkdir -p "$ANDROID_AVD_HOME"
-          printf 'no\n' | "$(dirname "$sdkmanager")/avdmanager" create avd -n agus_wallet -k 'system-images;android-35;default;x86_64'
+          printf 'no\n' | "$(dirname "$AGUS_SDKMANAGER")/avdmanager" create avd -n agus_wallet \
+            -p "$ANDROID_AVD_HOME/agus_wallet.avd" -k 'system-images;android-35;default;x86_64'
+          printf 'avd.ini.encoding=UTF-8\npath=%s\ntarget=android-35\n' "$ANDROID_AVD_HOME/agus_wallet.avd" > "$ANDROID_AVD_HOME/agus_wallet.ini"
           export PATH="$ANDROID_HOME/platform-tools:$PATH"
           "$ANDROID_HOME/emulator/emulator" -avd agus_wallet -port 5554 -no-window -no-audio \
             -no-snapshot -no-boot-anim -gpu swiftshader_indirect -memory 3072 > "$out/emulator.log" 2>&1 &

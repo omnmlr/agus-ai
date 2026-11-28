@@ -1,6 +1,6 @@
 # Android provider companion
 
-The native reference app uses the provider API from `services/control-plane`. It provides a recording and integration target while the founder and Chisom own the final UI. The developer portal stays web-first. Its URL can be set from Welcome or Profile.
+The native Companion uses the provider API from `services/control-plane` and defaults to the AGUS HTTPS workspace. The developer portal opens in the browser. See the [review APK and physical acceptance guide](../../docs/phase-2-3/companion-hackathon-review.md).
 
 ## Build and install
 
@@ -14,16 +14,18 @@ adb devices -l
 adb -s DEVICE_SERIAL install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The Windows equivalent uses `gradlew.bat` and `adb.exe`. The APK package is `app.agus.companion`, separate from the financial app and Android execution fixture. The debug signing key is for development. Configure a dedicated release signing identity before producing a distributable release.
+The Windows equivalent uses `gradlew.bat` and `adb.exe`. The APK package is `app.agus.companion`, separate from the financial app and Android execution fixture. The debug signing key is for development. Use the existing Companion signing identity for a release APK.
 
-Run the control plane, web portal and desktop runner using the root setup. Enter the control plane **origin** as the app’s sign-in host and the **web** origin in Developer portal. Use HTTPS for shared preview or deployment. With the API's default port 8080, use `http://10.0.2.2:8080` from a local emulator. For a USB development device, use `adb -s DEVICE_SERIAL reverse tcp:8080 tcp:8080` and enter `http://127.0.0.1:8080`. Reverse the separate web port if you need a local developer portal on the same phone. Debug cleartext support is restricted to emulator and local ADB reverse addresses.
+The Companion and Work Runtime share launcher and splash resources in `branding/res`. `python apps/android/branding/render.py` regenerates the Android artwork from `apps/web/public/assets` using Inkscape and Pillow. The APK builds use the checked-in resources directly.
+
+Run the control plane, web portal and desktop runner using the root setup. In a debug build, open **Use a password or test server** to enter a local control-plane origin. The release build uses the AGUS HTTPS workspace. Use HTTPS for shared preview or deployment. With the API's default port 8080, use `http://10.0.2.2:8080` from a local emulator. For a USB development device, use `adb -s DEVICE_SERIAL reverse tcp:8080 tcp:8080` and enter `http://127.0.0.1:8080`. Reverse the separate web port if you need a local developer portal on the same phone. Debug cleartext support is restricted to emulator and local ADB reverse addresses.
 
 ## Primary screens
 
 | Screen | Behavior |
 | --- | --- |
 | Welcome | Provider entry, private code review with safe auth resume, and Developer portal. |
-| Auth | Account creation and sign-in with the control-plane account. The bearer session stays in memory. Logout revokes it on the server. |
+| Auth | Google, email code and existing password account flows. The bearer session is encrypted using Android Keystore. Logout clears it and requests server revocation. |
 | Enrollment | Generate a short-lived one-time code for the desktop runner. |
 | Home | Tappable payout chart, owned device readiness, today’s terminal sessions, and current session. |
 | My Device | Owned capability profile and freshness, diagnostics, and a Device options menu for private share, rename and revoke. |
@@ -34,11 +36,11 @@ Run the control plane, web portal and desktop runner using the root setup. Enter
 | Earnings | Device-scoped Devnet payout totals, daily chart, status and history, with Explorer links only for returned public signatures. |
 | Profile | Account ID, developer portal settings, privacy guidance, test wallet and sign-out. |
 
-The three tabs are Home, Activity and Earnings. The UI polls authoritative detail every ten seconds while foregrounded and supports manual refresh. Session tokens, wallet authorizations and invitation codes are excluded from backups and durable application state. Closing the app leaves workload authorization and stop enforcement with the server and runner.
+The three tabs are Home, Activity and Earnings. The UI polls authoritative detail every ten seconds while foregrounded and supports manual refresh. Backups are disabled. Session and pending App Link records are encrypted with Android Keystore. Wallet authorizations are transient. Closing the app leaves workload authorization and stop enforcement with the server and runner.
 
-The companion controls enrollment and observes workload status. Automation runs on a dedicated, operator-approved USB Android phone or emulator managed by the desktop runner. Use disposable accounts and reviewed APKs. The MWA action authorizes the official Fake Wallet for a disposable Devnet public address and immediately deauthorizes. It does not sign transactions or change a server-side payout destination. The upstream adapter is pinned to 2.1.1 because 2.2.x declares minimum compile SDK 37.
+The companion controls enrollment and observes workload status. Automation runs on a dedicated, operator-approved USB Android phone or emulator managed by the desktop runner. Use disposable accounts and reviewed APKs. The MWA action asks the official Fake Wallet to sign an off-chain ownership challenge for a disposable Devnet public address. Verified addresses apply to future payouts. Wallet verification broadcasts no transaction. The upstream adapter is pinned to 2.1.1 because 2.2.x declares minimum compile SDK 37.
 
-Private invitations share an opaque code or a configured HTTPS `/invite/<code>` web link. In the reference build, paste the code in Activity or Welcome. Android App Links require the actual deployment host and release-signing certificate in `/.well-known/assetlinks.json`. Add the verified intent filter together with that association. Accept remains a separate authenticated action on the assigned account.
+Private invitations share an opaque code or a configured HTTPS `/invite/<code>` web link. Paste the code in Activity or Welcome, or open the HTTPS App Link. Verified App Links require the deployed certificate association in `/.well-known/assetlinks.json`. Accept remains a separate authenticated action on the assigned account.
 
 ## Verification and integration selectors
 
