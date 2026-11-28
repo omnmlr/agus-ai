@@ -80,6 +80,20 @@ def run():
     ui.adb("shell", "wm", "size", "320x720")
     ui.adb("shell", "settings", "put", "system", "font_scale", "1.15")
     screen("13-narrow-home", "Your device is ready")
+    ui.adb("shell", "wm", "size", "400x890")
+    ui.adb("shell", "settings", "put", "system", "font_scale", "1.0")
+    ui.tap("Profile", scroll=False)
+    ui.tap(ident("auth_sign_out"))
+    ui.tap("Sign out", scroll=False)
+    ui.tap(ident("welcome_get_started"))
+    ui.tap(ident("auth_use_email"))
+    ui.fill(ident("auth_email"), "reviewer@example.invalid")
+    ui.tap(ident("auth_email_send"))
+    screen("02-email-code", "Check your inbox")
+    otp = Path(os.environ["AGUS_REVIEW_DATA"]) / "review-otp.txt"
+    ui.fill(ident("auth_email_code"), otp.read_text().strip())
+    ui.tap(ident("auth_email_verify"))
+    screen("14-email-session", "Your device is ready")
 
 try:
     run()

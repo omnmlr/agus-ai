@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createControlPlane } from '../../services/control-plane/src/server.mjs';
 
@@ -24,8 +24,23 @@ async function request(route, token, body) {
 }
 
 if (mode === 'serve') {
+  const outboundFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (url !== 'https://api.resend.com/emails') return outboundFetch(url, options);
+    const message = JSON.parse(options.body);
+    const code = /\b[0-9]{6}\b/.exec(message.text);
+    if (!code || message.to[0] !== email) return new Response(null, { status: 400 });
+    await writeFile(resolve(directory, 'review-otp.txt'), code[0], { mode: 0o600 });
+    return new Response(null, { status: 200 });
+  };
   const { server } = await createControlPlane({
-    env: { AGUS_LOCAL_DATA_DIR: resolve(directory), AGUS_HEARTBEAT_MS: '600000' },
+    env: {
+      AGUS_LOCAL_DATA_DIR: resolve(directory), AGUS_HEARTBEAT_MS: '600000',
+      AGUS_PROVIDER_BOOTSTRAP_TOKEN: 'disposable-companion-review-bootstrap',
+      AGUS_RESEND_API_KEY: 'disposable-intercepted-review-key',
+      AGUS_AUTH_FROM_EMAIL: 'review@example.invalid',
+      AGUS_EMAIL_OTP_SECRET: 'disposable-companion-review-otp-secret',
+    },
   });
   server.listen(18768, '127.0.0.1');
 } else if (mode === 'register') {

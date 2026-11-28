@@ -72,7 +72,8 @@ jobs:
           curl -sf --retry 8 --retry-delay 1 --retry-connrefused http://127.0.0.1:18768/health
           export PATH="$ANDROID_HOME/platform-tools:$PATH"
           timeout 250 bash -c 'adb -s emulator-5554 wait-for-device; until [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
-          AGUS_COMPANION_APK="$RUNNER_TEMP/companion-review/agus-companion-review.apk" \
+          AGUS_REVIEW_DATA="$RUNNER_TEMP/companion-api" \
+            AGUS_COMPANION_APK="$RUNNER_TEMP/companion-review/agus-companion-review.apk" \
             AGUS_WORKLOAD_APK="$RUNNER_TEMP/companion-metadata-fixture.apk" \
             python3 scripts/android/companion-review.py "$out"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
