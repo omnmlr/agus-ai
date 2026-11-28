@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.agus.companion",
+      "sha256_cert_fingerprints": [
+        "E2:7B:CA:DF:EB:5E:89:61:69:88:BD:46:C9:D3:20:1A:D5:B6:23:46:00:6C:71:81:67:80:FD:44:C3:E2:EE:1B"
+      ]
+    }
+  }
+]
