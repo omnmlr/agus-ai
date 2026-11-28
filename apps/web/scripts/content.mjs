@@ -58,7 +58,21 @@ const articles = {
   '/docs/integrations': ['Integrations', 'Integrate with your lab', 'Use the developer client, CLI and MCP for authorized workflows. Use the cooperative SDK for a reviewed test variant.', `
     <section><h2>CLI</h2><p>From the repository root, use Node 24. Set <code>AGUS_API_URL</code> to your authorized origin and <code>AGUS_API_TOKEN_FILE</code> to an absolute private file path outside the repository. Set <code>AGUS_API_PASSWORD</code> through an approved local secret input before login and clear it afterward.</p>
     ${snippet('node packages/developer-client/src/cli.mjs login developer@example.invalid\nnode packages/developer-client/src/cli.mjs projects\nnode packages/developer-client/src/cli.mjs --help')}
-    </section><section><h2>Typed client and MCP</h2><p>The ${repo('packages/developer-client', 'developer client')} exposes the same control-plane contract. For MCP, configure a stdio client to run <code>node</code> with the absolute path to <code>packages/developer-client/src/cli.mjs</code> and the argument <code>mcp</code>. Supply the same API origin and private token file using the client’s environment configuration. The tools follow the authorized device, scenario and action scope.</p></section>
+    </section><section><h2>Typed client and MCP</h2><p>The ${repo('packages/developer-client', 'developer client')} exposes the same control-plane contract. Run <code>npm ci</code> from the repository root first. With the API origin and token file configured as above, this script lists projects through the typed client.</p>
+    ${snippet(`import { readFile } from 'node:fs/promises';
+import { createAgusClient } from '@agus/developer-client';
+
+const client = createAgusClient({
+  baseUrl: process.env.AGUS_API_URL,
+  getToken: async () => (await readFile(
+    process.env.AGUS_API_TOKEN_FILE, 'utf8',
+  )).trim(),
+});
+
+const { data, error } = await client.GET('/api/v1/projects');
+if (error) throw new Error(error.error.message);
+console.log(data.projects);`, 'JavaScript')}
+    <p>For MCP, configure a stdio client to run <code>node</code> with the absolute path to <code>packages/developer-client/src/cli.mjs</code> and the argument <code>mcp</code>. Supply the same API origin and private token file using the client’s environment configuration. The tools follow the authorized device, scenario and action scope.</p></section>
     <section><h2>Cooperative Android SDK</h2><p>Use a distinct approved test application ID and a single reviewed Activity. Bind the test-only variant to the signed <code>cooperative-v1</code> workload contract, pin the approved manifest key, and verify the exact APK and signer with your operator.</p><p>${repo('packages/cooperative-android', 'Cooperative Android SDK guide and sample')}</p></section>`],
   '/docs/evidence': ['Evidence', 'Read and verify execution evidence', 'Use the build digest, issuer identity and evidence references to understand exactly what a result covers.', `
     <section><h2>Read a dedicated run</h2><p>Distinguish run execution state, evaluation outcome, cleanup, and any independent transaction verification. Download the receipt or individual authorized artifacts from the run detail. Compare the APK digest with the input and verify the signature with a key established through runner enrollment.</p></section>

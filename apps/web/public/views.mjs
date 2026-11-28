@@ -80,7 +80,7 @@ export function authView(register, fromInvite = false) {
       <h2 id="auth-title">${heading}</h2>
       <p>${fromInvite ? 'Use the account that received this private invitation.' : 'Access your developer workspace.'}</p>
       <form id="google-start-form" class="form-stack">
-        <button type="submit" class="button button-outline google-button"><span aria-hidden="true">G</span> Continue with Google</button>
+        <button type="submit" class="button button-outline google-button"><img src="/assets/google-g.png" alt="" width="17" height="17"> Continue with Google</button>
         <details class="auth-invite"><summary>Have a registration token?</summary><label class="field">Registration token<input name="registrationToken" maxlength="512" autocomplete="off" spellcheck="false"></label></details>
       </form>
       <div class="auth-divider"><span>or use your email</span></div>

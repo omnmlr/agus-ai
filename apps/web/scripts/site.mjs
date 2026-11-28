@@ -38,7 +38,7 @@ const action = config.launchMode === 'waitlist'
   : ['Open console', '/console.html'];
 const cta = `<a class="site-button primary" href="${e(action[1])}">${action[0]} <span aria-hidden="true">↗</span></a>`;
 
-const brand = `<a class="site-brand" href="/" aria-label="AGUS AI home"><img src="/assets/mark.svg" width="32" height="32" alt="">AGUS<span>AI</span></a>`;
+const brand = `<a class="site-brand" href="/" aria-label="AGUS AI home"><img src="/assets/mark.svg" width="32" height="32" alt="">AGUS <span>AI</span></a>`;
 
 function links(items, path) {
   return items.map(([label, href]) => `<a href="${e(href)}"${href === path ? ' aria-current="page"' : ''}>${e(label)}</a>`).join('');

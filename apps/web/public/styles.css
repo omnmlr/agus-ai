@@ -30,8 +30,8 @@ h1, h2, h3 { line-height: 1.12; letter-spacing: -.035em; }
 .mono, code, pre { font-family: var(--mono); }
 .break-all { overflow-wrap: anywhere; }
 .wrap { width: min(100% - 3rem, 76rem); margin-inline: auto; }
-.brand { display: inline-flex; align-items: center; gap: .5rem; color: var(--ink); font-weight: 700; font-size: 1.3rem; letter-spacing: -.055em; text-decoration: none; white-space: nowrap; }
-.brand-prefix { color: var(--accent); margin-left: -.3rem; }
+.brand { display: inline-flex; align-items: center; gap: .5rem; color: #edf3e8; font-weight: 700; font-size: 1.3rem; letter-spacing: -.055em; text-decoration: none; white-space: nowrap; }
+.brand-prefix { color: #c4d5b8; margin-left: -.3rem; }
 .brand img { border-radius: 5px; }
 .button { display: inline-flex; align-items: center; justify-content: center; width: fit-content; min-height: 2.7rem; padding: .56rem .95rem; border: 1px solid transparent; border-radius: .36rem; text-decoration: none; font-weight: 690; font-size: .93rem; text-align: center; }
 .button-primary { background: var(--accent); color: var(--accent-dark); }
@@ -100,7 +100,7 @@ h1, h2, h3 { line-height: 1.12; letter-spacing: -.035em; }
 .auth-panel > p { margin-bottom: 19px; color: var(--muted); }
 .auth-panel .form-stack { gap: .59rem; }
 .auth-panel #auth-form .button-primary, .auth-panel .google-button { width: 100%; }
-.google-button span { font-weight: 700; color: #315a9c; font-size: 1.05rem; }
+.google-button img { object-fit: contain; }
 .auth-divider { display: flex; gap: 11px; align-items: center; color: var(--muted); font-size: .79rem; margin-block: 13px; }
 .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .auth-invite { color: var(--muted); font-size: .8rem; }
