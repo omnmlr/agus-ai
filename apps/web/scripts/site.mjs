@@ -101,6 +101,7 @@ ${path === '/404' ? '<meta name="robots" content="noindex, follow">' : `<link re
 <link rel="preload" href="/assets/geist.woff2" as="font" type="font/woff2" crossorigin>
 ${workspace ? '<script src="/theme.js"></script><link rel="stylesheet" href="/theme.css">' : ''}
 <link rel="stylesheet" href="/site.css">
+${path === '/' ? '<link rel="stylesheet" href="/orbital.css">' : ''}
 <script type="module" src="/site.mjs"></script>
 </head>
 <body class="${className}">
