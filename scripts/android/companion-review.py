@@ -66,6 +66,7 @@ def run():
     screen("07-job-details", "Job Details")
     ui.tap(ident("invitation_accept"))
     ui.tap("Accept", scroll=False)
+    ui.tap("Open session")
     screen("08-running", "Running session")
     ui.tap(ident("session_stop"), scroll=False)
     ui.tap("Request stop", scroll=False)
